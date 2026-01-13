@@ -1,0 +1,17 @@
+# 依赖
+node_modules/
+
+# 构建输出
+dist/
+build/
+*.js.map
+*.d.ts.map
+
+# 日志
+*.log
+
+# 类型定义文件（通常由工具生成，不需要格式化）
+typings/
+
+# 配置文件（某些配置文件格式化可能会破坏格式）
+package-lock.json
