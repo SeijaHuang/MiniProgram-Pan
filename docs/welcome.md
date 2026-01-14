@@ -34,9 +34,15 @@ PRD 定义的 A/B/C/D 四大区域，在当前实现中的对应关系：
 - **区域 A：顶部留白 / 装饰区域**
     - 对应：`welcome-page__header`
     - 功能：制造视觉呼吸空间，可用于轻量装饰元素或后续标语、副标题等。
-- **区域 B：主角色动画区域**
-    - 对应：`welcome-page__hero` + `welcome-page__character`（鸭子形象图片）
-    - 功能：核心视觉焦点，承载清汤大老爷形象。
+- **区域 B：主视觉 + 角色区域**
+    - 对应：`welcome-page__hero`
+    - 内部包含：
+        - 情绪标题：`welcome-page__title` / `welcome-page__title-text`（文案：“判了么”，白字 + 黑色描边 + 右下投影）
+        - 主角头像区：`welcome-page__avatar-wrapper` / `welcome-page__avatar-container` / `welcome-page__avatar-image`（清汤大老爷头像）
+        - 副标题与 Slogan：`welcome-page__tagline` 及其子元素
+            - 主 tagline 文案：`清汤大老爷在线断案`（亮黄色 + 立体阴影）
+            - 次 tagline 文案：`将争吵转化为游戏 · 在爆笑中和好如初`（白色 + 柔和阴影）
+    - 功能：承载核心视觉与情绪表达，是用户视线首先聚焦的区域。
 - **区域 C：主操作按钮区域**
     - 对应：`welcome-page__actions`
     - 包含：
@@ -51,21 +57,15 @@ PRD 定义的 A/B/C/D 四大区域，在当前实现中的对应关系：
 
 #### 2.2 视觉层级（z-index）
 
-当前样式中已按照 PRD 要求拆出多层视觉层级：
+当前样式采用更简洁的层级划分：
 
 - **Layer 1 - 背景层**
-    - `welcome-page__background`
-    - 渐变背景实现波普风高饱和色彩（红 / 黄 / 蓝 / 绿），对应 PRD 中的背景渐变方案。
-- **Layer 2 - 动画装饰层**
-    - `welcome-page__decorations` + `welcome-page__cloud*`、`welcome-page__shape*`
-    - 包含云朵、圆形、星形、三角形、环、菱形等几何图形，用于增强动感和趣味。
-- **Layer 3 - 主角色层**
-    - `welcome-page__hero` 内部的 `welcome-page__character` 图片
-    - 后续可在此区域增加 `wx.createAnimation` 实现角色待机动画。
-- **Layer 4 - UI 交互层**
-    - `welcome-page__actions`、`welcome-page__footer`
-    - 承载点击按钮和底部功能图标。
-- **Layer 5 - 弹窗层（待实现）**
+    - 整个 `welcome-page` 容器的线性渐变背景。
+- **Layer 2 - 主视觉层**
+    - `welcome-page__hero` 区域中的标题、头像、tagline。
+- **Layer 3 - UI 交互层**
+    - `welcome-page__actions`、`welcome-page__footer`，承载主按钮、次按钮和底部功能图标。
+- **Layer 4 - 弹窗层（待实现）**
     - PRD 中定义的「输入房间号弹窗」「规则说明弹窗」目前尚未在 WXML 中实现，后续可通过 `wx.showModal` 或自定义弹窗组件实现。
 
 #### 2.3 安全区域与适配
@@ -77,22 +77,21 @@ PRD 定义的 A/B/C/D 四大区域，在当前实现中的对应关系：
 
 ### 3. 核心视觉元素
 
-#### 3.1 背景与装饰
+#### 3.1 背景与主视觉
 
 - **背景渐变**：
-    - 使用 135° 渐变，色彩从红 → 黄 → 蓝 → 绿过渡，对应 PRD 中的主背景渐变设定。
-- **云朵元素**：
-    - 通过多组 `welcome-page__cloud--1 ~ 4` 组成，位置分布在屏幕上方 / 中段 / 底部，满足「多处漂浮云朵」的氛围要求。
-- **几何图形**：
-    - 使用多个圆形、星形、三角形、环形、菱形等，颜色采用高饱和度并叠加透明度，贴合波普艺术风格。
-- **"冤" 字水印（待实现）**：
-    - PRD 中要求全屏散落的「冤」字低透明水印，目前代码中尚未添加，可后续通过 `text` 元素 + 低透明度样式补充。
+    - 使用 135° 渐变，色彩从红 → 橙 → 黄过渡（`#ff3b30 → #ff7a00 → #ffc400`），对应当前实现的高饱和暖色背景。
+- **情绪标题（判了么）**：
+    - 白色大号字体，黑色描边 + 右下黑色投影，形成强烈 pop 风格视觉冲击，是整个页面的第一视觉锚点。
+- **副标题与 Slogan**：
+    - 副标题采用亮黄色文字 + 立体阴影，强调「清汤大老爷在线断案」的设定。
+    - Slogan 采用白色文字 + 柔和阴影，补充「将争吵转化为游戏 · 在爆笑中和好如初」的产品价值主张。
 
 #### 3.2 清汤大老爷（鸭子角色）
 
-- 当前以静态图片 `duck.png` 承载主角形象：
+- 当前以静态图片 `duck.png` 承载主角头像：
     - 路径：`/images/duck.png`
-    - 展示区域：`welcome-page__hero` 中居中显示。
+    - 展示区域：`welcome-page__avatar-container` / `welcome-page__avatar-image`。
 - 形象细节（参考 PRD）：
     - 呆萌鸭子 + 清朝官袍 + 官帽 + 惊堂木 + 卷轴 + 虎皮坐垫等元素可在视觉稿与素材阶段进一步完善。
 - 尺寸与位置：
