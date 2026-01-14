@@ -11,12 +11,7 @@
     width: 750rpx;
     min-height: 100vh;
     box-sizing: border-box;
-    background: linear-gradient(
-        135deg,
-        #ff3b30 0%,
-        #ff7a00 50%,
-        #ffc400 100%
-    );
+    background: linear-gradient(135deg, #ff3b30 0%, #ff7a00 50%, #ffc400 100%);
 }
 
 /* Section A: Header Decoration */
@@ -39,10 +34,37 @@
 .welcome-page__hero {
     flex: 1;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     width: 100%;
     padding: 40rpx 0;
+}
+
+/* Emotional Title */
+.welcome-page__title {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 48rpx;
+}
+
+.welcome-page__title-text {
+    font-size: 96rpx;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 8rpx;
+    text-shadow:
+        /* 黑色描边（四周） */
+        -3rpx 0 0 #000000,
+        3rpx 0 0 #000000,
+        0 -3rpx 0 #000000,
+        0 3rpx 0 #000000,
+        -3rpx -3rpx 0 #000000,
+        3rpx -3rpx 0 #000000,
+        -3rpx 3rpx 0 #000000,
+        3rpx 3rpx 0 #000000,
+        /* 右下角黑色投影 */ 8rpx 10rpx 0 #000000;
 }
 
 /* Avatar wrapper - contains badge and circle */
@@ -86,6 +108,48 @@
 .welcome-page__avatar-image {
     width: 180rpx;
     height: 180rpx;
+}
+
+/* Subtitle + Slogan Block */
+.welcome-page__tagline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 48rpx;
+    padding: 0 40rpx;
+    gap: 12rpx;
+}
+
+/* Primary tagline - 副标题（亮黄色 + 黑色描边） */
+.welcome-page__tagline-primary {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.welcome-page__tagline-primary-text {
+    font-size: 44rpx;
+    font-weight: 700;
+    color: #ffd000;
+    letter-spacing: 4rpx;
+    /* 仅保留轻微立体阴影，不做描边 */
+    text-shadow: 4rpx 4rpx 0 rgba(0, 0, 0, 1);
+}
+
+/* Secondary tagline - Slogan（白色 + 黑色描边） */
+.welcome-page__tagline-secondary {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.welcome-page__tagline-secondary-text {
+    font-size: 28rpx;
+    font-weight: 500;
+    color: #ffffff;
+    letter-spacing: 2rpx;
+    /* 仅保留柔和投影，不做描边 */
+    text-shadow: 2rpx 2rpx 4rpx rgba(0, 0, 0, 1);
 }
 
 /* Section C: Action Buttons */

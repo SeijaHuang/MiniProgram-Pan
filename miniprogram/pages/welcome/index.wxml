@@ -7,6 +7,11 @@
 
     <!-- Section B: Main Visual Character -->
     <view class="welcome-page__hero">
+        <!-- Emotional Title -->
+        <view class="welcome-page__title">
+            <text class="welcome-page__title-text">判了么</text>
+        </view>
+
         <view class="welcome-page__avatar-wrapper" animation="{{ avatarAnimation }}">
             <!-- Top decoration (crown/badge placeholder) -->
             <view class="welcome-page__avatar-badge">
@@ -23,6 +28,16 @@
                     src="/images/duck.png"
                     mode="aspectFit"
                 ></image>
+            </view>
+        </view>
+
+        <!-- Subtitle + Slogan Block -->
+        <view class="welcome-page__tagline">
+            <view class="welcome-page__tagline-primary">
+                <text class="welcome-page__tagline-primary-text">清汤大老爷在线断案</text>
+            </view>
+            <view class="welcome-page__tagline-secondary">
+                <text class="welcome-page__tagline-secondary-text">将争吵转化为游戏 · 在爆笑中和好如初</text>
             </view>
         </view>
     </view>
