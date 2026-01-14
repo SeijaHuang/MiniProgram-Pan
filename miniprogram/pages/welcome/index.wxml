@@ -1,20 +1,33 @@
 <!--pages/welcome/index.wxml-->
 <view class="welcome-page">
-    <!-- Section A: Top Decoration Area -->
+    <!-- Section A: Top Decoration -->
     <view class="welcome-page__header">
-        <view class="welcome-page__decoration"></view>
+        <view class="welcome-page__header-decoration"></view>
     </view>
 
-    <!-- Section B: Main Visual Character Area -->
+    <!-- Section B: Main Visual Character -->
     <view class="welcome-page__hero">
-        <image
-            class="welcome-page__character"
-            src="/images/duck.png"
-            mode="aspectFit"
-        ></image>
+        <view class="welcome-page__avatar-wrapper" animation="{{ avatarAnimation }}">
+            <!-- Top decoration (crown/badge placeholder) -->
+            <view class="welcome-page__avatar-badge">
+                <image
+                    class="welcome-page__badge-icon"
+                    src="/images/crown.png"
+                    mode="aspectFit"
+                ></image>
+            </view>
+            <!-- Circular avatar container -->
+            <view class="welcome-page__avatar-container">
+                <image
+                    class="welcome-page__avatar-image"
+                    src="/images/duck.png"
+                    mode="aspectFit"
+                ></image>
+            </view>
+        </view>
     </view>
 
-    <!-- Section C: Action Buttons Area -->
+    <!-- Section C: Action Buttons -->
     <view class="welcome-page__actions">
         <button class="welcome-page__btn welcome-page__btn--primary" bindtap="handleStartJudge">
             <text class="welcome-page__btn-text">开始审判</text>

@@ -1,14 +1,22 @@
 /* pages/welcome/index.wxss */
 
-/* Page Container */
+/* ========================================
+   PAGE CONTAINER
+   极简全屏渐变背景，无装饰元素
+   ======================================== */
 .welcome-page {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: 100vh;
     width: 750rpx;
-    background-color: #f5f5f5;
+    min-height: 100vh;
     box-sizing: border-box;
+    background: linear-gradient(
+        135deg,
+        #ff3b30 0%,
+        #ff7a00 50%,
+        #ffc400 100%
+    );
 }
 
 /* Section A: Header Decoration */
@@ -20,10 +28,10 @@
     align-items: center;
 }
 
-.welcome-page__decoration {
+.welcome-page__header-decoration {
     width: 100rpx;
     height: 8rpx;
-    background-color: #e0e0e0;
+    background-color: rgba(255, 255, 255, 0.4);
     border-radius: 4rpx;
 }
 
@@ -37,9 +45,47 @@
     padding: 40rpx 0;
 }
 
-.welcome-page__character {
-    width: 400rpx;
-    height: 400rpx;
+/* Avatar wrapper - contains badge and circle */
+.welcome-page__avatar-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Top decoration badge */
+.welcome-page__avatar-badge {
+    position: absolute;
+    top: -30rpx;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60rpx;
+    height: 60rpx;
+    z-index: 10;
+}
+
+.welcome-page__badge-icon {
+    width: 100%;
+    height: 100%;
+}
+
+/* Circular avatar container */
+.welcome-page__avatar-container {
+    width: 220rpx;
+    height: 220rpx;
+    border-radius: 50%;
+    background-color: #ffffff;
+    border: 8rpx solid #1a1a1a;
+    box-shadow: 0 16rpx 32rpx rgba(0, 0, 0, 0.25);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.welcome-page__avatar-image {
+    width: 180rpx;
+    height: 180rpx;
 }
 
 /* Section C: Action Buttons */
@@ -110,5 +156,6 @@
 
 .welcome-page__footer-text {
     font-size: 24rpx;
-    color: #999999;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
 }
