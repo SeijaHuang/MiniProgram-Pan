@@ -1,0 +1,54 @@
+<!--pages/welcome/index.wxml-->
+<view class="welcome-page">
+    <!-- Section A: Top Decoration Area -->
+    <view class="welcome-page__header">
+        <view class="welcome-page__decoration"></view>
+    </view>
+
+    <!-- Section B: Main Visual Character Area -->
+    <view class="welcome-page__hero">
+        <image
+            class="welcome-page__character"
+            src="/images/duck.png"
+            mode="aspectFit"
+        ></image>
+    </view>
+
+    <!-- Section C: Action Buttons Area -->
+    <view class="welcome-page__actions">
+        <button class="welcome-page__btn welcome-page__btn--primary" bindtap="handleStartJudge">
+            <text class="welcome-page__btn-text">开始审判</text>
+        </button>
+        <button class="welcome-page__btn welcome-page__btn--secondary" bindtap="handleInputRoom">
+            <text class="welcome-page__btn-text">输入房间号</text>
+        </button>
+    </view>
+
+    <!-- Section D: Bottom Function Area -->
+    <view class="welcome-page__footer">
+        <view class="welcome-page__footer-item" bindtap="handleSettings">
+            <image
+                class="welcome-page__footer-icon"
+                src="/images/icon-settings.png"
+                mode="aspectFit"
+            ></image>
+            <text class="welcome-page__footer-text">设置</text>
+        </view>
+        <view class="welcome-page__footer-item" bindtap="handleRules">
+            <image
+                class="welcome-page__footer-icon"
+                src="/images/icon-rules.png"
+                mode="aspectFit"
+            ></image>
+            <text class="welcome-page__footer-text">规则</text>
+        </view>
+        <view class="welcome-page__footer-item" bindtap="handleFeedback">
+            <image
+                class="welcome-page__footer-icon"
+                src="/images/icon-feedback.png"
+                mode="aspectFit"
+            ></image>
+            <text class="welcome-page__footer-text">反馈</text>
+        </view>
+    </view>
+</view>
