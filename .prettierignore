@@ -13,6 +13,9 @@ build/
 # 类型定义文件（通常由工具生成，不需要格式化）
 typings/
 
+# backend 使用独立的 Prettier 配置
+backend/
+
 # 配置文件（某些配置文件格式化可能会破坏格式）
 package-lock.json
 
