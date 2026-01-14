@@ -42,13 +42,14 @@
         </view>
     </view>
 
-    <!-- Section C: Action Buttons -->
+    <!-- Section C: Main CTA Button -->
     <view class="welcome-page__actions">
-        <button class="welcome-page__btn welcome-page__btn--primary" bindtap="handleStartJudge">
-            <text class="welcome-page__btn-text">开始审判</text>
-        </button>
-        <button class="welcome-page__btn welcome-page__btn--secondary" bindtap="handleInputRoom">
-            <text class="welcome-page__btn-text">输入房间号</text>
+        <button
+            class="welcome-page__btn welcome-page__btn--cta"
+            hover-class="welcome-page__btn--cta-pressed"
+            bindtap="handleStartJudge"
+        >
+            <text class="welcome-page__btn-text">我要申冤！</text>
         </button>
     </view>
 

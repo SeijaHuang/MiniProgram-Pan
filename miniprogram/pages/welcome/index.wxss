@@ -152,14 +152,13 @@
     text-shadow: 2rpx 2rpx 4rpx rgba(0, 0, 0, 1);
 }
 
-/* Section C: Action Buttons */
+/* Section C: Main CTA Button */
 .welcome-page__actions {
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 40rpx 60rpx;
-    gap: 24rpx;
     box-sizing: border-box;
 }
 
@@ -169,30 +168,37 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    border-radius: 48rpx;
+    border-radius: 24rpx;
     border: none;
+    transition:
+        transform 0.1s ease-out,
+        box-shadow 0.1s ease-out;
 }
 
-.welcome-page__btn--primary {
-    background-color: #ffcc00;
+/* 主 CTA 按钮 - 红色背景 + 粗黑描边 + 底部厚度感 */
+.welcome-page__btn--cta {
+    background: linear-gradient(180deg, #ff3b30 0%, #e6392e 100%);
+    border: 8rpx solid #000000;
+    border-bottom-width: 12rpx;
+    box-shadow:
+        0 8rpx 0 0 #000000,
+        0 12rpx 16rpx rgba(0, 0, 0, 0.3);
+    position: relative;
 }
 
-.welcome-page__btn--secondary {
-    background-color: #ffffff;
-    border: 2rpx solid #e0e0e0;
+.welcome-page__btn--cta .welcome-page__btn-text {
+    font-size: 40rpx;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 2rpx;
 }
 
-.welcome-page__btn-text {
-    font-size: 32rpx;
-    font-weight: 500;
-}
-
-.welcome-page__btn--primary .welcome-page__btn-text {
-    color: #333333;
-}
-
-.welcome-page__btn--secondary .welcome-page__btn-text {
-    color: #666666;
+/* 按压状态 - hover-class */
+.welcome-page__btn--cta-pressed {
+    transform: scale(0.96) translateY(6rpx);
+    box-shadow:
+        0 2rpx 0 0 #000000,
+        0 4rpx 8rpx rgba(0, 0, 0, 0.2);
 }
 
 /* Section D: Footer Function Area */

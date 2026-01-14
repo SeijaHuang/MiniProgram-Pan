@@ -65,10 +65,6 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
         // TODO: Navigate to game creation or matchmaking
     },
 
-    handleInputRoom() {
-        // TODO: Show room input dialog or navigate to room input page
-    },
-
     handleSettings() {
         // TODO: Navigate to settings page
     },
