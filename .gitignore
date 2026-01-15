@@ -27,3 +27,6 @@ build/
 ehthumbs.db
 Thumbs.db
 Desktop.ini
+
+# 临时文件
+tmpclaude-*
