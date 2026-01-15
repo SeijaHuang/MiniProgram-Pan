@@ -2,12 +2,19 @@
 <view class="welcome-page">
     <!-- Section B: Main Visual Character -->
     <view class="welcome-page__hero">
-        <!-- Emotional Title -->
-        <view class="welcome-page__title">
+        <!-- 阶段 1：主标题 - 旋转 + 缩放入场 -->
+        <view
+            class="welcome-page__title {{ isEntranceReady ? 'welcome-page__title--initial' : '' }}"
+            animation="{{ titleAnimation }}"
+        >
             <text class="welcome-page__title-text">判了么</text>
         </view>
 
-        <view class="welcome-page__avatar-wrapper" animation="{{ avatarAnimation }}">
+        <!-- 阶段 2：头像 - 缩放入场 + 呼吸动画 -->
+        <view
+            class="welcome-page__avatar-wrapper {{ isEntranceReady ? 'welcome-page__avatar-wrapper--initial' : '' }}"
+            animation="{{ avatarAnimation }}"
+        >
             <!-- Top decoration (crown/badge placeholder) -->
             <view class="welcome-page__avatar-badge">
                 <text class="welcome-page__badge-icon">👑</text>
@@ -22,8 +29,11 @@
             </view>
         </view>
 
-        <!-- Subtitle + Slogan Block -->
-        <view class="welcome-page__tagline">
+        <!-- 阶段 3：副标题 + Slogan - 上滑入场 -->
+        <view
+            class="welcome-page__tagline {{ isEntranceReady ? 'welcome-page__tagline--initial' : '' }}"
+            animation="{{ taglineAnimation }}"
+        >
             <view class="welcome-page__tagline-primary">
                 <text class="welcome-page__tagline-primary-text">清汤大老爷在线断案</text>
             </view>
@@ -33,8 +43,11 @@
         </view>
     </view>
 
-    <!-- Section C: Main CTA Button -->
-    <view class="welcome-page__actions">
+    <!-- 阶段 4：CTA 按钮 - 弹性缩放入场 -->
+    <view
+        class="welcome-page__actions {{ isEntranceReady ? 'welcome-page__actions--initial' : '' }}"
+        animation="{{ ctaAnimation }}"
+    >
         <button
             class="welcome-page__btn welcome-page__btn--cta"
             hover-class="welcome-page__btn--cta-pressed"
@@ -46,8 +59,11 @@
         </button>
     </view>
 
-    <!-- Section D: Bottom Function Area -->
-    <view class="welcome-page__footer">
+    <!-- 阶段 5：底部功能区 - 淡入 -->
+    <view
+        class="welcome-page__footer {{ isEntranceReady ? 'welcome-page__footer--initial' : '' }}"
+        animation="{{ footerAnimation }}"
+    >
         <view class="welcome-page__footer-item" bindtap="handleSettings">
             <text class="welcome-page__footer-text">设置</text>
         </view>
@@ -55,7 +71,6 @@
             <text class="welcome-page__footer-text">规则</text>
         </view>
         <view class="welcome-page__footer-item" bindtap="handleFeedback">
-
             <text class="welcome-page__footer-text">反馈</text>
         </view>
     </view>

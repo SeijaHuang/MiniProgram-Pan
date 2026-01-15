@@ -25,12 +25,21 @@
     padding: 40rpx 0;
 }
 
-/* Emotional Title */
+/* ========================================
+   阶段 1：主标题
+   入场效果：旋转 + 缩放 + 弹性
+   ======================================== */
 .welcome-page__title {
     display: flex;
     justify-content: center;
     align-items: center;
     margin-bottom: 48rpx;
+}
+
+/* 主标题初始状态：缩小 + 旋转 + 透明 */
+.welcome-page__title--initial {
+    opacity: 0;
+    transform: scale(0) rotate(-180deg);
 }
 
 .welcome-page__title-text {
@@ -51,12 +60,22 @@
         /* 右下角黑色投影 */ 8rpx 10rpx 0 #000000;
 }
 
-/* Avatar wrapper - contains badge and circle */
+/* ========================================
+   阶段 2：头像
+   入场效果：缩放 + 淡入
+   idle 效果：轻微上下浮动
+   ======================================== */
 .welcome-page__avatar-wrapper {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+/* 头像初始状态：缩小 + 透明 */
+.welcome-page__avatar-wrapper--initial {
+    opacity: 0;
+    transform: scale(0.6);
 }
 
 /* Top decoration badge */
@@ -78,6 +97,7 @@
     justify-content: center;
     align-items: center;
 }
+
 /* Circular avatar container */
 .welcome-page__avatar-container {
     width: 220rpx;
@@ -97,7 +117,10 @@
     height: 100%;
 }
 
-/* Subtitle + Slogan Block */
+/* ========================================
+   阶段 3：副标题 + Slogan
+   入场效果：上滑 + 淡入
+   ======================================== */
 .welcome-page__tagline {
     display: flex;
     flex-direction: column;
@@ -105,6 +128,12 @@
     margin-top: 48rpx;
     padding: 0 40rpx;
     gap: 12rpx;
+}
+
+/* 副标题初始状态：下移 + 透明 */
+.welcome-page__tagline--initial {
+    opacity: 0;
+    transform: translateY(40rpx);
 }
 
 /* Primary tagline - 副标题（亮黄色 + 黑色描边） */
@@ -139,7 +168,11 @@
     text-shadow: 2rpx 2rpx 4rpx rgba(0, 0, 0, 1);
 }
 
-/* Section C: Main CTA Button */
+/* ========================================
+   阶段 4：CTA 按钮
+   入场效果：弹性缩放 + 落地感
+   idle 效果：光扫动画
+   ======================================== */
 .welcome-page__actions {
     width: 100%;
     display: flex;
@@ -147,6 +180,12 @@
     align-items: center;
     padding: 40rpx 60rpx;
     box-sizing: border-box;
+}
+
+/* CTA 按钮初始状态：缩小 + 透明 */
+.welcome-page__actions--initial {
+    opacity: 0;
+    transform: scale(0);
 }
 
 .welcome-page__btn {
@@ -157,9 +196,6 @@
     align-items: center;
     border-radius: 24rpx;
     border: none;
-    transition:
-        transform 0.1s ease-out,
-        box-shadow 0.1s ease-out;
 }
 
 /* 主 CTA 按钮 - 红色背景 + 粗黑描边 + 底部厚度感 */
@@ -244,7 +280,10 @@
     animation: none;
 }
 
-/* Section D: Footer Function Area */
+/* ========================================
+   阶段 5：底部功能区
+   入场效果：淡入
+   ======================================== */
 .welcome-page__footer {
     width: 100%;
     display: flex;
@@ -253,6 +292,11 @@
     align-items: center;
     padding: 40rpx 60rpx 80rpx;
     box-sizing: border-box;
+}
+
+/* 底部导航初始状态：透明 */
+.welcome-page__footer--initial {
+    opacity: 0;
 }
 
 .welcome-page__footer-item {
