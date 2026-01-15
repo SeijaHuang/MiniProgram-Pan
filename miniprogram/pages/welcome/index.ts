@@ -199,17 +199,19 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
     },
 
     /**
-     * 呼吸动画：头像轻微上下浮动
+     * 呼吸动画：头像放大缩小
      * 在入场动画完成后持续播放
      */
     startBreathingAnimation(): void {
-        // 初始向上浮动
-        this.animateBreathing(true);
+        // Initial scale to 1.3
+        this.isScaledUp = true;
+        this.animateBreathing(1.3);
 
-        // 每 1.5 秒切换方向
+        // Toggle scale every 1.5s (half of 3s cycle)
         this.breathingTimer = setInterval(() => {
             this.isScaledUp = !this.isScaledUp;
-            this.animateBreathing(this.isScaledUp);
+            const targetScale = this.isScaledUp ? 1.3 : 1.0;
+            this.animateBreathing(targetScale);
         }, 1500);
     },
 
@@ -220,22 +222,16 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
         }
     },
 
-    /**
-     * 呼吸动画单帧
-     * @param isUp - true 为向上浮动，false 为回到原位
-     */
-    animateBreathing(isUp: boolean): void {
+    animateBreathing(scale: number): void {
         const animation = wx.createAnimation({
             duration: 1500,
             timingFunction: 'ease-in-out',
         });
 
-        const translateY = isUp ? -10 : 0;
-        const scale = isUp ? 1.02 : 1;
-
-        animation.translateY(translateY).scale(scale, scale).step();
-
-        this.setData({ avatarAnimation: animation.export() });
+        animation.scale(scale, scale).step();
+        this.setData({
+            avatarAnimation: animation.export(),
+        });
     },
 
     handleStartJudge(): void {
