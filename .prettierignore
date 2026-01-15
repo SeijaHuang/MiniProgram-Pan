@@ -15,3 +15,7 @@ typings/
 
 # 配置文件（某些配置文件格式化可能会破坏格式）
 package-lock.json
+
+# yml files
+*.yml
+*.yaml
