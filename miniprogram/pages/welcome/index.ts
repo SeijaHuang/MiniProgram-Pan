@@ -62,7 +62,9 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
     },
 
     handleStartJudge() {
-        // TODO: Navigate to game creation or matchmaking
+        setTimeout(async () => {
+            await wx.navigateTo({ url: '/pages/waiting-room/index' });
+        }, 250);
     },
 
     handleSettings() {

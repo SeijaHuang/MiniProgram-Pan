@@ -1,10 +1,5 @@
 <!--pages/welcome/index.wxml-->
 <view class="welcome-page">
-    <!-- Section A: Top Decoration -->
-    <view class="welcome-page__header">
-        <view class="welcome-page__header-decoration"></view>
-    </view>
-
     <!-- Section B: Main Visual Character -->
     <view class="welcome-page__hero">
         <!-- Emotional Title -->
@@ -15,18 +10,14 @@
         <view class="welcome-page__avatar-wrapper" animation="{{ avatarAnimation }}">
             <!-- Top decoration (crown/badge placeholder) -->
             <view class="welcome-page__avatar-badge">
-                <image
-                    class="welcome-page__badge-icon"
-                    src="/images/crown.png"
-                    mode="aspectFit"
-                ></image>
+                <text class="welcome-page__badge-icon">👑</text>
             </view>
             <!-- Circular avatar container -->
             <view class="welcome-page__avatar-container">
                 <image
                     class="welcome-page__avatar-image"
-                    src="/images/duck.png"
-                    mode="aspectFit"
+                    src="https://images.unsplash.com/photo-1611991687319-5dabaabde43a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5ZWxsb3clMjBkdWNrJTIwY2FydG9vbnxlbnwxfHx8fDE3NjgyMDQ3MTV8MA&ixlib=rb-4.1.0&q=80&w=1080"
+                    mode="aspectFill"
                 ></image>
             </view>
         </view>
@@ -49,34 +40,22 @@
             hover-class="welcome-page__btn--cta-pressed"
             bindtap="handleStartJudge"
         >
-            <text class="welcome-page__btn-text">我要申冤！</text>
+            <!-- Light sweep effect layer -->
+            <view class="welcome-page__btn-shine"></view>
+            <text class="welcome-page__btn-text">我要申冤</text>
         </button>
     </view>
 
     <!-- Section D: Bottom Function Area -->
     <view class="welcome-page__footer">
         <view class="welcome-page__footer-item" bindtap="handleSettings">
-            <image
-                class="welcome-page__footer-icon"
-                src="/images/icon-settings.png"
-                mode="aspectFit"
-            ></image>
             <text class="welcome-page__footer-text">设置</text>
         </view>
         <view class="welcome-page__footer-item" bindtap="handleRules">
-            <image
-                class="welcome-page__footer-icon"
-                src="/images/icon-rules.png"
-                mode="aspectFit"
-            ></image>
             <text class="welcome-page__footer-text">规则</text>
         </view>
         <view class="welcome-page__footer-item" bindtap="handleFeedback">
-            <image
-                class="welcome-page__footer-icon"
-                src="/images/icon-feedback.png"
-                mode="aspectFit"
-            ></image>
+
             <text class="welcome-page__footer-text">反馈</text>
         </view>
     </view>

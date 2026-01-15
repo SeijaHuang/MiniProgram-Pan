@@ -2,82 +2,62 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## ⚠️ MANDATORY CODING RULES ⚠️
-
-**CRITICAL**: Before writing ANY code, you MUST read and follow the rules in `.cursor/rules/` directory. These rules are MANDATORY for all AI coding tools (Cursor, Claude Code, etc.).
-
-### Rule Files (Read in Order):
-
-1. **`.cursor/rules/00-general.md`** - SOLID, DRY, KISS, readability principles
-2. **`.cursor/rules/01-typescript.md`** - TypeScript strict rules (NO `any` types)
-3. **`.cursor/rules/02-miniprogram-frontend.md`** - WXML, WXSS, animations, components
-4. **`.cursor/rules/03-miniprogram-logic.md`** - Page/App lifecycle, data management
-5. **`.cursor/rules/04-websocket.md`** - WebSocket implementation patterns
-6. **`.cursor/rules/05-architecture.md`** - Project structure, separation of concerns
-
-**These rules are NON-NEGOTIABLE**. Every code change must comply with these standards. Failure to follow these rules will result in code that fails linting, breaks the build, or violates project architecture.
-
 ## Project Overview
 
-This is a WeChat Mini Program built with the **native WeChat Mini Program framework** (not React/Vue/uni-app) using TypeScript. The project supports real-time two-player interactive features via WebSocket.
+WeChat Mini Program built with the **native framework** (not React/Vue/uni-app) using TypeScript. Supports real-time two-player interactive features via WebSocket.
 
 ## Development Commands
 
 ```bash
-# Install dependencies
-npm install
+npm install            # Install dependencies
+npm run prepare        # Initialize Husky git hooks
 
-# Initialize Husky git hooks
-npm run prepare
-
-# Linting and formatting
-npm run lint              # Check code with ESLint
-npm run lint:fix          # Auto-fix ESLint issues
-npm run format            # Format code with Prettier
-npm run format:check      # Check Prettier formatting
+npm run lint           # Check code with ESLint
+npm run lint:fix       # Auto-fix ESLint issues
+npm run format         # Format code with Prettier
+npm run format:check   # Check Prettier formatting
 ```
 
 ## Development Environment
 
-- **Tool**: WeChat DevTools (微信开发者工具) is required to run and preview the Mini Program
+- **Tool**: WeChat DevTools (微信开发者工具) - required to run/preview
 - **Node.js**: >= 14.0.0
-- **Entry Point**: `miniprogram/` directory (configured in `project.config.json`)
-- **AppID**: `wxb5671c7f8f976e0d` (in `project.config.json`)
+- **Entry Point**: `miniprogram/` directory
 
 ## Architecture
 
-### File Structure
+### Directory Structure
 
 ```
 miniprogram/
-├── app.ts              # Application entry (App lifecycle)
-├── app.json            # Global configuration (pages, window, theme)
+├── app.ts              # App entry with App<IAppOption>()
+├── app.json            # Global config, page routes
 ├── app.wxss            # Global styles
-├── pages/              # Page directories
-│   ├── index/          # Each page has: .ts, .wxml, .wxss, .json
-│   └── logs/
-├── components/         # Custom components (future)
-└── utils/              # Utility functions
+├── pages/              # Each page = directory with .ts/.wxml/.wxss/.json
+├── components/         # Reusable components (same 4-file structure)
+├── services/           # Business logic, API calls
+├── utils/              # Pure utility functions
+└── assets/             # Static assets (images, etc.)
 ```
 
-### WeChat Mini Program Structure
+### Separation of Concerns
 
-Each page consists of 4 files:
-- `.ts` - TypeScript logic (Page lifecycle, data, event handlers)
-- `.wxml` - Template markup (similar to HTML)
-- `.wxss` - Styles (similar to CSS)
-- `.json` - Page configuration
+- **Pages**: UI logic only - delegate business logic to services
+- **Services**: Business rules, API communication, data processing
+- **Utils**: Pure functions, no side effects, easily testable
 
-### Key Framework Concepts
+### Key Patterns
 
-- **App**: Defined in `app.ts` with `App<IAppOption>()`, contains global data and lifecycle hooks
-- **Page**: Each page uses `Page()` constructor with lifecycle methods (onLoad, onShow, etc.)
-- **Data Binding**: Use `this.setData()` to update view (one-way data binding)
-- **Navigation**: Configured in `app.json` pages array; use `wx.navigateTo()`, `wx.redirectTo()` for routing
+- **App**: `App<IAppOption>()` in `app.ts` with `globalData` for shared state
+- **Page**: `Page()` with lifecycle (onLoad, onShow, onReady, onHide, onUnload)
+- **Data Binding**: One-way via `this.setData()` - always batch updates when possible
+- **Navigation**: `wx.navigateTo()` (with back), `wx.redirectTo()` (replaces), `wx.switchTab()` (tab bar)
 
-### Animation Implementation
+## Critical Constraints
 
-All animations MUST use `wx.createAnimation()` API, NOT CSS animations:
+### Animation - MANDATORY
+
+All animations MUST use `wx.createAnimation()` API. **CSS animations/transitions are FORBIDDEN**:
 
 ```typescript
 const animation = wx.createAnimation({
@@ -88,66 +68,77 @@ animation.translateX(100).step();
 this.setData({ animationData: animation.export() });
 ```
 
-### WebSocket for Real-time Communication
+In WXML: `<view animation="{{ animationData }}"></view>`
 
-Project requires WebSocket for two-player real-time features. Suggested pattern:
+### TypeScript - MANDATORY
+
+- **No `any` types** - Use `unknown` with type guards instead
+- **Explicit return types** on all functions
+- **Interface prefix**: `I` (e.g., `IUser`, `IPageData`)
+- **Unused code**: Prefix intentionally unused params with `_`
+- **WeChat types**: Use `WechatMiniprogram` namespace
+
+### Code Style
+
+- 4 spaces indentation
+- Single quotes
+- Semicolons required
+- 80 character line width
+
+### Pre-commit Hooks
+
+Husky + lint-staged auto-runs on commit:
+
+- ESLint + Prettier on `.ts`, `.js`, `.json`, `.md`
+- Commit blocked if unfixable errors exist
+
+## WXML/WXSS Patterns
+
+### WXML
+
+- Use `wx:key` with unique identifiers (not index) for `wx:for`
+- Use `data-*` attributes for event data, access via `event.currentTarget.dataset`
+- Keep logic in TypeScript, not templates
+
+### WXSS
+
+- Use `rpx` for responsive sizing (750rpx = screen width)
+- Use BEM naming: `.block__element--modifier`
+- Global styles in `app.wxss`, page-specific in page `.wxss`
+
+## WebSocket Pattern
+
+For real-time two-player features, implement singleton WebSocketManager:
 
 ```typescript
-// utils/websocket.ts
 class WebSocketManager {
+    private static instance: WebSocketManager;
     private socketTask: WechatMiniprogram.SocketTask | null = null;
 
-    connect(url: string) {
-        this.socketTask = wx.connectSocket({ url });
-        this.socketTask.onMessage((res) => {
-            // Handle messages
-        });
+    static getInstance(): WebSocketManager {
+        /* ... */
+    }
+    connect(url: string): Promise<void> {
+        /* ... */
+    }
+    send(type: string, data: unknown): void {
+        /* ... */
+    }
+    on(messageType: string, handler: MessageHandler): void {
+        /* ... */
     }
 }
 ```
 
-## Code Standards
+Key requirements:
 
-### TypeScript Configuration
-
-- **Strict mode enabled**: All strict TypeScript checks are active
-- **No implicit any**: Must provide explicit types
-- **No unused variables/imports**: Will fail pre-commit if present
-- **ESLint enforces**: `@typescript-eslint/no-explicit-any: "error"`
-
-### Code Style (Enforced by Prettier)
-
-- **Indentation**: 4 spaces (not tabs)
-- **Quotes**: Single quotes
-- **Semicolons**: Required
-- **Line width**: 80 characters
-- **Trailing commas**: ES5 style
-
-### Pre-commit Hooks
-
-Husky + lint-staged runs automatically on `git commit`:
-- ESLint checks and auto-fixes `.ts` and `.js` files
-- Prettier formats `.ts`, `.js`, `.json`, `.md` files
-- Commit will be blocked if unfixable errors exist
-
-### Framework Constraints
-
-- **Native API only**: Do NOT use React, Vue, uni-app, or other frameworks
-- **TypeScript for logic**: All `.ts` files must have proper types
-- **WXML for templates**: Use WeChat's template syntax
-- **WXSS for styles**: Use WeChat's styling system
-- **wx.createAnimation for animations**: Do NOT use CSS transitions/animations
+- Heartbeat mechanism to keep connection alive
+- Automatic reconnection with max attempts
+- Register handlers in `onLoad`, unregister in `onUnload`
+- Use WSS (secure WebSocket) protocol
 
 ## Type Definitions
 
-- **Location**: `typings/` directory (custom WeChat API types)
-- **Package**: `miniprogram-api-typings` provides official WeChat API types
-- **Usage**: TypeScript will automatically reference types from `typeRoots`
-
-## Configuration Files
-
-- `.eslintrc.json`: ESLint with TypeScript rules, Prettier integration
-- `.prettierrc.json`: Code formatting rules
-- `tsconfig.json`: TypeScript strict mode with ES2020 target
-- `project.config.json`: WeChat DevTools project settings
-- `app.json`: Mini Program global config (pages, navigation bar, theme)
+- **Custom types**: `typings/` directory
+- **WeChat API types**: `miniprogram-api-typings` package
+- **Namespace**: `WechatMiniprogram` for all WeChat types

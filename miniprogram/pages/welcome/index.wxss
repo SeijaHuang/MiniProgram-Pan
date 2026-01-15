@@ -14,22 +14,6 @@
     background: linear-gradient(135deg, #ff3b30 0%, #ff7a00 50%, #ffc400 100%);
 }
 
-/* Section A: Header Decoration */
-.welcome-page__header {
-    width: 100%;
-    height: 120rpx;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.welcome-page__header-decoration {
-    width: 100rpx;
-    height: 8rpx;
-    background-color: rgba(255, 255, 255, 0.4);
-    border-radius: 4rpx;
-}
-
 /* Section B: Hero Character Area */
 .welcome-page__hero {
     flex: 1;
@@ -78,7 +62,7 @@
 /* Top decoration badge */
 .welcome-page__avatar-badge {
     position: absolute;
-    top: -30rpx;
+    top: -45rpx;
     left: 50%;
     transform: translateX(-50%);
     width: 60rpx;
@@ -89,8 +73,11 @@
 .welcome-page__badge-icon {
     width: 100%;
     height: 100%;
+    font-size: 60rpx;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
-
 /* Circular avatar container */
 .welcome-page__avatar-container {
     width: 220rpx;
@@ -106,8 +93,8 @@
 }
 
 .welcome-page__avatar-image {
-    width: 180rpx;
-    height: 180rpx;
+    width: 100%;
+    height: 100%;
 }
 
 /* Subtitle + Slogan Block */
@@ -184,6 +171,53 @@
         0 8rpx 0 0 #000000,
         0 12rpx 16rpx rgba(0, 0, 0, 0.3);
     position: relative;
+    padding-top: 50rpx;
+    padding-bottom: 50rpx;
+    overflow: hidden;
+}
+
+/* ========================================
+   LIGHT SWEEP EFFECT
+   持续的光线扫过动画
+   ======================================== */
+.welcome-page__btn-shine {
+    position: absolute;
+    top: -20%;
+    left: -50%;
+    width: 35%;
+    height: 140%;
+    background: linear-gradient(
+        105deg,
+        transparent 0%,
+        transparent 35%,
+        rgba(255, 255, 240, 0.25) 45%,
+        rgba(255, 255, 240, 0.35) 50%,
+        rgba(255, 255, 240, 0.25) 55%,
+        transparent 65%,
+        transparent 100%
+    );
+    transform: skewX(-15deg);
+    animation: btn-shine-sweep 3s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Keyframes: 光带从左侧扫到右侧 */
+@keyframes btn-shine-sweep {
+    0% {
+        left: -50%;
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        left: 120%;
+        opacity: 0;
+    }
 }
 
 .welcome-page__btn--cta .welcome-page__btn-text {
@@ -191,6 +225,9 @@
     font-weight: 700;
     color: #ffffff;
     letter-spacing: 2rpx;
+    text-align: center;
+    position: relative;
+    z-index: 2;
 }
 
 /* 按压状态 - hover-class */
@@ -199,6 +236,12 @@
     box-shadow:
         0 2rpx 0 0 #000000,
         0 4rpx 8rpx rgba(0, 0, 0, 0.2);
+}
+
+/* 按压时隐藏光线扫过效果 */
+.welcome-page__btn--cta-pressed .welcome-page__btn-shine {
+    opacity: 0 !important;
+    animation: none;
 }
 
 /* Section D: Footer Function Area */

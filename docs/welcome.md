@@ -46,11 +46,10 @@ PRD 定义的 A/B/C/D 四大区域，在当前实现中的对应关系：
 - **区域 C：主操作按钮区域**
     - 对应：`welcome-page__actions`
     - 包含：
-        - 主按钮「开始审判」 → `handleStartJudge`
-        - 次按钮「输入房间号」 → `handleInputRoom`
+        - 唯一主 CTA 按钮「我要申冤！」 → `handleStartJudge`（已实现导航到等待房间页）
 - **区域 D：底部功能区**
     - 对应：`welcome-page__footer`
-    - 包含三个入口：
+    - 包含三个文字入口（无图标）：
         - 「设置」 → `handleSettings`
         - 「规则」 → `handleRules`
         - 「反馈」 → `handleFeedback`
@@ -89,13 +88,39 @@ PRD 定义的 A/B/C/D 四大区域，在当前实现中的对应关系：
 
 #### 3.2 清汤大老爷（鸭子角色）
 
-- 当前以静态图片 `duck.png` 承载主角头像：
-    - 路径：`/images/duck.png`
-    - 展示区域：`welcome-page__avatar-container` / `welcome-page__avatar-image`。
-- 形象细节（参考 PRD）：
-    - 呆萌鸭子 + 清朝官袍 + 官帽 + 惊堂木 + 卷轴 + 虎皮坐垫等元素可在视觉稿与素材阶段进一步完善。
-- 尺寸与位置：
-    - 当前实现保证角色居中且占据屏幕中部，后续可根据实际设备进一步精调宽高与位置，以接近 PRD 中的比例表。
+- **头像展示**：
+    - 图片源：在线图片 URL（Unsplash），黄色鸭子卡通形象
+    - 展示区域：`welcome-page__avatar-container` / `welcome-page__avatar-image`
+    - 图片模式：`aspectFill`，充满 220rpx × 220rpx 的圆形容器，超出部分自动裁剪
+    - 容器样式：白色背景、8rpx 黑色边框、圆形、带阴影
+- **皇冠装饰**：
+    - 位置：头像上方（`top: -45rpx`），居中显示
+    - 样式：使用 emoji 图标 👑，字体大小 60rpx
+    - 对应元素：`welcome-page__avatar-badge` / `welcome-page__badge-icon`
+- **动画效果**：
+    - 呼吸动画：使用 `wx.createAnimation` 实现，scale 在 1.0 到 1.3 之间循环（每 1.5 秒切换）
+    - 动画绑定：通过 `animation="{{ avatarAnimation }}"` 绑定到 `welcome-page__avatar-wrapper`
+
+#### 3.3 主 CTA 按钮
+
+- **视觉设计**：
+    - 背景：红色渐变（`linear-gradient(180deg, #ff3b30 0%, #e6392e 100%)`）
+    - 描边：8rpx 黑色边框，底部加粗至 12rpx 营造厚度感
+    - 阴影：底部 8rpx 黑色投影 + 12rpx 16rpx 模糊阴影，增强立体感
+    - 圆角：24rpx（大圆角，非胶囊形）
+    - 尺寸：宽度 100%，高度自适应（上下 padding 各 50rpx）
+- **文字样式**：
+    - 文案：「我要申冤！」
+    - 颜色：白色（`#ffffff`）
+    - 字号：40rpx
+    - 字重：700（粗体）
+    - 字间距：2rpx
+- **交互反馈**：
+    - 按压状态（`hover-class="welcome-page__btn--cta-pressed"`）：
+        - `scale(0.96)` 缩小
+        - `translateY(6rpx)` 下移
+        - 阴影变浅（模拟被按下效果）
+    - 过渡动画：`transition` 0.1s ease-out
 
 ---
 
@@ -107,25 +132,31 @@ PRD 定义的 A/B/C/D 四大区域，在当前实现中的对应关系：
     - 使用 `transform` 和 opacity，避免频繁修改 `left/top`。
     - 所有补间动画须通过 `wx.createAnimation` 实现（不使用 CSS 动画）。
     - 页面隐藏时（`onHide` / `onUnload`）应暂停或销毁动画，避免性能浪费。
-- **当前状态**：
-    - `index.wxss` 已提供丰富装饰元素，但尚未接入 `wx.createAnimation` 动画逻辑。
-    - 后续可以在 `index.ts` 中增加动画创建和导出数据字段，例如：
-        - 云朵 / 几何图形的缓慢漂浮 / 旋转
-        - 角色待机动画（轻微晃动、眨眼等）
+- **已实现的动画**：
+    - **头像呼吸动画**：
+        - 实现位置：`index.ts` 中的 `startBreathingAnimation()` / `animateScale()`
+        - 效果：头像在 scale 1.0 和 1.3 之间循环缩放，模拟呼吸效果
+        - 周期：每 1.5 秒切换一次，完整周期 3 秒
+        - 动画时长：每次缩放 1500ms，缓动函数 `ease-in-out`
+        - 生命周期管理：页面加载时启动，隐藏/卸载时停止
+- **待实现的动画**：
+    - 按钮光影左右移动效果（可考虑使用 `wx.createAnimation` 实现）
+    - 其他装饰元素的动画（如云朵、几何图形等）
 
 #### 4.2 交互入口与事件
 
-`index.ts` 中已预先定义交互处理函数（尚未实现具体逻辑）：
+`index.ts` 中定义的交互处理函数：
 
-- **开始审判**：`handleStartJudge`
-    - 期望行为：进入房主创建房间 / 匹配流程。
-- **输入房间号**：`handleInputRoom`
-    - 期望行为：弹出输入房间号弹窗或跳转到输入页。
-- **设置**：`handleSettings`
+- **我要申冤！**：`handleStartJudge` ✅ **已实现**
+    - 当前行为：延迟 250ms 后导航到等待房间页面（`/pages/waiting-room/index`）
+    - 按钮样式：红色渐变背景、粗黑描边（8rpx，底部 12rpx）、底部厚度感阴影、大圆角（24rpx）
+    - 按压反馈：使用 `hover-class="welcome-page__btn--cta-pressed"`，按下时 scale(0.96) + translateY(6rpx) + 阴影变浅
+    - 文字样式：白色、40rpx、字重 700、上下 padding 50rpx
+- **设置**：`handleSettings` ⏳ **待实现**
     - 期望行为：进入设置页（音效开关、震动开关等）。
-- **规则**：`handleRules`
+- **规则**：`handleRules` ⏳ **待实现**
     - 期望行为：展示玩法 / 审判规则说明，可采用弹窗或独立页面。
-- **反馈**：`handleFeedback`
+- **反馈**：`handleFeedback` ⏳ **待实现**
     - 期望行为：跳转到反馈页或打开客服 / 问卷链接。
 
 ---
@@ -134,16 +165,26 @@ PRD 定义的 A/B/C/D 四大区域，在当前实现中的对应关系：
 
 #### 5.1 当前实现状态（2026-01-14）
 
-- 已完成：
+- ✅ **已完成**：
     - 欢迎页面基础结构搭建（四大区域划分）
-    - 波普风渐变背景 + 云朵 + 几何图形等装饰元素
-    - 主角鸭子图片展示位
-    - 主按钮 / 副按钮 / 底部三个功能入口布局与点击事件占位
-- 待实现 / 待完善：
-    - 所有角色与装饰动画接入 `wx.createAnimation`
-    - 输入房间号、规则说明等弹窗 / 页面
+    - 135° 渐变背景（红→橙→黄）
+    - 情绪标题「判了么」：96rpx 白色字体 + 黑色描边 + 右下黑色投影
+    - 副标题与 Slogan：亮黄色主 tagline + 白色次 tagline
+    - 主角头像展示：
+        - 220rpx × 220rpx 圆形头像容器
+        - 在线图片（Unsplash），aspectFill 模式充满容器
+        - 头像上方皇冠装饰（👑 emoji，位置 -45rpx）
+        - 头像呼吸动画（scale 1.0 ↔ 1.3，周期 3 秒）
+    - 主 CTA 按钮「我要申冤！」：
+        - 红色渐变背景 + 粗黑描边 + 底部厚度感
+        - 按压反馈效果（hover-class）
+        - 已实现导航到等待房间页面
+    - 底部功能区：三个文字入口（设置、规则、反馈）
+- ⏳ **待实现 / 待完善**：
+    - 按钮光影左右移动动画效果
+    - 设置、规则、反馈页面的具体实现
     - WebSocket 相关的后续流程联动（与房间创建 / 加入流程串联）
-    - 「冤」字水印背景元素
+    - 其他装饰元素的动画（如云朵、几何图形等）
 
 #### 5.2 与 PRD 的对齐建议
 
