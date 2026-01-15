@@ -36,5 +36,11 @@
         "@typescript-eslint/no-unsafe-call": "off",
         "@typescript-eslint/no-unsafe-return": "off"
     },
-    "ignorePatterns": ["node_modules/", "dist/", "build/", "typings/"]
+    "ignorePatterns": [
+        "node_modules/",
+        "dist/",
+        "build/",
+        "typings/",
+        ".github/workflows/"
+    ]
 }
