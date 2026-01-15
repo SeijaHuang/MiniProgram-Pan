@@ -5,6 +5,7 @@ This directory contains **mandatory coding rules** that MUST be followed by all 
 ## Purpose
 
 These rules ensure:
+
 - **Code Quality**: SOLID, DRY, KISS principles
 - **Type Safety**: Strict TypeScript without `any` types
 - **Consistency**: Uniform code style across the project
@@ -16,14 +17,18 @@ These rules ensure:
 The rules are organized into numbered files that should be read in order:
 
 ### 00-general.md
+
 **General Coding Principles**
+
 - SOLID principles (Single Responsibility, Open/Closed, etc.)
 - DRY (Don't Repeat Yourself)
 - KISS (Keep It Simple, Stupid)
 - Readability and code style guidelines
 
 ### 01-typescript.md
+
 **TypeScript Rules**
+
 - **CRITICAL**: NO `any` types allowed (ESLint will fail)
 - Explicit return types required
 - Strict null checks
@@ -31,7 +36,9 @@ The rules are organized into numbered files that should be read in order:
 - Generic types usage
 
 ### 02-miniprogram-frontend.md
+
 **WeChat Mini Program Frontend Rules**
+
 - WXML template best practices
 - WXSS styling with `rpx` units
 - **CRITICAL**: Animations MUST use `wx.createAnimation()` (NO CSS animations)
@@ -39,7 +46,9 @@ The rules are organized into numbered files that should be read in order:
 - Performance optimization
 
 ### 03-miniprogram-logic.md
+
 **WeChat Mini Program Logic Layer Rules**
+
 - App and Page lifecycle management
 - Data binding with `setData()`
 - Event handlers
@@ -48,7 +57,9 @@ The rules are organized into numbered files that should be read in order:
 - API request handling
 
 ### 04-websocket.md
+
 **WebSocket Real-time Communication Rules**
+
 - WebSocket manager singleton pattern
 - Connection management with heartbeat
 - Automatic reconnection
@@ -56,7 +67,9 @@ The rules are organized into numbered files that should be read in order:
 - Error handling
 
 ### 05-architecture.md
+
 **Architecture and Project Structure Rules**
+
 - Directory organization
 - Separation of concerns (Pages/Services/Utils)
 - Dependency injection
@@ -66,12 +79,15 @@ The rules are organized into numbered files that should be read in order:
 ## How AI Tools Should Use These Rules
 
 ### For Cursor
+
 Cursor automatically reads files in `.cursor/rules/` directory. These rules will be applied to all code suggestions.
 
 ### For Claude Code
+
 Claude Code reads `CLAUDE.md` which references these rules. AI must read and apply these rules before writing code.
 
 ### For GitHub Copilot
+
 Copy these rules to `.github/copilot-instructions.md` for Copilot to follow.
 
 ## Enforcement
@@ -79,9 +95,9 @@ Copy these rules to `.github/copilot-instructions.md` for Copilot to follow.
 These rules are enforced through:
 
 1. **Pre-commit Hooks**: Husky + lint-staged
-   - ESLint checks TypeScript rules
-   - Prettier enforces code formatting
-   - Commits will be BLOCKED if rules are violated
+    - ESLint checks TypeScript rules
+    - Prettier enforces code formatting
+    - Commits will be BLOCKED if rules are violated
 
 2. **Code Review**: All PRs must comply with these rules
 
@@ -106,6 +122,7 @@ Before submitting code, verify:
 ## Examples
 
 Each rule file contains extensive examples showing:
+
 - ✅ GOOD: Correct implementation
 - ❌ BAD: What to avoid
 
@@ -114,6 +131,7 @@ Each rule file contains extensive examples showing:
 ## Updates
 
 When updating these rules:
+
 1. Discuss with the team
 2. Update the relevant rule file
 3. Update this README if structure changes
@@ -122,6 +140,7 @@ When updating these rules:
 ## Questions?
 
 If any rule is unclear or seems contradictory, please:
+
 1. Check the examples in the rule file
 2. Discuss with the team
 3. Propose clarifications via PR

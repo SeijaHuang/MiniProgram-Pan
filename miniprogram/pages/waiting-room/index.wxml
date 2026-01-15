@@ -1,0 +1,3 @@
+<view class="waiting-room-page">
+    <text class="waiting-room-page__title">等待房间</text>
+</view>
