@@ -11,6 +11,8 @@ interface WelcomePageData {
     footerAnimation: AnimationResult;
     // 控制初始隐藏状态
     isEntranceReady: boolean;
+    // 头像入场完成后移除 --initial 类
+    avatarEntranceComplete: boolean;
 }
 
 // 动画时序配置（毫秒）
@@ -42,6 +44,7 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
         ctaAnimation: {} as AnimationResult,
         footerAnimation: {} as AnimationResult,
         isEntranceReady: false,
+        avatarEntranceComplete: false,
     },
 
     breathingTimer: null as number | null,
@@ -58,7 +61,7 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
 
     onShow(): void {
         // 如果入场动画已完成，恢复呼吸动画
-        if (this.hasPlayedEntrance && !this.breathingTimer) {
+        if (this.avatarEntranceComplete && !this.breathingTimer) {
             this.startBreathingAnimation();
         }
     },
@@ -144,7 +147,9 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
 
         animation.scale(1, 1).opacity(1).step();
 
-        this.setData({ avatarAnimation: animation.export() });
+        this.setData({ avatarAnimation: animation.export() }, () => {
+            this.setData({ avatarEntranceComplete: true });
+        });
     },
 
     /**
@@ -203,11 +208,11 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
      * 在入场动画完成后持续播放
      */
     startBreathingAnimation(): void {
-        // Initial scale to 1.3
+        // 从当前状态（scale 1.0）开始，先放大到 1.05
         this.isScaledUp = true;
         this.animateBreathing(1.3);
 
-        // Toggle scale every 1.5s (half of 3s cycle)
+        // 每 1500ms 切换一次缩放状态
         this.breathingTimer = setInterval(() => {
             this.isScaledUp = !this.isScaledUp;
             const targetScale = this.isScaledUp ? 1.3 : 1.0;
