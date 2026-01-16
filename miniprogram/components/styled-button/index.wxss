@@ -1,7 +1,7 @@
 /* components/styled-button/index.wxss */
 
 .styled-button {
-    width: 100%;
+    width: 100% !important;
     min-height: 96rpx;
     display: flex;
     justify-content: center;
@@ -13,10 +13,8 @@
     box-shadow:
         0 8rpx 0 0 #000000,
         0 12rpx 16rpx rgba(0, 0, 0, 0.3);
-    position: relative;
     padding-top: 30rpx;
     padding-bottom: 30rpx;
-    overflow: hidden;
 }
 
 /* 红色背景（默认）- 欢迎页按钮 */
