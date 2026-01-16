@@ -1,0 +1,14 @@
+<!--components/styled-button/index.wxml-->
+<button
+    class="styled-button styled-button--{{ color }} {{ customClass }}"
+    hover-class="styled-button--pressed"
+    bindtap="handleTap"
+    style="{{ buttonStyle }}"
+>
+    <!-- Light sweep effect layer -->
+    <view class="styled-button__shine"></view>
+    <view class="styled-button__icon">
+        <text>{{ icon }}</text>
+    </view>
+    <text class="styled-button__text styled-button__text--{{ color }}">{{ text }}</text>
+</button>

@@ -1,3 +1,7 @@
 {
-    "usingComponents": {}
+    "usingComponents": {
+        "styled-button": "/components/styled-button/index"
+    },
+    "navigationStyle": "custom",
+    "navigationBarTitleText": "连接孽缘"
 }

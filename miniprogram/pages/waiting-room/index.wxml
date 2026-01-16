@@ -1,3 +1,160 @@
-<view class="waiting-room-page">
-    <text class="waiting-room-page__title">等待房间</text>
+<!--pages/waiting-room/index.wxml-->
+<view class="waiting-room">
+    <!-- 入口模式 -->
+    <block wx:if="{{ viewMode === 'entry' }}">
+        <!-- 标题区域 -->
+        <view class="waiting-room__header">
+            <text class="waiting-room__title">连接"孽缘"</text>
+        </view>
+
+        <!-- 按钮区域 -->
+        <view class="waiting-room__buttons">
+            <!-- 发起申冤按钮 -->
+            <view
+                class="waiting-room__button-wrapper"
+                animation="{{ hostButtonAnimation }}"
+            >
+                <styled-button
+                    text="发起申冤"
+                    color="yellow"
+                    icon="📣"
+                    customClass="waiting-room__styled-btn"
+                    bindtap="onHostButtonTap"
+                ></styled-button>
+            </view>
+
+            <!-- 加入房间按钮 -->
+            <view
+                class="waiting-room__button-wrapper"
+                animation="{{ joinButtonAnimation }}"
+            >
+                <styled-button
+                    text="加入房间"
+                    color="blue"
+                    icon="🔗"
+                    customClass="waiting-room__styled-btn"
+                    bindtap="onJoinButtonTap"
+                ></styled-button>
+            </view>
+        </view>
+    </block>
+
+    <!-- 房主等待模式 -->
+    <block wx:elif="{{ viewMode === 'host_waiting' }}">
+        <view class="waiting-room__header">
+            <text class="waiting-room__title">连接"孽缘"</text>
+        </view>
+
+        <view class="waiting-room__waiting">
+            <!-- 房间号展示 -->
+            <view class="waiting-room__room-info">
+                <text class="waiting-room__room-label">房间号</text>
+                <view class="waiting-room__room-code">
+                    <text
+                        wx:for="{{ roomCode }}"
+                        wx:key="index"
+                        class="waiting-room__room-digit"
+                    >{{ item }}</text>
+                </view>
+            </view>
+
+            <!-- 等待文案 -->
+            <view class="waiting-room__waiting-text">
+                <text>{{ currentWaitingText }}</text>
+            </view>
+
+            <!-- 取消按钮 -->
+            <view
+                class="waiting-room__btn waiting-room__btn--cancel"
+                animation="{{ cancelButtonAnimation }}"
+                bindtap="onCancelHost"
+            >
+                <text class="waiting-room__btn-text waiting-room__btn-text--white">取消审判</text>
+            </view>
+        </view>
+    </block>
+
+    <!-- 访客等待模式 -->
+    <block wx:elif="{{ viewMode === 'guest_waiting' }}">
+        <view class="waiting-room__header">
+            <text class="waiting-room__title">连接"孽缘"</text>
+        </view>
+
+        <view class="waiting-room__waiting">
+            <view class="waiting-room__guest-info">
+                <text class="waiting-room__guest-success">已成功加入房间</text>
+                <view class="waiting-room__room-code waiting-room__room-code--small">
+                    <text
+                        wx:for="{{ roomCode }}"
+                        wx:key="index"
+                        class="waiting-room__room-digit waiting-room__room-digit--small"
+                    >{{ item }}</text>
+                </view>
+                <text class="waiting-room__guest-waiting">等待开庭...</text>
+            </view>
+        </view>
+    </block>
+
+    <!-- 加入房间弹窗 -->
+    <view
+        wx:if="{{ showJoinModal }}"
+        class="waiting-room__modal-mask"
+        catchtouchmove="preventTouchMove"
+        bindtap="onCloseModal"
+    >
+        <view class="waiting-room__modal" catchtap="preventTouchMove">
+            <!-- 关闭按钮 -->
+            <view class="waiting-room__modal-close" bindtap="onCloseModal">
+                <text>×</text>
+            </view>
+
+            <!-- 弹窗标题 -->
+            <text class="waiting-room__modal-title">请输入房间号</text>
+
+            <!-- 6位输入框展示 -->
+            <view class="waiting-room__code-input-wrapper">
+                <view class="waiting-room__code-boxes">
+                    <view
+                        wx:for="{{ roomCodeDisplay }}"
+                        wx:key="index"
+                        class="waiting-room__code-box {{ item ? 'waiting-room__code-box--filled' : '' }}"
+                    >
+                        <text>{{ item }}</text>
+                    </view>
+                </view>
+                <!-- 隐藏的真实输入框 -->
+                <input
+                    class="waiting-room__code-input"
+                    type="number"
+                    maxlength="6"
+                    value="{{ roomCodeInput }}"
+                    bindinput="onRoomCodeInput"
+                    focus="{{ showJoinModal }}"
+                    placeholder=""
+                />
+            </view>
+
+            <!-- 错误提示 -->
+            <view wx:if="{{ errorMessage }}" class="waiting-room__error">
+                <text>{{ errorMessage }}</text>
+            </view>
+
+            <!-- 确认按钮 -->
+            <view
+                class="waiting-room__modal-btn {{ isJoinButtonDisabled ? 'waiting-room__modal-btn--disabled' : '' }}"
+                animation="{{ confirmButtonAnimation }}"
+                bindtap="{{ isJoinButtonDisabled ? '' : 'onConfirmJoin' }}"
+            >
+                <text>确认加入</text>
+            </view>
+        </view>
+    </view>
+
+    <!-- 倒计时遮罩 -->
+    <view wx:if="{{ showCountdown }}" class="waiting-room__countdown-mask">
+        <view class="waiting-room__countdown">
+            <text class="waiting-room__countdown-number">{{ countdown }}</text>
+            <text class="waiting-room__countdown-text">即将开庭</text>
+        </view>
+    </view>
 </view>

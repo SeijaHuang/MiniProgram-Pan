@@ -1,5 +1,9 @@
 {
-    "pages": ["pages/welcome/index", "pages/waiting-room/index"],
+    "pages": [
+        "pages/welcome/index",
+        "pages/waiting-room/index",
+        "pages/drum/index"
+    ],
     "window": {
         "navigationBarTextStyle": "black",
         "navigationBarTitleText": "Weixin",

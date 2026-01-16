@@ -48,15 +48,10 @@
         class="welcome-page__actions {{ isEntranceReady ? 'welcome-page__actions--initial' : '' }}"
         animation="{{ ctaAnimation }}"
     >
-        <button
-            class="welcome-page__btn welcome-page__btn--cta"
-            hover-class="welcome-page__btn--cta-pressed"
+        <styled-button
+            text="我要申冤"
             bindtap="handleStartJudge"
-        >
-            <!-- Light sweep effect layer -->
-            <view class="welcome-page__btn-shine"></view>
-            <text class="welcome-page__btn-text">我要申冤</text>
-        </button>
+        ></styled-button>
     </view>
 
     <!-- 阶段 5：底部功能区 - 淡入 -->
