@@ -4,7 +4,10 @@
     <block wx:if="{{ viewMode === 'entry' }}">
         <!-- 标题区域 -->
         <view class="waiting-room__header">
-            <text class="waiting-room__title">连接"孽缘"</text>
+            <styled-title
+                text='连接"孽缘"'
+                customClass="waiting-room__title"
+            ></styled-title>
         </view>
 
         <!-- 按钮区域 -->
@@ -42,7 +45,10 @@
     <!-- 房主等待模式 -->
     <block wx:elif="{{ viewMode === 'host_waiting' }}">
         <view class="waiting-room__header">
-            <text class="waiting-room__title">连接"孽缘"</text>
+            <styled-title
+                text='连接"孽缘"'
+                customClass="waiting-room__title"
+            ></styled-title>
         </view>
 
         <view class="waiting-room__waiting">
@@ -77,7 +83,10 @@
     <!-- 访客等待模式 -->
     <block wx:elif="{{ viewMode === 'guest_waiting' }}">
         <view class="waiting-room__header">
-            <text class="waiting-room__title">连接"孽缘"</text>
+            <styled-title
+                text='连接"孽缘"'
+                customClass="waiting-room__title"
+            ></styled-title>
         </view>
 
         <view class="waiting-room__waiting">

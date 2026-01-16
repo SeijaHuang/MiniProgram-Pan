@@ -3,12 +3,11 @@
     <!-- Section B: Main Visual Character -->
     <view class="welcome-page__hero">
         <!-- 阶段 1：主标题 - 旋转 + 缩放入场 -->
-        <view
-            class="welcome-page__title {{ isEntranceReady ? 'welcome-page__title--initial' : '' }}"
+        <styled-title
+            text="判了么"
+            isInitial="{{ isEntranceReady }}"
             animation="{{ titleAnimation }}"
-        >
-            <text class="welcome-page__title-text">判了么</text>
-        </view>
+        ></styled-title>
 
         <!-- 阶段 2：头像 - 缩放入场 + 呼吸动画 -->
         <view

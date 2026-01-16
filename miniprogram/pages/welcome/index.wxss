@@ -26,41 +26,6 @@
 }
 
 /* ========================================
-   阶段 1：主标题
-   入场效果：旋转 + 缩放 + 弹性
-   ======================================== */
-.welcome-page__title {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 48rpx;
-}
-
-/* 主标题初始状态：缩小 + 旋转 + 透明 */
-.welcome-page__title--initial {
-    opacity: 0;
-    transform: scale(0) rotate(-180deg);
-}
-
-.welcome-page__title-text {
-    font-size: 96rpx;
-    font-weight: 700;
-    color: #ffffff;
-    letter-spacing: 8rpx;
-    text-shadow:
-        /* 黑色描边（四周） */
-        -3rpx 0 0 #000000,
-        3rpx 0 0 #000000,
-        0 -3rpx 0 #000000,
-        0 3rpx 0 #000000,
-        -3rpx -3rpx 0 #000000,
-        3rpx -3rpx 0 #000000,
-        -3rpx 3rpx 0 #000000,
-        3rpx 3rpx 0 #000000,
-        /* 右下角黑色投影 */ 8rpx 10rpx 0 #000000;
-}
-
-/* ========================================
    阶段 2：头像
    入场效果：缩放 + 淡入
    idle 效果：轻微上下浮动
