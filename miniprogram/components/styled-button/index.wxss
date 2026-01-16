@@ -78,11 +78,25 @@
     }
 }
 
+/* 内容容器 */
+.styled-button__content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+}
+
+/* 有 icon 时，垂直排列 */
+.styled-button__content--with-icon {
+    flex-direction: column;
+    gap: 5rpx;
+}
+
 .styled-button__icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-right: 12rpx;
 }
 
 .styled-button__icon text {
@@ -96,30 +110,16 @@
     letter-spacing: 2rpx;
     text-align: center;
     position: relative;
-    z-index: 2;
 }
 
 /* 文字颜色 - 根据背景色调整 */
-.styled-button__text--red {
+.styled-button__text--red,
+.styled-button__text--blue {
     color: #ffffff;
 }
 
 .styled-button__text--yellow {
-    color: #cc0000;
-    text-shadow:
-        -2rpx -2rpx 0 #000000,
-        2rpx -2rpx 0 #000000,
-        -2rpx 2rpx 0 #000000,
-        2rpx 2rpx 0 #000000;
-}
-
-.styled-button__text--blue {
-    color: #ffffff;
-    text-shadow:
-        -2rpx -2rpx 0 #000000,
-        2rpx -2rpx 0 #000000,
-        -2rpx 2rpx 0 #000000,
-        2rpx 2rpx 0 #000000;
+    color: #ff0000;
 }
 
 /* 按压状态 - hover-class */
@@ -131,7 +131,7 @@
 }
 
 /* 按压时隐藏光线扫过效果 */
-.styled-button--pressed .styled-button__shine {
-    opacity: 0 !important;
+.styled-button.styled-button--pressed .styled-button__shine {
+    opacity: 0;
     animation: none;
 }

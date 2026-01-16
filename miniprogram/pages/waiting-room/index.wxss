@@ -96,34 +96,31 @@
 
 /* ========================================
    Styled Button 在 Waiting Room 中的样式覆盖
+   使用更具体的选择器来覆盖组件默认样式
    ======================================== */
-.waiting-room__styled-btn {
-    width: 650rpx !important;
-    min-height: 160rpx !important;
-    height: 160rpx !important;
-    border-radius: 40rpx !important;
-    border: 10rpx solid #000000 !important;
-    border-bottom-width: 10rpx !important;
+.waiting-room .waiting-room__styled-btn.styled-button {
+    width: 650rpx;
+    min-height: 160rpx;
+    height: 160rpx;
+    border-radius: 40rpx;
+    border: 10rpx solid #000000;
+    border-bottom-width: 10rpx;
     box-shadow:
         0 12rpx 0 0 #000000,
-        0 14rpx 0 0 rgba(0, 0, 0, 0.3) !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    flex-direction: row !important;
+        0 14rpx 0 0 rgba(0, 0, 0, 0.3);
 }
 
-.waiting-room__styled-btn .styled-button__text {
-    font-size: 48rpx !important;
-    font-weight: 800 !important;
-    letter-spacing: 4rpx !important;
+.waiting-room .waiting-room__styled-btn.styled-button .styled-button__text {
+    font-size: 48rpx;
+    font-weight: 800;
+    letter-spacing: 4rpx;
 }
 
-.waiting-room__styled-btn .styled-button__icon {
-    margin-right: 20rpx !important;
-}
-
-.waiting-room__styled-btn .styled-button__icon text {
-    font-size: 56rpx !important;
+.waiting-room
+    .waiting-room__styled-btn.styled-button
+    .styled-button__icon
+    text {
+    font-size: 56rpx;
 }
 
 /* 取消按钮 - 灰色调 */

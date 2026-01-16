@@ -105,6 +105,7 @@ Husky + lint-staged auto-runs on commit:
 - Use `rpx` for responsive sizing (750rpx = screen width)
 - Use BEM naming: `.block__element--modifier`
 - Global styles in `app.wxss`, page-specific in page `.wxss`
+- **No `!important`** - Fix specificity issues properly instead of using `!important`
 
 ## WebSocket Pattern
 
