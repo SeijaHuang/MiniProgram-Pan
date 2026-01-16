@@ -17,7 +17,8 @@
         "strict": true,
         "strictPropertyInitialization": true,
         "lib": ["ES2020"],
-        "typeRoots": ["./typings"]
+        "typeRoots": ["./typings"],
+        "skipLibCheck": true
     },
     "include": ["./**/*.ts"],
     "exclude": ["node_modules"]

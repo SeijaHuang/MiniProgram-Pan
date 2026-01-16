@@ -32,3 +32,6 @@ jobs:
 
             - name: Check code formatting
               run: npx prettier --check "**/*.{yml,yaml}" --ignore-path .prettierignore
+
+            - name: TypeScript type check
+              run: npx tsc --noEmit 
