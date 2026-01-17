@@ -73,13 +73,9 @@
     width: 600rpx;
 }
 
-/* 取消按钮 - 灰色调 */
-.waiting-room__btn--cancel {
-    background-color: #666666;
-    box-shadow:
-        0 12rpx 0 0 #000000,
-        0 14rpx 0 0 rgba(0, 0, 0, 0.3);
-    margin-top: 80rpx;
+/* 取消按钮包装器 */
+.waiting-room__cancel-wrapper {
+    margin-top: 120rpx;
 }
 
 /* 按钮图标区域 */
@@ -126,6 +122,7 @@
     width: 100%;
     padding: 0 50rpx;
     box-sizing: border-box;
+    flex:1
 }
 
 /* 房间信息 */
@@ -180,7 +177,7 @@
 
 /* 等待文案 */
 .waiting-room__waiting-text {
-    font-size: 32rpx;
+    font-size: 48rpx;
     color: rgba(255, 255, 255, 0.95);
     text-align: center;
     min-height: 48rpx;

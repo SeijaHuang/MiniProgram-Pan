@@ -70,12 +70,13 @@
             </view>
 
             <!-- 取消按钮 -->
-            <view
-                class="waiting-room__btn waiting-room__btn--cancel"
-                animation="{{ cancelButtonAnimation }}"
-                bindtap="onCancelHost"
-            >
-                <text class="waiting-room__btn-text waiting-room__btn-text--white">取消审判</text>
+            <view class="waiting-room__cancel-wrapper">
+                <styled-button
+                    text="取消审判"
+                    color="grey"
+                    showShine="{{ false }}"
+                    bindtap="onCancelHost"
+                ></styled-button>
             </view>
         </view>
     </block>

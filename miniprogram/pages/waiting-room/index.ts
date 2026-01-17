@@ -426,12 +426,12 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      */
     startMockGuestJoin(): void {
         // 5-10秒后模拟对方加入
-        const delay = 5000 + Math.random() * 5000;
+        const delay = 10000 + Math.random() * 5000;
 
         this.mockGuestTimer = setTimeout(() => {
             if (this.data.viewMode === 'host_waiting') {
                 this.clearAllTimers();
-                this.startCountdown();
+                // this.startCountdown();
             }
         }, delay);
     },
@@ -442,7 +442,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     startCountdown(): void {
         this.setData({
             showCountdown: true,
-            countdown: 3,
+            countdown: 10,
         });
 
         this.triggerHapticFeedback();

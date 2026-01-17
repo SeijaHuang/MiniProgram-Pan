@@ -13,7 +13,11 @@ Component({
         },
         color: {
             type: String,
-            value: 'red', // 'red' | 'yellow' | 'blue'
+            value: 'red', // 'red' | 'yellow' | 'blue' | 'grey'
+        },
+        showShine: {
+            type: Boolean,
+            value: true,
         },
         customClass: {
             type: String,
