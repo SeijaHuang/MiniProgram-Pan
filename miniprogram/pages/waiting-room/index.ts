@@ -442,6 +442,12 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      * 启动倒计时
      */
     startCountdown(): void {
+        // 防止重复调用，先清除已有的倒计时定时器
+        if (this.countdownTimer) {
+            clearInterval(this.countdownTimer);
+            this.countdownTimer = null;
+        }
+
         this.setData({
             showCountdown: true,
             countdown: INITIAL_COUNTDOWN_TIME,
