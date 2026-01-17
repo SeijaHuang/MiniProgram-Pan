@@ -264,15 +264,14 @@
     background-color: #ffffff;
 }
 
-/* 隐藏的真实输入框 */
+/* 隐藏的真实输入框 - 原生组件需要特殊处理 */
 .waiting-room__code-input {
     position: absolute;
     top: 0;
-    left: 0;
+    left: -9999rpx;
     width: 100%;
     height: 100%;
     opacity: 0;
-    z-index: 10;
 }
 
 /* 错误提示 */

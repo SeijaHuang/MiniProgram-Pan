@@ -22,6 +22,7 @@ interface IWaitingRoomPageData {
     showJoinModal: boolean;
     roomCodeInput: string;
     roomCodeDisplay: string[];
+    inputFocus: boolean;
     errorType: ErrorType;
     errorMessage: string;
     isJoinButtonDisabled: boolean;
@@ -95,6 +96,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         showJoinModal: false,
         roomCodeInput: '',
         roomCodeDisplay: ['', '', '', '', '', ''],
+        inputFocus: false,
         errorType: null,
         errorMessage: '',
         isJoinButtonDisabled: true,
@@ -275,6 +277,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
                 showJoinModal: true,
                 roomCodeInput: '',
                 roomCodeDisplay: ['', '', '', '', '', ''],
+                inputFocus: true,
                 errorType: null,
                 errorMessage: '',
                 isJoinButtonDisabled: true,
@@ -290,8 +293,19 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             showJoinModal: false,
             roomCodeInput: '',
             roomCodeDisplay: ['', '', '', '', '', ''],
+            inputFocus: false,
             errorType: null,
             errorMessage: '',
+        });
+    },
+
+    /**
+     * 点击输入框区域，触发隐藏 input 聚焦
+     */
+    onCodeBoxesTap(): void {
+        // 需要先设为 false 再设为 true，才能重新触发聚焦
+        this.setData({ inputFocus: false }, () => {
+            this.setData({ inputFocus: true });
         });
     },
 
@@ -371,6 +385,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             // 加入成功
             this.setData({
                 showJoinModal: false,
+                inputFocus: false,
                 viewMode: 'guest_waiting',
                 roomCode: roomCodeInput,
             });
