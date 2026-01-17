@@ -123,7 +123,7 @@
 
             <!-- 6位输入框展示 -->
             <view class="waiting-room__code-input-wrapper">
-                <view class="waiting-room__code-boxes">
+                <view class="waiting-room__code-boxes" bindtap="onCodeBoxesTap">
                     <view
                         wx:for="{{ roomCodeDisplay }}"
                         wx:key="index"
@@ -139,8 +139,7 @@
                     maxlength="6"
                     value="{{ roomCodeInput }}"
                     bindinput="onRoomCodeInput"
-                    focus="{{ showJoinModal }}"
-                    placeholder=""
+                    focus="{{ inputFocus }}"
                 />
             </view>
 
