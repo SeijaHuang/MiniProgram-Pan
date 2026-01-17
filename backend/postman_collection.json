@@ -1,0 +1,83 @@
+{
+  "info": {
+    "name": "MiniProgram-Pan Backend",
+    "description": "WebSocket API for two-player game",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "HTTP Endpoints",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket Messages",
+      "item": [
+        {
+          "name": "Create Room",
+          "request": {
+            "description": "Create a new game room",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"room:create\",\n  \"data\": {\n    \"playerName\": \"Player 1\",\n    \"playerAvatar\": \"https://example.com/avatar.png\"\n  },\n  \"timestamp\": {{$timestamp}}\n}"
+            }
+          }
+        },
+        {
+          "name": "Join Room",
+          "request": {
+            "description": "Join an existing room",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"room:join\",\n  \"data\": {\n    \"roomId\": \"room_xxx\",\n    \"playerName\": \"Player 2\"\n  },\n  \"timestamp\": {{$timestamp}}\n}"
+            }
+          }
+        },
+        {
+          "name": "Player Ready",
+          "request": {
+            "description": "Mark player as ready to start",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"player:ready\",\n  \"data\": {\n    \"playerId\": \"player_xxx\"\n  },\n  \"timestamp\": {{$timestamp}}\n}"
+            }
+          }
+        },
+        {
+          "name": "Game Move",
+          "request": {
+            "description": "Make a move in the game",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"game:move\",\n  \"data\": {\n    \"x\": 5,\n    \"y\": 3\n  },\n  \"timestamp\": {{$timestamp}}\n}"
+            }
+          }
+        },
+        {
+          "name": "Heartbeat",
+          "request": {
+            "description": "Send heartbeat to keep connection alive",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"heartbeat\",\n  \"data\": {\n    \"timestamp\": {{$timestamp}}\n  },\n  \"timestamp\": {{$timestamp}}\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

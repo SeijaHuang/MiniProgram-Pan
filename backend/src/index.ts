@@ -1,13 +1,18 @@
 import http from 'http';
 import app from './app';
 import { initWebSocket } from './ws';
+import { loadEnv, validateEnv } from './utils/env-loader';
+import { APP_CONFIG } from './constants/config';
 
-const PORT = Number(process.env.PORT) || 8080;
+// Load environment variables
+loadEnv();
+validateEnv();
 
 const server = http.createServer(app);
 
 initWebSocket(server);
 
-server.listen(PORT, () => {
-    console.log(`server listening on ${PORT}`);
+server.listen(APP_CONFIG.PORT, () => {
+    console.log(`Server listening on port ${APP_CONFIG.PORT}`);
+    console.log(`Environment: ${APP_CONFIG.NODE_ENV}`);
 });
