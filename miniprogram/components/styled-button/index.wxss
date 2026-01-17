@@ -31,7 +31,7 @@
 .styled-button--blue {
     background-color: #6e95f7;
 }
-l bu
+
 /* 灰色背景 - 取消按钮 */
 .styled-button--grey {
     background-color: #666666;

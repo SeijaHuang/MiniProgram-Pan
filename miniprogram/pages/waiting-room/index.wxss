@@ -78,40 +78,6 @@
     margin-top: 120rpx;
 }
 
-/* 按钮图标区域 */
-.waiting-room__btn-icon {
-    margin-right: 20rpx;
-}
-
-.waiting-room__btn-emoji {
-    font-size: 56rpx;
-}
-
-/* 按钮文字 */
-.waiting-room__btn-text {
-    font-size: 48rpx;
-    font-weight: 800;
-    letter-spacing: 4rpx;
-}
-
-.waiting-room__btn-text--red {
-    color: #cc0000;
-    text-shadow:
-        -2rpx -2rpx 0 #000000,
-        2rpx -2rpx 0 #000000,
-        -2rpx 2rpx 0 #000000,
-        2rpx 2rpx 0 #000000;
-}
-
-.waiting-room__btn-text--white {
-    color: #ffffff;
-    text-shadow:
-        -2rpx -2rpx 0 #000000,
-        2rpx -2rpx 0 #000000,
-        -2rpx 2rpx 0 #000000,
-        2rpx 2rpx 0 #000000;
-}
-
 /* ========================================
    等待区域 - host_waiting / guest_waiting
    ======================================== */
