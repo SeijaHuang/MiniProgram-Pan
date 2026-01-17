@@ -2,8 +2,8 @@
 
 <view class="{{ customClass }}">
     <button
-        class="styled-button styled-button--{{ color }} "
-        hover-class="styled-button--pressed"
+        class="styled-button styled-button--{{ color }} {{ disabled ? 'styled-button--disabled' : '' }}"
+        hover-class="{{ disabled ? '' : 'styled-button--pressed' }}"
         bindtap="handleTap"
         style="{{ buttonStyle }}"
     >

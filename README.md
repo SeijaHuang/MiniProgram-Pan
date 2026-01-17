@@ -22,8 +22,11 @@ miniprogram/
 ├── pages/              # 页面目录
 │   ├── welcome/        # 欢迎页（首页）
 │   ├── waiting-room/   # 房间创建 & 等待页
+│   ├── drum/           # 击鼓页面
 │   └── logs/           # 日志页
 ├── components/         # 组件目录（自定义组件）
+│   ├── styled-button/  # 样式化按钮组件
+│   └── styled-title/   # 样式化标题组件
 ├── services/           # 业务逻辑、API 调用
 └── utils/              # 工具函数目录
 ```
@@ -114,6 +117,8 @@ class WebSocketManager {
 
 - **页面**: 放置在 `miniprogram/pages/` 目录下，每个页面包含 `.ts`、`.wxml`、`.wxss`、`.json` 四个文件
 - **组件**: 放置在 `miniprogram/components/` 目录下，结构与页面相同
+    - `styled-button`: 可复用的样式化按钮组件，支持多种颜色主题和动画效果
+    - `styled-title`: 可复用的样式化标题组件，支持动画绑定
 - **服务层**: 放置在 `miniprogram/services/` 目录下，处理业务逻辑和 API 调用
 - **工具函数**: 放置在 `miniprogram/utils/` 目录下，纯函数，无副作用
 
@@ -148,7 +153,9 @@ npm run format:check
 
 如果检查失败，commit 会被阻止，需要先修复错误。
 
-## 页面文档
+## 文档
+
+### 页面文档
 
 项目包含以下页面的详细实现文档：
 
@@ -162,6 +169,21 @@ npm run format:check
 - 核心视觉元素和交互细节
 - 状态管理和跳转逻辑
 - 实现状态和后续规划
+
+### 组件文档
+
+- **组件索引**: `docs/components.md` - 所有自定义组件的详细说明
+    - **Styled Button** (`styled-button`) - 可复用的样式化按钮组件
+        - 支持多种颜色主题（红、黄、蓝、灰）
+        - 支持图标和文字
+        - 光线扫过动画效果
+        - 按压反馈效果
+    - **Styled Title** (`styled-title`) - 可复用的样式化标题组件
+        - 统一的大号粗体白色文字风格
+        - 黑色描边和投影效果
+        - 支持动画绑定和初始状态控制
+
+详细使用方法和 API 说明请参考 `docs/components.md`。
 
 ## 开发注意事项
 

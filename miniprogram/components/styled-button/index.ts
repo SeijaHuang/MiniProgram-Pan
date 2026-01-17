@@ -19,6 +19,10 @@ Component({
             type: Boolean,
             value: true,
         },
+        disabled: {
+            type: Boolean,
+            value: false,
+        },
         customClass: {
             type: String,
             value: '',
@@ -31,6 +35,9 @@ Component({
 
     methods: {
         handleTap(): void {
+            if (this.properties.disabled) {
+                return;
+            }
             this.triggerEvent('tap');
         },
     },

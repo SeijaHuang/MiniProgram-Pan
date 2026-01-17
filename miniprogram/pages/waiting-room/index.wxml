@@ -150,13 +150,13 @@
             </view>
 
             <!-- 确认按钮 -->
-            <view
-                class="waiting-room__modal-btn {{ isJoinButtonDisabled ? 'waiting-room__modal-btn--disabled' : '' }}"
-                animation="{{ confirmButtonAnimation }}"
-                bindtap="{{ isJoinButtonDisabled ? '' : 'onConfirmJoin' }}"
-            >
-                <text>确认加入</text>
-            </view>
+            <styled-button
+                text="确认加入"
+                color="blue"
+                showShine="{{ isJoinButtonDisabled ? false : true }}"
+                disabled="{{ isJoinButtonDisabled }}"
+                bindtap="onConfirmJoin"
+            ></styled-button>
         </view>
     </view>
 

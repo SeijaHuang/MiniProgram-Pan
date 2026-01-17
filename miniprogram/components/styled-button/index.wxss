@@ -126,6 +126,19 @@
     color: #ff0000;
 }
 
+/* 禁用状态 */
+.styled-button--disabled {
+    background-color: #cccccc;
+    border-color: #999999;
+    box-shadow:
+        0 8rpx 0 0 #999999,
+        0 12rpx 16rpx rgba(0, 0, 0, 0.2);
+}
+
+.styled-button--disabled .styled-button__text {
+    color: #999999;
+}
+
 /* 按压状态 - hover-class */
 .styled-button--pressed {
     transform: scale(0.96) translateY(6rpx);
