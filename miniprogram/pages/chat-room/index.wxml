@@ -1,0 +1,72 @@
+<!--
+    Chat Room Page - 对簿公堂 / 语音申冤页
+    Phase: SPEAKER_A -> SPEAKER_B -> DONE
+-->
+<view class="chat-room">
+    <!-- 顶部倒计时区域 - 仅显示居中倒计时 -->
+    <view class="chat-room__countdown-area">
+        <view class="chat-room__countdown chat-room__countdown--{{countdownClass}}">
+            <text class="chat-room__countdown-text">{{remaining}}</text>
+        </view>
+    </view>
+
+    <!-- 飞行表情层 -->
+    <view class="chat-room__reactions">
+        <view
+            wx:for="{{reactions}}"
+            wx:key="id"
+            class="chat-room__reaction chat-room__reaction--lane{{item.lane}}"
+        >
+            <text class="chat-room__reaction-emoji">{{item.emoji}}</text>
+        </view>
+    </view>
+
+    <!-- 发言舞台区 -->
+    <view class="chat-room__stage">
+        <!-- 非录音状态显示文案 -->
+        <view class="chat-room__stage-hint" wx:if="{{!isRecording}}">
+            <text wx:if="{{canSpeak}}">点击麦克风开始申冤...</text>
+            <text wx:else>等待对方陈述...</text>
+        </view>
+
+        <!-- 录音中显示波纹动画 -->
+        <view class="chat-room__recording-wave" wx:if="{{isRecording}}">
+            <view class="chat-room__wave-bar"></view>
+            <view class="chat-room__wave-bar"></view>
+            <view class="chat-room__wave-bar"></view>
+            <view class="chat-room__wave-bar"></view>
+            <view class="chat-room__wave-bar"></view>
+        </view>
+    </view>
+
+    <!-- 麦克风按钮 -->
+    <view class="chat-room__mic-area">
+        <view
+            class="chat-room__mic {{canSpeak ? (isRecording ? 'chat-room__mic--recording' : 'chat-room__mic--active') : 'chat-room__mic--disabled'}}"
+            bindtouchstart="onMicTouchStart"
+            bindtouchend="onMicTouchEnd"
+            bindtouchcancel="onMicTouchCancel"
+        >
+            <text class="chat-room__mic-icon">🎤</text>
+        </view>
+        <text class="chat-room__mic-label">
+            {{isRecording ? '松开结束' : (canSpeak ? '按住说话' : '等待发言')}}
+        </text>
+    </view>
+
+    <!-- 底部表情面板 -->
+    <view class="chat-room__emoji-panel {{canReact ? '' : 'chat-room__emoji-panel--disabled'}}">
+        <view
+            wx:for="{{emojiList}}"
+            wx:key="*this"
+            class="chat-room__emoji-btn"
+            data-emoji="{{item}}"
+            bindtap="onEmojiTap"
+        >
+            <text class="chat-room__emoji-text">{{item}}</text>
+        </view>
+    </view>
+
+    <!-- 安全区域 -->
+    <view class="chat-room__safe-area"></view>
+</view>

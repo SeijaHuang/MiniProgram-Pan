@@ -75,7 +75,7 @@ const WAITING_TEXTS: string[] = [
     '等待你的"冤家"上线...',
 ];
 
-const INITIAL_COUNTDOWN_TIME = 10;
+const INITIAL_COUNTDOWN_TIME = 3;
 
 /**
  * 生成6位随机房间号
@@ -479,7 +479,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
                 this.clearAllTimers();
                 // 跳转到击鼓抢麦页面
                 wx.navigateTo({
-                    url: '/pages/drum/index',
+                    url: '/pages/chat-room/index',
                     fail: err => {
                         console.error('跳转失败:', err);
                         void wx.showToast({
