@@ -74,6 +74,8 @@ const WAITING_TEXTS: string[] = [
     '等待你的"冤家"上线...',
 ];
 
+const INITIAL_COUNTDOWN_TIME = 10;
+
 /**
  * 生成6位随机房间号
  */
@@ -431,7 +433,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         this.mockGuestTimer = setTimeout(() => {
             if (this.data.viewMode === 'host_waiting') {
                 this.clearAllTimers();
-                // this.startCountdown();
+                this.startCountdown();
             }
         }, delay);
     },
@@ -442,15 +444,17 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     startCountdown(): void {
         this.setData({
             showCountdown: true,
-            countdown: 10,
+            countdown: INITIAL_COUNTDOWN_TIME,
         });
 
         this.triggerHapticFeedback();
 
-        this.countdownTimer = setInterval(() => {
-            const newCount = this.data.countdown - 1;
+        let currentCount = INITIAL_COUNTDOWN_TIME;
 
-            if (newCount <= 0) {
+        this.countdownTimer = setInterval(() => {
+            currentCount -= 1;
+
+            if (currentCount <= 0) {
                 this.clearAllTimers();
                 // 跳转到击鼓抢麦页面
                 wx.navigateTo({
@@ -466,7 +470,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             } else {
                 this.triggerHapticFeedback();
                 this.setData({
-                    countdown: newCount,
+                    countdown: currentCount,
                 });
             }
         }, 1000);
