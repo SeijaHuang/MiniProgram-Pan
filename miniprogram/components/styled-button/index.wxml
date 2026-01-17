@@ -1,0 +1,20 @@
+<!--components/styled-button/index.wxml-->
+
+<view class="{{ customClass }}">
+    <button
+        class="styled-button styled-button--{{ color }} {{ disabled ? 'styled-button--disabled' : '' }}"
+        hover-class="{{ disabled ? '' : 'styled-button--pressed' }}"
+        bindtap="handleTap"
+        style="{{ buttonStyle }}"
+    >
+        <!-- Light sweep effect layer -->
+        <view wx:if="{{ showShine }}" class="styled-button__shine"></view>
+        <view class="styled-button__content {{ icon ? 'styled-button__content--with-icon' : '' }}">
+            <view wx:if="{{ icon }}" class="styled-button__icon">
+                <text>{{ icon }}</text>
+            </view>
+            <text class="styled-button__text styled-button__text--{{ color }}">{{ text }}</text>
+        </view>
+    </button>
+</view>
+

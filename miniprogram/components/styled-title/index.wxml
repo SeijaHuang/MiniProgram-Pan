@@ -1,0 +1,7 @@
+<!--components/styled-title/index.wxml-->
+<view
+    class="styled-title {{ isInitial ? 'styled-title--initial' : '' }}"
+    animation="{{ animation }}"
+>
+    <text class="styled-title__text {{ customClass }}">{{ text }}</text>
+</view>

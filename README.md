@@ -20,9 +20,14 @@ miniprogram/
 ├── app.json            # 小程序全局配置
 ├── app.wxss            # 全局样式
 ├── pages/              # 页面目录
-│   ├── index/          # 首页
+│   ├── welcome/        # 欢迎页（首页）
+│   ├── waiting-room/   # 房间创建 & 等待页
+│   ├── drum/           # 击鼓页面
 │   └── logs/           # 日志页
 ├── components/         # 组件目录（自定义组件）
+│   ├── styled-button/  # 样式化按钮组件
+│   └── styled-title/   # 样式化标题组件
+├── services/           # 业务逻辑、API 调用
 └── utils/              # 工具函数目录
 ```
 
@@ -100,7 +105,7 @@ class WebSocketManager {
             },
         });
 
-        this.socketTask.onMessage((res) => {
+        this.socketTask.onMessage(res => {
             // 处理消息
             console.log('收到消息:', res.data);
         });
@@ -110,9 +115,12 @@ class WebSocketManager {
 
 ### 目录规范
 
-- **页面**: 放置在 `miniprogram/pages/` 目录下
-- **组件**: 放置在 `miniprogram/components/` 目录下
-- **工具函数**: 放置在 `miniprogram/utils/` 目录下
+- **页面**: 放置在 `miniprogram/pages/` 目录下，每个页面包含 `.ts`、`.wxml`、`.wxss`、`.json` 四个文件
+- **组件**: 放置在 `miniprogram/components/` 目录下，结构与页面相同
+    - `styled-button`: 可复用的样式化按钮组件，支持多种颜色主题和动画效果
+    - `styled-title`: 可复用的样式化标题组件，支持动画绑定
+- **服务层**: 放置在 `miniprogram/services/` 目录下，处理业务逻辑和 API 调用
+- **工具函数**: 放置在 `miniprogram/utils/` 目录下，纯函数，无副作用
 
 ## 代码检查
 
@@ -145,6 +153,38 @@ npm run format:check
 
 如果检查失败，commit 会被阻止，需要先修复错误。
 
+## 文档
+
+### 页面文档
+
+项目包含以下页面的详细实现文档：
+
+- **欢迎页（Welcome）**: `docs/welcome.md` - 首页入口，包含角色展示和主 CTA 按钮
+- **等待页（Waiting Room）**: `docs/waiting-room.md` - 房间创建和等待对方加入的页面
+
+每个页面文档包含：
+
+- 页面目标和用户心理状态
+- 页面结构和布局说明
+- 核心视觉元素和交互细节
+- 状态管理和跳转逻辑
+- 实现状态和后续规划
+
+### 组件文档
+
+- **组件索引**: `docs/components.md` - 所有自定义组件的详细说明
+    - **Styled Button** (`styled-button`) - 可复用的样式化按钮组件
+        - 支持多种颜色主题（红、黄、蓝、灰）
+        - 支持图标和文字
+        - 光线扫过动画效果
+        - 按压反馈效果
+    - **Styled Title** (`styled-title`) - 可复用的样式化标题组件
+        - 统一的大号粗体白色文字风格
+        - 黑色描边和投影效果
+        - 支持动画绑定和初始状态控制
+
+详细使用方法和 API 说明请参考 `docs/components.md`。
+
 ## 开发注意事项
 
 1. **不使用任何第三方框架**: 项目仅使用微信小程序原生 API
@@ -152,6 +192,7 @@ npm run format:check
 3. **禁止使用 any**: ESLint 会检查并阻止使用 `any` 类型
 4. **动画实现**: 统一使用 `wx.createAnimation`，不使用 CSS 动画
 5. **实时通信**: 使用 WebSocket 实现双人实时互动
+6. **页面复用**: Waiting Room 页面同时服务于创建者和被邀请者，通过角色判断显示不同按钮
 
 ## 文件说明
 

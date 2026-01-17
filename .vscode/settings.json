@@ -1,0 +1,36 @@
+{
+    // 启用保存时自动格式化
+    "editor.formatOnSave": true,
+
+    // 设置 Prettier 为默认格式化工具
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+    // 为特定文件类型设置格式化工具
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+
+    // 确保 Prettier 配置被使用
+    "prettier.requireConfig": true,
+
+    // 启用 ESLint 自动修复（在格式化之后）
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+
+    // 禁用 Prettier ESLint 扩展（避免冲突）
+    "prettier-eslint.enable": false
+}

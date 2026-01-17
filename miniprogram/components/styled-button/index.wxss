@@ -1,0 +1,154 @@
+/* components/styled-button/index.wxss */
+
+.styled-button {
+    width: 100% !important;
+    min-height: 96rpx;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 24rpx;
+    border: none;
+    border: 8rpx solid #000000;
+    border-bottom-width: 12rpx;
+    box-shadow:
+        0 8rpx 0 0 #000000,
+        0 12rpx 16rpx rgba(0, 0, 0, 0.3);
+    padding-top: 30rpx;
+    padding-bottom: 30rpx;
+}
+
+/* 红色背景（默认）- 欢迎页按钮 */
+.styled-button--red {
+    background: linear-gradient(180deg, #ff3b30 0%, #e6392e 100%);
+}
+
+/* 黄色背景 - 发起申冤按钮 */
+.styled-button--yellow {
+    background-color: #ffd200;
+}
+
+/* 蓝色背景 - 加入房间按钮 */
+.styled-button--blue {
+    background-color: #6e95f7;
+}
+
+/* 灰色背景 - 取消按钮 */
+.styled-button--grey {
+    background-color: #666666;
+}
+
+/* ========================================
+   LIGHT SWEEP EFFECT
+   持续的光线扫过动画
+   ======================================== */
+.styled-button__shine {
+    position: absolute;
+    top: -20%;
+    left: -50%;
+    width: 35%;
+    height: 140%;
+    background: linear-gradient(
+        105deg,
+        transparent 0%,
+        transparent 35%,
+        rgba(255, 255, 240, 0.25) 45%,
+        rgba(255, 255, 240, 0.35) 50%,
+        rgba(255, 255, 240, 0.25) 55%,
+        transparent 65%,
+        transparent 100%
+    );
+    transform: skewX(-15deg);
+    animation: btn-shine-sweep 3s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Keyframes: 光带从左侧扫到右侧 */
+@keyframes btn-shine-sweep {
+    0% {
+        left: -50%;
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        left: 120%;
+        opacity: 0;
+    }
+}
+
+/* 内容容器 */
+.styled-button__content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+}
+
+/* 有 icon 时，垂直排列 */
+.styled-button__content--with-icon {
+    flex-direction: column;
+    gap: 5rpx;
+}
+
+.styled-button__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.styled-button__icon text {
+    font-size: 40rpx;
+    line-height: 1;
+}
+
+.styled-button__text {
+    font-size: 40rpx;
+    font-weight: 700;
+    letter-spacing: 2rpx;
+    text-align: center;
+    position: relative;
+}
+
+/* 文字颜色 - 根据背景色调整 */
+.styled-button__text--red,
+.styled-button__text--blue,
+.styled-button__text--grey {
+    color: #ffffff;
+}
+
+.styled-button__text--yellow {
+    color: #ff0000;
+}
+
+/* 禁用状态 */
+.styled-button--disabled {
+    background-color: #cccccc;
+    border-color: #999999;
+    box-shadow:
+        0 8rpx 0 0 #999999,
+        0 12rpx 16rpx rgba(0, 0, 0, 0.2);
+}
+
+.styled-button--disabled .styled-button__text {
+    color: #999999;
+}
+
+/* 按压状态 - hover-class */
+.styled-button--pressed {
+    transform: scale(0.96) translateY(6rpx);
+    box-shadow:
+        0 2rpx 0 0 #000000,
+        0 4rpx 8rpx rgba(0, 0, 0, 0.2);
+}
+
+/* 按压时隐藏光线扫过效果 */
+.styled-button.styled-button--pressed .styled-button__shine {
+    opacity: 0;
+    animation: none;
+}

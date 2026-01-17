@@ -1,5 +1,8 @@
 {
-    "usingComponents": {},
+    "usingComponents": {
+        "styled-button": "/components/styled-button/index",
+        "styled-title": "/components/styled-title/index"
+    },
     "navigationBarTitleText": "欢迎",
     "navigationBarBackgroundColor": "#f5f5f5",
     "navigationBarTextStyle": "black"
