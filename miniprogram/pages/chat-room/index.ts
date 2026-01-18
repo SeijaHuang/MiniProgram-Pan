@@ -6,6 +6,13 @@
 type Phase = 'SPEAKER_A' | 'SPEAKER_B' | 'DONE';
 type Role = 'A' | 'B';
 
+interface IMessage {
+    id: number;
+    role: Role;
+    content: string;
+    timestamp: number;
+}
+
 interface IReaction {
     id: number;
     emoji: string;
@@ -33,6 +40,9 @@ interface IChatRoomPageData {
     // 录音状态
     isRecording: boolean;
 
+    // 消息列表（语音转文字）
+    messages: IMessage[];
+
     // 表情系统
     reactions: IReaction[];
     emojiList: string[];
@@ -43,6 +53,7 @@ interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     recorderManager: WechatMiniprogram.RecorderManager | null;
     reactionIdCounter: number;
     reactionTimeouts: number[];
+    messageIdCounter: number;
 }
 
 const EMOJI_LIST = ['😠', '😢', '❤️', '🤔', '😂', '😅', '🥺', '💔'];
@@ -73,6 +84,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         isRecording: false,
 
+        messages: [],
+
         reactions: [],
         emojiList: EMOJI_LIST,
     },
@@ -81,6 +94,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     recorderManager: null,
     reactionIdCounter: 0,
     reactionTimeouts: [],
+    messageIdCounter: 0,
 
     onLoad(options): void {
         // 解析页面参数
@@ -445,8 +459,29 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 格式化时间
      */
     formatTime(seconds: number): string {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
+        const mins: number = Math.floor(seconds / 60);
+        const secs: number = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    },
+
+    /**
+     * 添加消息到对话列表
+     * @param role 发送者角色
+     * @param content 语音转文字内容
+     */
+    addMessage(role: Role, content: string): void {
+        const id: number = ++this.messageIdCounter;
+        const timestamp: number = Date.now();
+
+        const newMessage: IMessage = {
+            id,
+            role,
+            content,
+            timestamp,
+        };
+
+        this.setData({
+            messages: [...this.data.messages, newMessage],
+        });
     },
 });
