@@ -73,10 +73,31 @@ In WXML: `<view animation="{{ animationData }}"></view>`
 ### TypeScript - MANDATORY
 
 - **No `any` types** - Use `unknown` with type guards instead
-- **Explicit return types** on all functions
+- **Explicit types on all variables** - Every variable declaration must have an explicit type annotation
+- **Explicit types on all function parameters and return types** - Every function must specify types for all parameters and return value
 - **Interface prefix**: `I` (e.g., `IUser`, `IPageData`)
 - **Unused code**: Prefix intentionally unused params with `_`
 - **WeChat types**: Use `WechatMiniprogram` namespace
+
+```typescript
+// ✅ Correct
+const count: number = 0;
+const name: string = 'user';
+const items: string[] = [];
+
+function add(a: number, b: number): number {
+    return a + b;
+}
+
+const multiply = (x: number, y: number): number => x * y;
+
+// ❌ Wrong - missing type annotations
+const count = 0;
+const name = 'user';
+function add(a, b) {
+    return a + b;
+}
+```
 
 ### Code Style
 

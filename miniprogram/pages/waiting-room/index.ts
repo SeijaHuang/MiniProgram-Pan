@@ -477,9 +477,11 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
             if (currentCount <= 0) {
                 this.clearAllTimers();
-                // 跳转到击鼓抢麦页面
+                // 跳转到聊天房间页面，带上 roomId
+                const { roomCode, viewMode } = this.data;
+                const role = viewMode === 'host_waiting' ? 'A' : 'B';
                 wx.navigateTo({
-                    url: '/pages/chat-room/index',
+                    url: `/pages/chat-room/index?roomId=${roomCode}&role=${role}`,
                     fail: err => {
                         console.error('跳转失败:', err);
                         void wx.showToast({

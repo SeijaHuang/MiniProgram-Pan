@@ -14,6 +14,9 @@ interface IReaction {
 }
 
 interface IChatRoomPageData {
+    // 房间标识
+    roomId: string;
+
     // 核心状态机字段
     phase: Phase;
     localRole: Role;
@@ -35,7 +38,7 @@ interface IChatRoomPageData {
     emojiList: string[];
 }
 
-interface IChatRoomCustomOption {
+interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     timerId: number | null;
     recorderManager: WechatMiniprogram.RecorderManager | null;
     reactionIdCounter: number;
@@ -46,13 +49,22 @@ const EMOJI_LIST = ['😠', '😢', '❤️', '🤔', '😂', '😅', '🥺', '�
 const MAX_REACTIONS = 3;
 const REACTION_DURATION_MIN = 3000;
 const REACTION_DURATION_MAX = 5000;
+const TOTAL_PER_TURN = 20;
+const PHASE_TRANSITION: Record<Phase, Phase> = {
+    SPEAKER_A: 'SPEAKER_B',
+    SPEAKER_B: 'DONE',
+    DONE: 'DONE',
+};
+const REACTION_LANES = [0, 1, 2];
 
 Page<IChatRoomPageData, IChatRoomCustomOption>({
     data: {
+        roomId: '',
+
         phase: 'SPEAKER_A',
         localRole: 'A',
-        remaining: 60,
-        totalPerTurn: 60,
+        remaining: TOTAL_PER_TURN,
+        totalPerTurn: TOTAL_PER_TURN,
 
         canSpeak: true,
         canReact: false,
@@ -72,23 +84,32 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
     onLoad(options): void {
         // 解析页面参数
+        const roomId = options.roomId ?? '';
         const localRole: Role = options.role === 'B' ? 'B' : 'A';
-        const totalPerTurn = options.totalTime
-            ? parseInt(options.totalTime, 10)
-            : 60;
+
+        // 校验 roomId
+        // TODO: 后续对接 WebSocket，校验 roomId
+        if (!roomId) {
+            void wx.showToast({ title: '房间号无效', icon: 'error' });
+            setTimeout(() => {
+                void wx.navigateBack();
+            }, 1500);
+            return;
+        }
 
         // 计算初始权限
-        const canSpeak = this.computeCanSpeak('SPEAKER_A', localRole);
-        const canReact = !canSpeak;
+        const canSpeak: boolean = this.computeCanSpeak('SPEAKER_A', localRole);
+        const canReact: boolean = !canSpeak;
 
         this.setData({
+            roomId,
             localRole,
-            totalPerTurn,
-            remaining: totalPerTurn,
+            totalPerTurn: TOTAL_PER_TURN,
+            remaining: TOTAL_PER_TURN,
             phase: 'SPEAKER_A',
             canSpeak,
             canReact,
-            countdownClass: this.getCountdownClass(totalPerTurn),
+            countdownClass: this.getCountdownClass(TOTAL_PER_TURN),
         });
 
         // 初始化录音管理器
@@ -129,10 +150,12 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         }
 
         // 清理所有表情 timeout
-        this.reactionTimeouts.forEach(id => {
-            clearTimeout(id);
-        });
-        this.reactionTimeouts = [];
+        if (this.reactionTimeouts.length) {
+            this.reactionTimeouts.forEach(id => {
+                clearTimeout(id);
+            });
+            this.reactionTimeouts = [];
+        }
     },
 
     /**
@@ -168,12 +191,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         this.recorderManager = wx.getRecorderManager();
 
         this.recorderManager.onStart(() => {
-            console.log('[ChatRoom] Recording started');
             this.setData({ isRecording: true });
         });
 
-        this.recorderManager.onStop(res => {
-            console.log('[ChatRoom] Recording stopped', res.tempFilePath);
+        this.recorderManager.onStop(() => {
             this.setData({ isRecording: false });
             // TODO: 后续对接 WebSocket，发送录音文件
         });
@@ -233,15 +254,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             this.recorderManager.stop();
         }
 
-        let nextPhase: Phase;
-
-        if (phase === 'SPEAKER_A') {
-            nextPhase = 'SPEAKER_B';
-        } else if (phase === 'SPEAKER_B') {
-            nextPhase = 'DONE';
-        } else {
-            return;
-        }
+        const nextPhase: Phase = PHASE_TRANSITION[phase];
 
         if (nextPhase === 'DONE') {
             // 清理定时器
@@ -256,20 +269,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 canReact: false,
                 remaining: 0,
             });
+            return;
 
             // TODO: 跳转到分析页面
-            setTimeout(() => {
-                void wx.navigateTo({
-                    url: '/pages/analyzing/index',
-                    fail: () => {
-                        // 页面不存在时的 fallback
-                        void wx.showToast({
-                            title: '即将进入分析...',
-                            icon: 'none',
-                        });
-                    },
-                });
-            }, 1000);
         } else {
             // 切换到下一阶段
             const canSpeak = this.computeCanSpeak(nextPhase, localRole);
@@ -350,8 +352,16 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 停止录音
      */
     stopRecording(): void {
+        const audio = wx.createInnerAudioContext();
+        this.recorderManager?.onStop(res => {
+            audio.src = res.tempFilePath;
+            audio.play();
+        });
+
         if (this.recorderManager && this.data.isRecording) {
             this.recorderManager.stop();
+        } else {
+            audio.stop();
         }
     },
 
@@ -377,13 +387,14 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 分配轨道
         const usedLanes = this.data.reactions.map(r => r.lane);
-        let lane = 0;
-        for (let i = 0; i < 3; i++) {
-            if (!usedLanes.includes(i)) {
-                lane = i;
-                break;
-            }
-        }
+        const availableLanes = REACTION_LANES.filter(
+            lane => !usedLanes.includes(lane)
+        );
+
+        if (!availableLanes.length) return;
+
+        const lane =
+            availableLanes[Math.floor(Math.random() * availableLanes.length)];
 
         const id = ++this.reactionIdCounter;
 
@@ -394,7 +405,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         const timeoutId = setTimeout(() => {
             this.removeReaction(id);
-        }, duration) as unknown as number;
+        }, duration);
 
         this.reactionTimeouts.push(timeoutId);
 
@@ -424,6 +435,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         if (reaction) {
             const idx = this.reactionTimeouts.indexOf(reaction.timeoutId);
             if (idx > -1) {
+                clearTimeout(id);
                 this.reactionTimeouts.splice(idx, 1);
             }
         }
