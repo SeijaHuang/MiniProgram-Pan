@@ -240,8 +240,8 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
     },
 
     handleStartJudge(): void {
-        setTimeout(async () => {
-            await wx.navigateTo({ url: '/pages/waiting-room/index' });
+        setTimeout(() => {
+            void wx.navigateTo({ url: '/pages/waiting-room/index' });
         }, 250);
     },
 

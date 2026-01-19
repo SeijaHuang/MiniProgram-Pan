@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: chatroom-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - NODE_ENV=development
+      - WS_PATH=/ws
+      - LOG_LEVEL=debug
+    volumes:
+      # 挂载源代码 (支持热重载)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      # 防止 node_modules 被覆盖
+      - /app/node_modules
+    restart: unless-stopped
+    networks:
+      - chatroom-network
+
+networks:
+  chatroom-network:
+    driver: bridge

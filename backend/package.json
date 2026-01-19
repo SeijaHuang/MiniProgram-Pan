@@ -1,0 +1,37 @@
+{
+    "name": "backend",
+    "version": "1.0.0",
+    "main": "index.js",
+    "scripts": {
+        "dev": "ts-node src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "ws:test": "ts-node scripts/ws-test.ts",
+        "lint": "eslint . --ext .ts",
+        "lint:fix": "eslint . --ext .ts --fix",
+        "format": "prettier --write \"**/*.{ts,js,json}\"",
+        "format:check": "prettier --check \"**/*.{ts,js,json}\""
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "dotenv": "^17.2.3",
+        "express": "^5.2.1",
+        "ws": "^8.19.0"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.6",
+        "@types/node": "^25.0.8",
+        "@types/ws": "^8.18.1",
+        "@typescript-eslint/eslint-plugin": "^6.0.0",
+        "@typescript-eslint/parser": "^6.0.0",
+        "eslint": "^8.57.0",
+        "eslint-config-prettier": "^9.1.0",
+        "eslint-plugin-prettier": "^5.1.3",
+        "prettier": "^3.2.5",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.9.3"
+    }
+}
