@@ -22,7 +22,8 @@ miniprogram/
 ├── pages/              # 页面目录
 │   ├── welcome/        # 欢迎页（首页）
 │   ├── waiting-room/   # 房间创建 & 等待页
-│   ├── drum/           # Chat Room（对簿公堂）页面
+│   ├── drum/           # 击鼓页面
+│   ├── chat-room/      # Chat Room（对簿公堂）页面
 │   └── logs/           # 日志页
 ├── components/         # 组件目录（自定义组件）
 │   ├── styled-button/  # 样式化按钮组件
