@@ -105,26 +105,39 @@
 
 ### 5.1 默认状态
 
-- **文案**: `点击麦克风开始申冤…`
+- **文案**: `点击麦克风开始申冤…`（发言方）或 `等待对方陈述…`（监听方）
 - **样式**: 灰色、居中、半透明
 - **实现位置**:
-    - WXML: `chat-room__stage-text`
+    - WXML: `chat-room__stage-hint`
     - WXSS: 灰色半透明文字样式
 
 ### 5.2 录音中状态
 
-- **文案**: 隐藏默认文案
+- **语音识别对话框**: 显示在舞台中间，不遮挡顶部倒计时
+- **实时文本显示**: 录音中不断刷新临时识别文本（`speechTextLive`）
+- **占位文案**: 当 `speechTextLive` 为空时显示 `正在记录你的申冤内容…`
 - **麦克风**: 发光呼吸动画
-- **舞台背景**: 轻微光晕效果
+- **波纹动画**: 仅在无识别文本时显示录音波纹动画
 - **实现位置**:
-    - WXML: 通过 `wx:if` 控制文案显示/隐藏
-    - WXSS: 麦克风按钮添加发光和呼吸动画
+    - WXML: `chat-room__speech-bubble` 对话框容器
+    - WXSS: 对话框样式（`chat-room__speech-bubble`、`chat-room__speech-text`）
     - TS: `onRecordStart()` / `onRecordStop()` 方法
 
-### 5.3 结束条件
+### 5.3 录音结束状态
+
+- **最终文本显示**: 显示识别后的最终文本（`speechTextFinal`）
+- **只读状态**: 录音结束后对话框为只读状态
+
+### 5.4 识别错误状态
+
+- **错误提示**: 显示 `[本次语音未成功识别]`
+- **Toast 提示**: 同时显示 `语音识别失败` 的 Toast 提示
+
+### 5.5 结束条件
 
 - 用户松开麦克风 → 触发 `onRecordStop()`
 - 倒计时归零自动结束 → 在倒计时回调中调用 `stopRecording()`
+- 阶段切换时 → 清理识别状态
 
 ---
 
@@ -146,28 +159,68 @@
     - WXML: `chat-room__mic-button`
     - TS: `onMicPress()` / `onMicRelease()` 方法
 
-### 6.3 录音 API 集成
+### 6.3 录音与语音识别集成
 
-```typescript
-// 开始录音
-wx.startRecord({
-    success: () => {
-        // 更新状态为录音中
-    },
-    fail: () => {
-        // 处理录音失败
-    },
-});
+#### 6.3.1 微信同声传译插件（WechatSI）
 
-// 停止录音
-wx.stopRecord({
-    success: res => {
-        // 获取录音文件临时路径
-        const tempFilePath = res.tempFilePath;
-        // 上传到服务器或进行后续处理
-    },
-});
-```
+**必须使用方案A：WechatSI插件**
+
+- 不使用云函数、第三方ASR、数据库
+- 插件配置：在 `app.json` 中添加插件配置
+    ```json
+    {
+        "plugins": {
+            "WechatSI": {
+                "version": "0.3.0",
+                "provider": "wx069ba97219f66d99"
+            }
+        }
+    }
+    ```
+
+#### 6.3.2 录音与识别同步启停
+
+**开始录音时（`startRecording()`）**:
+
+1. 清空识别状态：`speechTextLive = ''`, `speechTextFinal = ''`, `recognizeError = null`
+2. 启动录音管理器：`recorderManager.start(...)`
+3. 同步启动识别管理器：`recognizeManager.start({ lang: "zh_CN" })`
+4. 更新状态：`isRecording: true`, `isRecognizing: true`
+
+**停止录音时（`stopRecording()`）**:
+
+1. 停止录音管理器：`recorderManager.stop()`
+2. 停止识别管理器：`recognizeManager.stop()`（会触发 `onStop` 回调）
+3. 更新状态：`isRecording: false`
+4. `onStop` 回调会将最终文本写入 `speechTextFinal`
+
+#### 6.3.3 识别回调处理
+
+**实时识别回调（`onRecognize`）**:
+
+- 接收参数：`res.result` 为临时识别文本（会持续变化）
+- 处理：实时更新 `speechTextLive`，显示在对话框
+
+**识别结束回调（`onStop`）**:
+
+- 接收参数：`res.result` 为最终文本
+- 处理：更新 `speechTextFinal` 和 `speechTextLive`，设置 `isRecognizing: false`
+
+**识别错误回调（`onError`）**:
+
+- 处理：设置 `recognizeError: '识别失败'`，显示 Toast 提示，设置 `isRecognizing: false`
+
+#### 6.3.4 状态清理
+
+**阶段切换时**:
+
+- 强制停止录音和识别（如果正在进行）
+- 清理识别状态：`speechTextLive = ''`, `speechTextFinal = ''`, `recognizeError = null`, `isRecognizing = false`
+
+**页面隐藏/卸载时**:
+
+- 在 `cleanup()` 方法中停止录音和识别
+- 清理识别状态
 
 ---
 
@@ -306,28 +359,119 @@ type ChatRoomState =
 - **弹幕效果**: 使用 `wx.createAnimation` 实现从底部到顶部的移动
 - **生命周期**: 3-5 秒后自动移除动画实例
 
----
+### 11.4 语音识别对话框动画
 
-## 12. 埋点建议
-
-| 事件名              | 说明                       | 触发时机           |
-| ------------------- | -------------------------- | ------------------ |
-| `chat_room_enter`   | 进入对簿公堂页面           | `onLoad`           |
-| `speech_start`      | 开始发言                   | 点击麦克风开始录音 |
-| `speech_end`        | 结束发言                   | 松开麦克风或超时   |
-| `emoji_send`        | 发送表情                   | 点击表情按钮       |
-| `countdown_warning` | 倒计时进入警告阶段（≤10s） | 倒计时 ≤ 10s       |
-| `speech_timeout`    | 发言超时                   | 倒计时归零未发言   |
+- **对话框显示**: 使用 `wx:if` 控制显示/隐藏，无需动画
+- **文本更新**: 通过 `setData` 实时更新 `speechTextLive`，文本自动刷新
 
 ---
 
-## 13. 验收标准
+## 12. 语音识别功能实现
+
+### 12.1 数据字段
+
+在 `Page data` 中新增以下字段：
+
+| 字段名            | 类型             | 说明                     |
+| ----------------- | ---------------- | ------------------------ |
+| `speechTextLive`  | `string`         | 录音中不断刷新的临时文本 |
+| `speechTextFinal` | `string`         | 本轮结束后的最终文本     |
+| `isRecognizing`   | `boolean`        | 是否识别中               |
+| `recognizeError`  | `string \| null` | 识别错误信息             |
+
+### 12.2 识别管理器初始化
+
+在页面实例上挂载 `recognizeManager: IRecordRecognitionManager | null`
+
+在 `onLoad` 中初始化：
+
+```typescript
+this.recognizeManager = plugin.getRecordRecognitionManager();
+this.initSpeechRecognitionCallbacks();
+```
+
+### 12.3 对话框显示规则
+
+**显示条件**: `isRecording === true` 或 `speechTextFinal` 有值 或 `recognizeError` 存在
+
+**显示内容**:
+
+1. `isRecording === true`:
+    - 优先显示 `speechTextLive`
+    - 若 `speechTextLive` 为空：显示 `正在记录你的申冤内容…`（占位文案样式）
+2. `isRecording === false` 且 `speechTextFinal` 有值:
+    - 显示 `speechTextFinal`（只读）
+3. `recognizeError` 存在:
+    - 显示 `[本次语音未成功识别]`（错误样式）
+
+**注意事项**:
+
+- 对话框不遮挡顶部倒计时
+- 监听方看到的是 `等待对方陈述…`（原本舞台提示文案），对话框区域可为空或展示对方的文本（本阶段先不实现对方文本同步）
+
+### 12.4 对话框样式规范
+
+**对话框容器** (`chat-room__speech-bubble`):
+
+- `max-width: 620rpx`
+- `padding: 32rpx`
+- `border-radius: 28rpx`
+- `background-color: rgba(0, 0, 0, 0.45)`
+- `border: 6rpx solid rgb(0, 0, 0)`
+- `box-shadow: 0 16rpx 32rpx rgba(0,0,0,0.35)`
+
+**文本样式** (`chat-room__speech-text`):
+
+- `color: rgb(255, 255, 255)`
+- `font-size: 30rpx`
+- `line-height: 1.6`
+- `word-break: break-all`
+- `text-align: center`
+
+**占位文案样式** (`chat-room__speech-text--placeholder`):
+
+- `color: rgb(220, 220, 220)`
+- `opacity: 0.9`
+
+**错误文案样式** (`chat-room__speech-text--error`):
+
+- `color: rgb(255, 200, 200)`
+- `opacity: 0.9`
+
+### 12.5 验收标准
+
+- [ ] 仅使用 WechatSI 插件识别（`requirePlugin("WechatSI")`）
+- [ ] 按住麦克风说话时，对话框文字会实时刷新（`speechTextLive`）
+- [ ] 松开/倒计时结束后，对话框显示最终文字（`speechTextFinal`）
+- [ ] 识别失败会显示兜底文案且 toast 提示
+- [ ] 不影响原有倒计时与阶段切换
+- [ ] 阶段切换时正确清理识别状态
+
+---
+
+## 13. 埋点建议
+
+| 事件名                       | 说明                       | 触发时机           |
+| ---------------------------- | -------------------------- | ------------------ |
+| `chat_room_enter`            | 进入对簿公堂页面           | `onLoad`           |
+| `speech_start`               | 开始发言                   | 点击麦克风开始录音 |
+| `speech_end`                 | 结束发言                   | 松开麦克风或超时   |
+| `speech_recognition_success` | 语音识别成功               | `onStop` 回调      |
+| `speech_recognition_error`   | 语音识别失败               | `onError` 回调     |
+| `emoji_send`                 | 发送表情                   | 点击表情按钮       |
+| `countdown_warning`          | 倒计时进入警告阶段（≤10s） | 倒计时 ≤ 10s       |
+| `speech_timeout`             | 发言超时                   | 倒计时归零未发言   |
+
+---
+
+## 14. 验收标准
 
 ### P0（必须通过）
 
 - [ ] 倒计时正确显示，颜色和动画根据剩余时间变化
 - [ ] 麦克风按钮状态正确切换（可发言/录音中/禁用）
 - [ ] 录音功能正常，可以开始和停止录音
+- [ ] 语音识别功能正常，实时文本和最终文本正确显示
 - [ ] 双方轮流发言流程正确
 - [ ] 表情互动功能正常（仅监听方可用）
 - [ ] 状态同步正确（WebSocket）
@@ -336,46 +480,57 @@ type ChatRoomState =
 
 - [ ] 倒计时动画流畅，无卡顿
 - [ ] 麦克风按钮反馈明显（震动、动画）
+- [ ] 语音识别对话框不遮挡倒计时
 - [ ] 表情弹幕不遮挡倒计时
 - [ ] 异常场景有明确提示
 
 ---
 
-## 14. 实现状态
+## 15. 实现状态
 
 ### 当前状态（2026-01-17）
 
-- ⏳ **待实现** - 根据 PRD v1.0 规划，Chat Room 页面待开发
+- ✅ **已完成** - 基础布局和倒计时实现
+- ✅ **已完成** - 麦克风按钮和录音功能
+- ✅ **已完成** - 表情互动系统
+- ✅ **已完成** - 微信同声传译插件集成（WechatSI）
+- ⏳ **待实现** - WebSocket 状态同步
+- ⏳ **待实现** - 异常处理和优化
 
 ### 后续规划
 
-1. **第一阶段**: 基础布局和倒计时实现
-2. **第二阶段**: 麦克风按钮和录音功能
-3. **第三阶段**: 表情互动系统
-4. **第四阶段**: WebSocket 状态同步
-5. **第五阶段**: 异常处理和优化
+1. ✅ **第一阶段**: 基础布局和倒计时实现
+2. ✅ **第二阶段**: 麦克风按钮和录音功能
+3. ✅ **第三阶段**: 表情互动系统
+4. ✅ **第四阶段**: 语音识别功能（WechatSI插件）
+5. ⏳ **第五阶段**: WebSocket 状态同步
+6. ⏳ **第六阶段**: 异常处理和优化
 
 ---
 
-## 15. 相关文件一览
+## 16. 相关文件一览
 
 - **页面实现**:
-    - 结构: `miniprogram/pages/drum/index.wxml`
-    - 样式: `miniprogram/pages/drum/index.wxss`
-    - 逻辑: `miniprogram/pages/drum/index.ts`
-    - 配置: `miniprogram/pages/drum/index.json`
+    - 结构: `miniprogram/pages/chat-room/index.wxml`
+    - 样式: `miniprogram/pages/chat-room/index.wxss`
+    - 逻辑: `miniprogram/pages/chat-room/index.ts`
+    - 配置: `miniprogram/pages/chat-room/index.json`
+- **插件配置**:
+    - 全局配置: `miniprogram/app.json`（WechatSI 插件配置）
 - **产品文档**:
     - 原始 PRD: `Chat_Room_PRD_v1.0.md`
     - 本实现文档: `docs/chat-room.md`
 - **相关服务**:
     - WebSocket 管理: `miniprogram/services/websocket.ts`（待实现）
-    - 录音服务: `miniprogram/services/audio.ts`（待实现）
+    - 录音服务: 已集成在页面逻辑中（使用 `wx.getRecorderManager()`）
+    - 语音识别: 使用微信同声传译插件（WechatSI）
 
 ---
 
-## 16. 设计原则总结
+## 17. 设计原则总结
 
 1. **视觉即状态** - 通过倒计时与动画体现阶段，减少文字说明
 2. **单一视觉焦点** - 顶部仅保留居中倒计时
-3. **强舞台感** - 发言者处于"公堂中央"
+3. **强舞台感** - 发言者处于"公堂中央"，语音识别对话框居中显示
 4. **娱乐化优先** - 避免严肃审讯感
+5. **实时反馈** - 语音识别实时显示，增强交互体验

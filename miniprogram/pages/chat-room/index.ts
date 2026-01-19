@@ -56,7 +56,22 @@ interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     messageIdCounter: number;
 }
 
-const EMOJI_LIST = ['😠', '😢', '❤️', '🤔', '😂', '😅', '🥺', '💔'];
+const EMOJI_LIST = [
+    '😠',
+    '😢',
+    '❤️',
+    '🤔',
+    '😂',
+    '😅',
+    '🥺',
+    '💔',
+    '👍',
+    '👎',
+    '🙄',
+    '😤',
+    '🤯',
+    '😭',
+];
 const MAX_REACTIONS = 3;
 const REACTION_DURATION_MIN = 3000;
 const REACTION_DURATION_MAX = 5000;
