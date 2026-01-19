@@ -1,0 +1,105 @@
+<!--
+    Chat Room Page - 对簿公堂 / 语音申冤页
+    Phase: SPEAKER_A -> SPEAKER_B -> DONE
+-->
+<view class="chat-room">
+    <!-- 顶部区域：倒计时 + 发言舞台 -->
+    <view class="chat-room__top-section">
+        <!-- 倒计时区域 -->
+        <view class="chat-room__countdown-area">
+            <view class="chat-room__countdown chat-room__countdown--{{countdownClass}}">
+                <text class="chat-room__countdown-text">{{remaining}}</text>
+            </view>
+        </view>
+
+        <!-- 发言舞台区 -->
+        <view class="chat-room__stage">
+            <!-- 非录音状态显示文案 -->
+            <view class="chat-room__stage-hint" wx:if="{{!isRecording}}">
+                <text wx:if="{{canSpeak}}">点击麦克风开始申冤...</text>
+                <text wx:else>等待对方陈述...</text>
+            </view>
+
+            <!-- 录音中显示波纹动画 -->
+            <view class="chat-room__recording-wave" wx:if="{{isRecording}}">
+                <view class="chat-room__wave-bar"></view>
+                <view class="chat-room__wave-bar"></view>
+                <view class="chat-room__wave-bar"></view>
+                <view class="chat-room__wave-bar"></view>
+                <view class="chat-room__wave-bar"></view>
+            </view>
+        </view>
+    </view>
+
+    <!-- 飞行表情层 -->
+    <view class="chat-room__reactions">
+        <view
+            wx:for="{{reactions}}"
+            wx:key="id"
+            class="chat-room__reaction chat-room__reaction--lane{{item.lane}}"
+        >
+            <text class="chat-room__reaction-emoji">{{item.emoji}}</text>
+        </view>
+    </view>
+
+    <!-- 对话框区域 - 语音转文字内容 -->
+    <scroll-view
+        class="chat-room__dialog"
+        scroll-y="{{true}}"
+        scroll-into-view="msg-{{messages[messages.length - 1].id}}"
+        scroll-with-animation="{{true}}"
+    >
+        <view class="chat-room__dialog-inner">
+            <!-- 空状态提示 -->
+            <view class="chat-room__dialog-empty" wx:if="{{messages.length === 0}}">
+                <text class="chat-room__dialog-empty-text">控诉内容将在此显示...</text>
+            </view>
+
+            <!-- 消息列表 -->
+            <view
+                wx:for="{{messages}}"
+                wx:key="id"
+                id="msg-{{item.id}}"
+                class="chat-room__message chat-room__message--{{item.role === localRole ? 'self' : 'other'}}"
+            >
+                <view class="chat-room__message-bubble">
+                    <text class="chat-room__message-text">{{item.content}}</text>
+                </view>
+                <view class="chat-room__message-role">
+                    <text>{{item.role === 'A' ? '原告' : '被告'}}</text>
+                </view>
+            </view>
+        </view>
+    </scroll-view>
+
+    <!-- 麦克风按钮 -->
+    <view class="chat-room__mic-area">
+        <view
+            class="chat-room__mic {{canSpeak ? (isRecording ? 'chat-room__mic--recording' : 'chat-room__mic--active') : 'chat-room__mic--disabled'}}"
+            bindtouchstart="onMicTouchStart"
+            bindtouchend="onMicTouchEnd"
+            bindtouchcancel="onMicTouchCancel"
+        >
+            <text class="chat-room__mic-icon">🎤</text>
+        </view>
+        <text class="chat-room__mic-label">
+            {{isRecording ? '松开结束' : (canSpeak ? '按住说话' : '等待发言')}}
+        </text>
+    </view>
+
+    <!-- 底部表情面板 -->
+    <view class="chat-room__emoji-panel {{canReact ? '' : 'chat-room__emoji-panel--disabled'}}">
+        <view
+            wx:for="{{emojiList}}"
+            wx:key="*this"
+            class="chat-room__emoji-btn"
+            data-emoji="{{item}}"
+            bindtap="onEmojiTap"
+        >
+            <text class="chat-room__emoji-text">{{item}}</text>
+        </view>
+    </view>
+
+    <!-- 安全区域 -->
+    <view class="chat-room__safe-area"></view>
+</view>

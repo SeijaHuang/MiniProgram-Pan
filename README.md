@@ -23,6 +23,7 @@ miniprogram/
 │   ├── welcome/        # 欢迎页（首页）
 │   ├── waiting-room/   # 房间创建 & 等待页
 │   ├── drum/           # 击鼓页面
+│   ├── chat-room/      # Chat Room（对簿公堂）页面
 │   └── logs/           # 日志页
 ├── components/         # 组件目录（自定义组件）
 │   ├── styled-button/  # 样式化按钮组件
@@ -161,6 +162,7 @@ npm run format:check
 
 - **欢迎页（Welcome）**: `docs/welcome.md` - 首页入口，包含角色展示和主 CTA 按钮
 - **等待页（Waiting Room）**: `docs/waiting-room.md` - 房间创建和等待对方加入的页面
+- **Chat Room（对簿公堂）**: `docs/chat-room.md` - 核心对簿与情绪释放页面，支持双方轮流语音申冤、表情互动和倒计时控制
 
 每个页面文档包含：
 
