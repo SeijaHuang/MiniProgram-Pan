@@ -4,6 +4,8 @@
     "main": "index.js",
     "scripts": {
         "dev": "ts-node src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js",
         "ws:test": "ts-node scripts/ws-test.ts",
         "lint": "eslint . --ext .ts",
         "lint:fix": "eslint . --ext .ts --fix",

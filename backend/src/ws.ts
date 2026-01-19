@@ -1,18 +1,24 @@
+/**
+ * WebSocket Server
+ * Handles real-time communication for room joining and chat
+ * 
+ * CRITICAL: Room creation is NOT handled here (use HTTP API)
+ * CRITICAL: Only handles JOIN_ROOM and CHAT_SEND
+ */
+
 import { Server, type WebSocket, type RawData } from 'ws';
 import type { Server as HttpServer } from 'http';
-import { WSClient } from './utils/ws-client';
-import { rawDataToText, generateClientId } from './utils/ws-utils';
+import { randomBytes } from 'crypto';
+import { connectionManager } from './services/connection-manager';
+import { handleJoinRoom } from './services/handlers/join-room-handler';
+import { handleChatSend } from './services/handlers/chat-send-handler';
+import type {
+    IWSMessage,
+    IJoinRoomMessage,
+    IChatSendMessage,
+} from './types/ws-messages';
+import { EWSMessageType, EWSErrorCode } from './types/ws-messages';
 import { WS_CONFIG } from './constants/config';
-import { MessageType } from './types/ws-messages';
-import type { IBaseMessage } from './types/ws-messages';
-import { roomCreateHandler } from './services/handlers/room-create-handler';
-import { roomJoinHandler } from './services/handlers/room-join-handler';
-import { playerReadyHandler } from './services/handlers/player-ready-handler';
-import { gameMoveHandler } from './services/handlers/game-move-handler';
-import { gameRoomManager } from './services/game-room-manager';
-
-// Store all connected clients
-const clients = new Map<string, WSClient>();
 
 export function initWebSocket(server: HttpServer): void {
     const wss = new Server({
@@ -20,202 +26,121 @@ export function initWebSocket(server: HttpServer): void {
         path: WS_CONFIG.PATH,
     });
 
-    console.log(`WebSocket server initialized on path: ${WS_CONFIG.PATH}`);
-
-    // Setup heartbeat interval
-    startHeartbeatCheck();
-
-    // Setup room cleanup interval
-    startRoomCleanup();
+    console.log(`[WebSocket] Server initialized on path: ${WS_CONFIG.PATH}`);
 
     wss.on('connection', (ws: WebSocket) => {
-        const clientId = generateClientId();
-        const client = new WSClient(clientId, ws);
-        clients.set(clientId, client);
+        const connectionId = generateConnectionId();
 
-        console.log(`Client connected: ${clientId} (Total: ${clients.size})`);
+        // Register connection
+        connectionManager.registerConnection(connectionId, ws);
 
-        // Send welcome message
-        client.send(MessageType.WELCOME, {
-            clientId,
-            serverTime: Date.now(),
-        });
+        console.log(
+            `[WebSocket] Client connected: ${connectionId} (Total: ${connectionManager.getAllConnections().length})`
+        );
 
         // Handle incoming messages
         ws.on('message', (data: RawData) => {
-            handleMessage(client, data);
+            handleMessage(connectionId, data);
         });
 
         // Handle connection close
         ws.on('close', () => {
-            handleDisconnect(client);
+            handleDisconnect(connectionId);
         });
 
         // Handle errors
         ws.on('error', (error) => {
-            console.error(`WebSocket error for client ${clientId}:`, error);
+            console.error(
+                `[WebSocket] Error for connection ${connectionId}:`,
+                error
+            );
         });
     });
 }
 
 /**
- * Handle incoming message from client
+ * Handle incoming WebSocket message
  */
-async function handleMessage(client: WSClient, data: RawData): Promise<void> {
+async function handleMessage(
+    connectionId: string,
+    data: RawData
+): Promise<void> {
     try {
         const messageText = rawDataToText(data);
-        const message = JSON.parse(messageText) as IBaseMessage;
+        const message = JSON.parse(messageText) as IWSMessage;
 
-        console.log(`Received message from ${client.id}: ${message.type}`);
-
-        // Update heartbeat timestamp
-        client.updateHeartbeat();
+        console.log(
+            `[WebSocket] Received ${message.type} from ${connectionId}`
+        );
 
         // Route message to appropriate handler
         switch (message.type) {
-            case MessageType.HEARTBEAT:
-                handleHeartbeat(client, message);
+            case EWSMessageType.JoinRoom:
+                await handleJoinRoom(
+                    connectionManager,
+                    connectionId,
+                    message as IJoinRoomMessage
+                );
                 break;
 
-            case MessageType.ROOM_CREATE:
-                await roomCreateHandler.handle(client, message as never);
-                break;
-
-            case MessageType.ROOM_JOIN:
-                await roomJoinHandler.handle(client, message as never);
-                break;
-
-            case MessageType.PLAYER_READY:
-                await playerReadyHandler.handle(client, message as never);
-                break;
-
-            case MessageType.GAME_MOVE:
-                await gameMoveHandler.handle(client, message as never);
+            case EWSMessageType.ChatSend:
+                await handleChatSend(
+                    connectionManager,
+                    connectionId,
+                    message as IChatSendMessage
+                );
                 break;
 
             default:
-                client.send(MessageType.ERROR, {
-                    code: 'UNKNOWN_MESSAGE_TYPE',
-                    message: `Unknown message type: ${message.type}`,
+                connectionManager.sendToConnection(connectionId, {
+                    type: EWSMessageType.Error,
+                    data: {
+                        code: EWSErrorCode.InvalidPayload,
+                        message: `Unknown message type: ${(message as IWSMessage).type}`,
+                    },
+                    timestamp: Date.now(),
                 });
         }
     } catch (error) {
-        console.error('Failed to parse message:', error);
-        client.send(MessageType.ERROR, {
-            code: 'INVALID_MESSAGE',
-            message: 'Failed to parse message',
+        console.error('[WebSocket] Message handling error:', error);
+        connectionManager.sendToConnection(connectionId, {
+            type: EWSMessageType.Error,
+            data: {
+                code: EWSErrorCode.InternalError,
+                message:
+                    error instanceof Error ? error.message : 'Unknown error',
+            },
+            timestamp: Date.now(),
         });
     }
 }
 
 /**
- * Handle heartbeat message
+ * Handle connection disconnect
  */
-function handleHeartbeat(client: WSClient, message: IBaseMessage): void {
-    client.send(MessageType.HEARTBEAT_ACK, {
-        timestamp: message.timestamp,
-        serverTime: Date.now(),
-    });
+function handleDisconnect(connectionId: string): void {
+    console.log(`[WebSocket] Client disconnected: ${connectionId}`);
+    connectionManager.handleDisconnect(connectionId);
 }
 
 /**
- * Handle client disconnect
+ * Convert RawData to text
  */
-function handleDisconnect(client: WSClient): void {
-    console.log(`Client disconnected: ${client.id}`);
-
-    // Notify room about player disconnect
-    if (client.roomId && client.playerId) {
-        gameRoomManager.setPlayerDisconnected(
-            client.roomId,
-            client.playerId
-        );
-
-        // Notify other players in the room
-        broadcastToRoom(client.roomId, MessageType.PLAYER_DISCONNECTED, {
-            playerId: client.playerId,
-        });
+function rawDataToText(data: RawData): string {
+    if (Buffer.isBuffer(data)) {
+        return data.toString('utf-8');
     }
-
-    clients.delete(client.id);
-    console.log(`Total clients: ${clients.size}`);
+    if (Array.isArray(data)) {
+        return Buffer.concat(data).toString('utf-8');
+    }
+    // ArrayBuffer case
+    return Buffer.from(data as ArrayBuffer).toString('utf-8');
 }
 
 /**
- * Start periodic heartbeat check
- * Removes clients that haven't sent heartbeat within timeout
+ * Generate unique connection ID
  */
-function startHeartbeatCheck(): void {
-    setInterval(() => {
-        const now = Date.now();
-        let removedCount = 0;
-
-        clients.forEach((client, clientId) => {
-            if (!client.isAlive(WS_CONFIG.CLIENT_TIMEOUT)) {
-                console.log(`Removing inactive client: ${clientId}`);
-                client.close(1000, 'Heartbeat timeout');
-                clients.delete(clientId);
-                removedCount++;
-            }
-        });
-
-        if (removedCount > 0) {
-            console.log(
-                `Removed ${removedCount} inactive clients. Active: ${clients.size}`
-            );
-        }
-    }, WS_CONFIG.HEARTBEAT_INTERVAL);
-}
-
-/**
- * Start periodic room cleanup
- * Removes inactive rooms
- */
-function startRoomCleanup(): void {
-    setInterval(() => {
-        gameRoomManager.cleanupInactiveRooms();
-    }, WS_CONFIG.HEARTBEAT_INTERVAL * 2);
-}
-
-/**
- * Get client by ID
- */
-export function getClient(clientId: string): WSClient | undefined {
-    return clients.get(clientId);
-}
-
-/**
- * Get all clients
- */
-export function getAllClients(): Map<string, WSClient> {
-    return clients;
-}
-
-/**
- * Broadcast message to all clients
- */
-export function broadcast<T>(type: MessageType, data: T): void {
-    clients.forEach((client) => {
-        client.send(type, data);
-    });
-}
-
-/**
- * Broadcast message to clients in a specific room
- */
-export function broadcastToRoom<T>(
-    roomId: string,
-    type: MessageType,
-    data: T,
-    excludeClientId?: string
-): void {
-    clients.forEach((client) => {
-        if (
-            client.roomId === roomId &&
-            client.id !== excludeClientId
-        ) {
-            client.send(type, data);
-        }
-    });
+function generateConnectionId(): string {
+    return `conn_${randomBytes(8).toString('hex')}`;
 }
 

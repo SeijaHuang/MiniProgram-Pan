@@ -1,227 +1,131 @@
 /**
- * WebSocket message types and interfaces
- * Defines the protocol for client-server communication
+ * WebSocket Transport Layer Types
+ * Defines the protocol for client-server real-time communication
+ * 
+ * CRITICAL: WebSocket is used ONLY for:
+ * - Joining rooms
+ * - Broadcasting messages
+ * - Handling disconnects
+ * - Sending protocol-level errors
+ * 
+ * CRITICAL: Room creation is handled via HTTP
  */
 
-import type { IGameRoom, IGameMove } from '../models/game';
-import type { IPlayer } from '../models/player';
+import type { IUser } from '../models/user';
+import type { IRoom } from '../models/room';
+import type { IMessage, MessageContent } from '../models/message';
 
 /**
- * All possible message types
+ * WebSocket Message Types
  */
-export enum MessageType {
-    // Connection messages
-    WELCOME = 'welcome',
-    HEARTBEAT = 'heartbeat',
-    HEARTBEAT_ACK = 'heartbeat_ack',
-    ERROR = 'error',
-
-    // Room management
-    ROOM_CREATE = 'room:create',
-    ROOM_CREATED = 'room:created',
-    ROOM_JOIN = 'room:join',
-    ROOM_JOINED = 'room:joined',
-    ROOM_LEAVE = 'room:leave',
-    ROOM_LEFT = 'room:left',
-    ROOM_LIST = 'room:list',
-    ROOM_LIST_RESPONSE = 'room:list_response',
-
-    // Player management
-    PLAYER_READY = 'player:ready',
-    PLAYER_JOINED = 'player:joined',
-    PLAYER_LEFT = 'player:left',
-    PLAYER_DISCONNECTED = 'player:disconnected',
-    PLAYER_RECONNECTED = 'player:reconnected',
-
-    // Game flow
-    GAME_START = 'game:start',
-    GAME_MOVE = 'game:move',
-    GAME_UPDATE = 'game:update',
-    GAME_END = 'game:end',
-    GAME_PAUSE = 'game:pause',
-    GAME_RESUME = 'game:resume',
+export enum EWSMessageType {
+    // Client → Server
+    JoinRoom = 'JOIN_ROOM',
+    ChatSend = 'CHAT_SEND',
+    
+    // Server → Client
+    JoinAck = 'JOIN_ACK',
+    ChatReceive = 'CHAT_RECEIVE',
+    Error = 'ERROR',
 }
 
 /**
- * Base message structure
+ * WebSocket Error Codes
  */
-export interface IBaseMessage<T = unknown> {
-    type: MessageType;
+export enum EWSErrorCode {
+    InvalidPayload = 'INVALID_PAYLOAD',
+    RoomNotFound = 'ROOM_NOT_FOUND',
+    RoomFull = 'ROOM_FULL',
+    RoomClosed = 'ROOM_CLOSED',
+    NotParticipant = 'NOT_PARTICIPANT',
+    RoomNotReady = 'ROOM_NOT_READY',
+    AlreadyJoined = 'ALREADY_JOINED',
+    InternalError = 'INTERNAL_ERROR',
+}
+
+/**
+ * Base WebSocket Message
+ */
+export interface IWSMessage<T = unknown> {
+    type: EWSMessageType;
     data: T;
     timestamp: number;
 }
 
+// ==================== Client → Server Messages ====================
+
 /**
- * Error message
+ * JOIN_ROOM: Request to join a room using a roomCode
  */
-export interface IErrorMessage extends IBaseMessage<IErrorData> {
-    type: MessageType.ERROR;
+export interface IJoinRoomMessage extends IWSMessage<IJoinRoomData> {
+    type: EWSMessageType.JoinRoom;
 }
 
-export interface IErrorData {
-    code: string;
-    message: string;
-    details?: unknown;
+export interface IJoinRoomData {
+    roomCode: string;
+    user: IUser;
 }
 
 /**
- * Welcome message (sent on connection)
+ * CHAT_SEND: Send a chat message
  */
-export interface IWelcomeMessage extends IBaseMessage<IWelcomeData> {
-    type: MessageType.WELCOME;
+export interface IChatSendMessage extends IWSMessage<IChatSendData> {
+    type: EWSMessageType.ChatSend;
 }
 
-export interface IWelcomeData {
-    clientId: string;
-    serverTime: number;
+export interface IChatSendData {
+    content: MessageContent;
 }
+
+// ==================== Server → Client Messages ====================
 
 /**
- * Heartbeat messages
+ * JOIN_ACK: Authoritative confirmation of room join
+ * CRITICAL: Must include full room state
+ * CRITICAL: Sent to ALL participants
  */
-export interface IHeartbeatMessage extends IBaseMessage<IHeartbeatData> {
-    type: MessageType.HEARTBEAT;
+export interface IJoinAckMessage extends IWSMessage<IJoinAckData> {
+    type: EWSMessageType.JoinAck;
 }
 
-export interface IHeartbeatData {
-    timestamp: number;
+export interface IJoinAckData {
+    room: IRoom;
 }
 
 /**
- * Room create message
+ * CHAT_RECEIVE: Broadcast chat message
+ * CRITICAL: Only sent after server validation
+ * CRITICAL: Sent to all participants in the room
  */
-export interface IRoomCreateMessage extends IBaseMessage<IRoomCreateData> {
-    type: MessageType.ROOM_CREATE;
+export interface IChatReceiveMessage extends IWSMessage<IChatReceiveData> {
+    type: EWSMessageType.ChatReceive;
 }
 
-export interface IRoomCreateData {
-    playerName: string;
-    playerAvatar?: string;
+export interface IChatReceiveData {
+    message: IMessage;
 }
 
 /**
- * Room created response
+ * ERROR: Protocol or domain failure
+ * CRITICAL: Must not change room state
+ * CRITICAL: Client must treat error as authoritative
  */
-export interface IRoomCreatedMessage extends IBaseMessage<IRoomCreatedData> {
-    type: MessageType.ROOM_CREATED;
+export interface IWSErrorMessage extends IWSMessage<IWSErrorData> {
+    type: EWSMessageType.Error;
 }
 
-export interface IRoomCreatedData {
-    room: IGameRoom;
-    player: IPlayer;
-}
-
-/**
- * Room join message
- */
-export interface IRoomJoinMessage extends IBaseMessage<IRoomJoinData> {
-    type: MessageType.ROOM_JOIN;
-}
-
-export interface IRoomJoinData {
-    roomId: string;
-    playerName: string;
-    playerAvatar?: string;
+export interface IWSErrorData {
+    code: EWSErrorCode;
+    message?: string;
 }
 
 /**
- * Room joined response
- */
-export interface IRoomJoinedMessage extends IBaseMessage<IRoomJoinedData> {
-    type: MessageType.ROOM_JOINED;
-}
-
-export interface IRoomJoinedData {
-    room: IGameRoom;
-    player: IPlayer;
-}
-
-/**
- * Player joined notification
- */
-export interface IPlayerJoinedMessage extends IBaseMessage<IPlayerJoinedData> {
-    type: MessageType.PLAYER_JOINED;
-}
-
-export interface IPlayerJoinedData {
-    player: IPlayer;
-    room: IGameRoom;
-}
-
-/**
- * Player ready message
- */
-export interface IPlayerReadyMessage extends IBaseMessage<IPlayerReadyData> {
-    type: MessageType.PLAYER_READY;
-}
-
-export interface IPlayerReadyData {
-    playerId: string;
-}
-
-/**
- * Game start notification
- */
-export interface IGameStartMessage extends IBaseMessage<IGameStartData> {
-    type: MessageType.GAME_START;
-}
-
-export interface IGameStartData {
-    room: IGameRoom;
-    startingPlayer: string;
-}
-
-/**
- * Game move message
- */
-export interface IGameMoveMessage extends IBaseMessage<IGameMoveData> {
-    type: MessageType.GAME_MOVE;
-}
-
-export interface IGameMoveData {
-    x: number;
-    y: number;
-}
-
-/**
- * Game update notification
- */
-export interface IGameUpdateMessage extends IBaseMessage<IGameUpdateData> {
-    type: MessageType.GAME_UPDATE;
-}
-
-export interface IGameUpdateData {
-    room: IGameRoom;
-    lastMove: IGameMove;
-}
-
-/**
- * Game end notification
- */
-export interface IGameEndMessage extends IBaseMessage<IGameEndData> {
-    type: MessageType.GAME_END;
-}
-
-export interface IGameEndData {
-    room: IGameRoom;
-    winner: string | null;
-    reason: 'completed' | 'timeout' | 'abandoned';
-}
-
-/**
- * Union type of all message types
+ * Union type of all WebSocket messages
  */
 export type WSMessage =
-    | IWelcomeMessage
-    | IHeartbeatMessage
-    | IErrorMessage
-    | IRoomCreateMessage
-    | IRoomCreatedMessage
-    | IRoomJoinMessage
-    | IRoomJoinedMessage
-    | IPlayerJoinedMessage
-    | IPlayerReadyMessage
-    | IGameStartMessage
-    | IGameMoveMessage
-    | IGameUpdateMessage
-    | IGameEndMessage;
+    | IJoinRoomMessage
+    | IChatSendMessage
+    | IJoinAckMessage
+    | IChatReceiveMessage
+    | IWSErrorMessage;
+

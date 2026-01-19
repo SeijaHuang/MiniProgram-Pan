@@ -3,18 +3,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: miniprogram-backend
+    container_name: chatroom-backend
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
       - NODE_ENV=development
       - WS_PATH=/ws
-      - WS_HEARTBEAT_INTERVAL=30000
-      - WS_CLIENT_TIMEOUT=60000
-      - WS_MAX_RECONNECT=5
-      - GAME_ROOM_TIMEOUT=300000
-      - GAME_MOVE_TIMEOUT=30000
       - LOG_LEVEL=debug
     volumes:
       # 挂载源代码 (支持热重载)
@@ -24,8 +19,8 @@ services:
       - /app/node_modules
     restart: unless-stopped
     networks:
-      - miniprogram-network
+      - chatroom-network
 
 networks:
-  miniprogram-network:
+  chatroom-network:
     driver: bridge

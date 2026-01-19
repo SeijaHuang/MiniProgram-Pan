@@ -1,4 +1,4 @@
-# Docker 快速指南
+# Docker 部署指南 - 聊天室后端
 
 ## 🚀 快速开始
 
@@ -20,70 +20,86 @@ chmod +x start-docker.sh
 ### 或使用 docker-compose
 
 ```bash
+# 开发环境（支持热重载）
 docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
 ```
 
-## 📋 常用命令
+## 📋 Docker镜像说明
+
+### Dockerfile.dev - 开发环境
+
+- 包含所有依赖（含devDependencies）
+- 支持热重载
+- 挂载源代码目录
+- 使用`ts-node`直接运行TypeScript
+
+### Dockerfile - 生产环境
+
+- 多阶段构建，优化镜像大小
+- 只包含生产依赖
+- TypeScript编译为JavaScript
+- 使用编译后的`dist`目录运行
+
+## 🔧 环境变量配置
+
+在 `docker-compose.yml` 中配置：
+
+```yaml
+environment:
+  - PORT=8080              # HTTP服务器端口
+  - NODE_ENV=development   # 环境：development/production
+  - WS_PATH=/ws           # WebSocket路径
+  - LOG_LEVEL=debug       # 日志级别
+```
+
+## 📦 常用命令
 
 | 操作 | 命令 |
 |------|------|
 | 启动服务 | `docker-compose up -d` |
 | 停止服务 | `docker-compose down` |
 | 查看日志 | `docker-compose logs -f` |
+| 实时日志 | `docker-compose logs -f backend` |
 | 重启服务 | `docker-compose restart` |
 | 重新构建 | `docker-compose up --build` |
 | 进入容器 | `docker-compose exec backend sh` |
+| 查看状态 | `docker-compose ps` |
 
-## 🔧 配置说明
+## 🧪 测试连接
 
-### 端口映射
+### 1. 测试HTTP API
 
-默认端口：`8080`
-
-修改端口：编辑 `docker-compose.yml`
-```yaml
-ports:
-  - "8081:8080"  # 主机端口:容器端口
-```
-
-### 环境变量
-
-在 `docker-compose.yml` 的 `environment` 部分修改：
-
-```yaml
-environment:
-  - PORT=8080
-  - NODE_ENV=development
-  - WS_PATH=/ws
-  - LOG_LEVEL=debug
-```
-
-### 代码热重载
-
-代码修改后会自动重启服务（通过 volume 映射实现）。
-
-如果修改未生效，手动重启：
 ```bash
-docker-compose restart
+# 创建房间
+curl -X POST http://localhost:8080/room/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "creator": {
+      "userId": "user_test",
+      "nickname": "Test User"
+    }
+  }'
 ```
 
-## 🧪 测试 WebSocket
+### 2. 测试WebSocket
 
-### 使用 Postman
+使用Postman：
+1. 创建WebSocket Request
+2. URL: `ws://localhost:8080/ws`
+3. Connect
+4. 发送JOIN_ROOM消息（见README.md）
 
-1. 确保 Docker 服务正在运行
-2. 打开 Postman
-3. 创建 WebSocket Request
-4. 连接到：`ws://localhost:8080/ws`
-5. 发送测试消息（见 README.md）
+### 3. 健康检查
 
-### 使用浏览器
-
-打开浏览器 Console：
-```javascript
-const ws = new WebSocket('ws://localhost:8080/ws');
-ws.onopen = () => console.log('Connected');
-ws.onmessage = (e) => console.log(JSON.parse(e.data));
+```bash
+curl http://localhost:8080/health
+# 预期响应: {"ok":true}
 ```
 
 ## ⚠️ 故障排查
@@ -157,33 +173,108 @@ docker-compose exec backend sh
 
 ## 📦 生产部署
 
-### 使用生产 Dockerfile
+### 方法1: 使用生产Dockerfile
 
 ```bash
 # 构建镜像
-docker build -t miniprogram-backend:latest -f Dockerfile .
+docker build -t chatroom-backend:latest -f Dockerfile .
 
 # 运行容器
 docker run -d \
   -p 8080:8080 \
   -e NODE_ENV=production \
-  --name miniprogram-backend \
+  -e PORT=8080 \
+  -e WS_PATH=/ws \
+  --name chatroom-backend \
   --restart unless-stopped \
-  miniprogram-backend:latest
+  chatroom-backend:latest
 ```
 
-### 使用 Docker Compose (生产)
+### 方法2: Docker Compose生产配置
 
-修改 `docker-compose.yml`：
+创建 `docker-compose.prod.yml`：
+
 ```yaml
 services:
   backend:
     build:
-      dockerfile: Dockerfile  # 使用生产 Dockerfile
+      context: .
+      dockerfile: Dockerfile  # 使用生产Dockerfile
+    container_name: chatroom-backend-prod
+    ports:
+      - "8080:8080"
     environment:
       - NODE_ENV=production
-    # 移除 volumes (代码热重载)
+      - PORT=8080
+      - WS_PATH=/ws
+    restart: always
+    networks:
+      - chatroom-network
+
+networks:
+  chatroom-network:
+    driver: bridge
 ```
+
+运行：
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+## 🔍 监控和维护
+
+### 查看容器状态
+```bash
+docker-compose ps
+docker stats chatroom-backend
+```
+
+### 清理未使用的资源
+```bash
+# 清理停止的容器
+docker container prune
+
+# 清理未使用的镜像
+docker image prune
+
+# 清理所有未使用资源
+docker system prune -a
+```
+
+### 备份和恢复
+
+由于当前版本不持久化数据，重启会丢失所有房间和消息。
+
+未来如果添加数据库，可以使用Docker volumes进行备份。
+
+## 📚 更多资源
+
+- [完整API文档](./README.md)
+- [架构说明](./ARCHITECTURE.md)
+- [重构总结](./REFACTOR_SUMMARY.md)
+
+---
+
+## 🎯 快速参考
+
+**开发环境**：
+```bash
+docker-compose up -d          # 启动
+docker-compose logs -f        # 查看日志
+docker-compose down          # 停止
+```
+
+**生产环境**：
+```bash
+docker build -t chatroom-backend -f Dockerfile .
+docker run -d -p 8080:8080 chatroom-backend
+```
+
+**测试连接**：
+```bash
+curl http://localhost:8080/health
+```
+
 
 ## 💡 最佳实践
 

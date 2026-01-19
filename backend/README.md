@@ -1,558 +1,625 @@
-## 后端服务说明
+# 聊天室后端服务
 
-本目录为微信小程序项目的 **Node.js/TypeScript 后端服务**，提供 HTTP 接口和 WebSocket 实时通信能力，支持双人游戏互动功能。
-
-## 核心功能
-
-- **健康检查 API**：用于服务探活和监控
-- **WebSocket 实时通信**：支持房间管理、玩家匹配、游戏状态同步
-- **游戏房间管理**：创建/加入房间、玩家准备、实时对战
-- **心跳检测**：自动清理断开连接的客户端
-- **环境配置管理**：使用 dotenv 管理配置
+基于HTTP + WebSocket的双人聊天室系统，支持房间创建、加入和实时聊天。
 
 ## 技术栈
 
-- **运行环境**：Node.js >= 14.0.0
-- **语言**：TypeScript (严格模式)
-- **HTTP 框架**：Express 5
-- **WebSocket**：ws 8.x
-- **代码规范**：ESLint + Prettier
+- **Node.js** + **TypeScript**
+- **Express** - HTTP服务器
+- **WebSocket (ws)** - 实时通信
+- **dotenv** - 环境变量管理
 
-## 项目结构
+## 项目特点
 
-```
-backend/
-├── src/
-│   ├── constants/          # 配置常量
-│   │   └── config.ts       # 应用配置 (端口、WebSocket 配置等)
-│   ├── models/             # 数据模型
-│   │   ├── player.ts       # 玩家模型
-│   │   └── game.ts         # 游戏房间模型
-│   ├── services/           # 业务逻辑层
-│   │   ├── game-room-manager.ts  # 房间管理服务
-│   │   └── handlers/       # 消息处理器
-│   │       ├── room-create-handler.ts
-│   │       ├── room-join-handler.ts
-│   │       ├── player-ready-handler.ts
-│   │       └── game-move-handler.ts
-│   ├── types/              # TypeScript 类型定义
-│   │   ├── ws-messages.ts  # WebSocket 消息协议
-│   │   └── common.ts       # 通用类型
-│   ├── utils/              # 工具函数
-│   │   ├── ws-client.ts    # WebSocket 客户端封装
-│   │   ├── ws-utils.ts     # WebSocket 工具函数
-│   │   ├── env-loader.ts   # 环境变量加载器
-│   │   └── message-handler.ts  # 消息处理器基类
-│   ├── middlewares/        # Express 中间件 (待实现)
-│   ├── app.ts              # Express 应用实例
-│   ├── ws.ts               # WebSocket 服务器
-│   └── index.ts            # 应用入口
-├── scripts/
-│   └── ws-test.ts          # WebSocket 测试脚本
-├── .env                    # 环境变量配置
-├── .env.example            # 环境变量示例
-├── tsconfig.json           # TypeScript 配置
-└── package.json            # 项目依赖
-```
+- ✅ 严格的双人房间系统（最多2人）
+- ✅ HTTP用于房间创建，WebSocket用于实时通信
+- ✅ 房间状态机：WAITING → READY → CLOSED
+- ✅ 完整的错误处理和验证
+- ✅ TypeScript类型安全
 
 ## 快速开始
 
-### 方式一：使用 Docker (推荐) ⭐
-
-#### 前置要求
-1. 安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-2. **重要**: 启动 Docker Desktop 并等待完全启动
-
-#### 一键启动（Windows）
-
-双击运行 `start-docker.bat` 或：
-```powershell
-.\start-docker.bat
-```
-
-#### 或使用命令行
-
-```bash
-cd backend
-
-# 启动服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
-```
-
-**启动成功后会看到：**
-```
-✅ Backend is running!
-
-📝 Service Info:
-   HTTP:      http://localhost:8080
-   WebSocket: ws://localhost:8080/ws
-   Health:    http://localhost:8080/health
-
-📊 View logs:  docker-compose logs -f
-🛑 Stop:       docker-compose down
-```
-
-**验证服务：**
-```bash
-curl http://localhost:8080/health
-# 返回: {"ok":true}
-```
-
-**使用 Postman 测试 WebSocket：**
-1. 打开 Postman
-2. New → WebSocket Request
-3. URL: `ws://localhost:8080/ws`
-4. Connect 后发送测试消息（见下方 WebSocket 测试部分）
-
-> 💡 详细的 Docker 使用说明请查看 [DOCKER.md](./DOCKER.md)
-
-### 方式二：本地开发
-
-#### 1. 安装依赖
+### 1. 安装依赖
 
 ```bash
 cd backend
 npm install
 ```
 
-#### 2. 配置环境变量
+### 2. 配置环境变量
 
-复制 `.env.example` 为 `.env`（首次运行已自动创建）：
+创建`.env`文件（或使用`.env.example`）：
 
-```bash
-cp .env.example .env
+```env
+PORT=8080
+WS_PATH=/ws
+NODE_ENV=development
 ```
 
-默认配置：
-- `PORT=8080` - HTTP 服务端口
-- `WS_PATH=/ws` - WebSocket 路径
-- `WS_HEARTBEAT_INTERVAL=30000` - 心跳间隔 (30秒)
-- `WS_CLIENT_TIMEOUT=60000` - 客户端超时 (60秒)
-
-#### 3. 启动服务
+### 3. 启动服务器
 
 ```bash
 npm run dev
 ```
-启动成功后会看到：
 
-```
-Environment variables loaded successfully
-WebSocket server initialized on path: /ws
-Server listening on port 8080
-Environment: development
-```
+服务器将在 `http://localhost:8080` 启动，WebSocket路径为 `ws://localhost:8080/ws`
 
+## API文档
 
-#### 4. 验证服务
+### HTTP API
 
-**HTTP 健康检查**：
-```bash
-curl http://localhost:8080/health
-# 返回: {"ok":true}
-```
+#### POST /room/create
+创建新房间
 
-或浏览器访问：`http://localhost:8080/health`
-
-## WebSocket 测试
-
-### 方法一：使用 Postman
-
-1. **下载 Postman** (免费): https://www.postman.com/downloads/
-2. 打开 Postman，创建新的 **WebSocket**
-3. 连接地址：`ws://localhost:8080/ws`
-4. 点击 **Connect**
-
-**发送测试消息**：
-
-#### 1. 创建房间
+**请求体：**
 ```json
 {
-  "type": "room:create",
-  "data": {
-    "playerName": "玩家1",
-    "playerAvatar": "https://example.com/avatar.png"
-  },
-  "timestamp": 1737158400000
-}
-```
-
-服务器会返回：
-```json
-{
-  "type": "room:created",
-  "data": {
-    "room": {
-      "id": "room_xxx",
-      "state": "waiting",
-      "players": [...]
-    },
-    "player": {
-      "id": "player_xxx",
-      "name": "玩家1"
-    }
-  },
-  "timestamp": 1737158400000
-}
-```
-
-#### 2. 加入房间
-```json
-{
-  "type": "room:join",
-  "data": {
-    "roomId": "room_xxx",
-    "playerName": "玩家2"
-  },
-  "timestamp": 1737158400000
-}
-```
-
-#### 3. 玩家准备
-```json
-{
-  "type": "player:ready",
-  "data": {
-    "playerId": "player_xxx"
-  },
-  "timestamp": 1737158400000
-}
-```
-
-#### 4. 游戏移动
-```json
-{
-  "type": "game:move",
-  "data": {
-    "x": 5,
-    "y": 3
-  },
-  "timestamp": 1737158400000
-}
-```
-
-#### 5. 心跳包
-```json
-{
-  "type": "heartbeat",
-  "data": {
-    "timestamp": 1737158400000
-  },
-  "timestamp": 1737158400000
-}
-```
-
-### 方法二：使用 VS Code 扩展
-
-1. 安装扩展：**WebSocket Client** 或 **REST Client**
-2. 创建 `.http` 文件：
-
-```http
-### WebSocket Connection
-CONNECT ws://localhost:8080/ws
-
-{
-  "type": "room:create",
-  "data": {
-    "playerName": "测试玩家"
-  },
-  "timestamp": {{$timestamp}}
-}
-```
-
-### 方法三：使用浏览器 Console
-
-打开浏览器开发者工具，在 Console 中执行：
-
-```javascript
-const ws = new WebSocket('ws://localhost:8080/ws');
-
-ws.onopen = () => {
-  console.log('Connected');
-  
-  // 创建房间
-  ws.send(JSON.stringify({
-    type: 'room:create',
-    data: {
-      playerName: '浏览器测试'
-    },
-    timestamp: Date.now()
-  }));
-};
-
-ws.onmessage = (event) => {
-  console.log('Received:', JSON.parse(event.data));
-};
-```
-
-### 方法四：使用测试脚本
-
-运行内置测试脚本：
-
-```bash
-npm run ws:test
-```
-
-## Docker 命令速查
-
-### 基本命令
-
-```bash
-# 启动服务
-docker-compose up
-
-# 后台启动
-docker-compose up -d
-
-# 停止服务
-docker-compose down
-
-# 查看日志
-docker-compose logs -f
-
-# 重新构建并启动
-docker-compose up --build
-
-# 进入容器
-docker-compose exec backend sh
-
-# 重启服务
-docker-compose restart
-```
-
-### 高级命令
-
-```bash
-# 只构建镜像
-docker-compose build
-
-# 查看运行状态
-docker-compose ps
-
-# 停止并删除容器、网络
-docker-compose down -v
-
-# 使用生产 Dockerfile
-docker build -t miniprogram-backend -f Dockerfile .
-docker run -p 8080:8080 miniprogram-backend
-```
-
-## 可用的 npm 脚本
-
-```bash
-npm run dev          # 开发模式启动 (使用 ts-node)
-npm run ws:test      # 运行 WebSocket 测试脚本
-npm run lint         # ESLint 代码检查
-npm run lint:fix     # 自动修复 ESLint 问题
-npm run format       # Prettier 格式化代码
-npm run format:check # 检查代码格式
-```
-
-## WebSocket 消息协议
-
-### 消息类型 (MessageType)
-
-| 类型 | 描述 | 方向 |
-|------|------|------|
-| `welcome` | 欢迎消息 | 服务器 → 客户端 |
-| `heartbeat` | 心跳请求 | 客户端 → 服务器 |
-| `heartbeat_ack` | 心跳响应 | 服务器 → 客户端 |
-| `room:create` | 创建房间 | 客户端 → 服务器 |
-| `room:created` | 房间已创建 | 服务器 → 客户端 |
-| `room:join` | 加入房间 | 客户端 → 服务器 |
-| `room:joined` | 已加入房间 | 服务器 → 客户端 |
-| `player:joined` | 玩家加入通知 | 服务器 → 所有玩家 |
-| `player:ready` | 玩家准备 | 客户端 → 服务器 |
-| `game:start` | 游戏开始 | 服务器 → 所有玩家 |
-| `game:move` | 游戏移动 | 客户端 → 服务器 |
-| `game:update` | 游戏状态更新 | 服务器 → 所有玩家 |
-| `game:end` | 游戏结束 | 服务器 → 所有玩家 |
-| `player:disconnected` | 玩家断开 | 服务器 → 其他玩家 |
-| `error` | 错误消息 | 服务器 → 客户端 |
-
-### 消息格式
-
-所有消息都遵循以下格式：
-
-```typescript
-{
-  type: string;        // 消息类型
-  data: object;        // 消息数据
-  timestamp: number;   // 时间戳 (毫秒)
-}
-```
-
-## 开发规范
-
-### TypeScript 严格模式
-- **禁止使用 `any` 类型** - ESLint 会报错
-- 所有函数必须有显式返回类型
-- 使用接口定义所有数据结构
-
-### 架构原则
-- **分层架构**：Controllers → Services → Models
-- **单一职责**：每个模块只做一件事
-- **依赖注入**：使用单例模式管理服务
-
-### 代码风格
-```bash
-npm run lint       # 检查代码质量
-npm run lint:fix   # 自动修复问题
-npm run format     # 格式化代码
-```
-
-## 扩展开发
-
-### 添加新的 WebSocket 消息类型
-
-1. **定义消息类型** (`src/types/ws-messages.ts`):
-```typescript
-export enum MessageType {
-  NEW_MESSAGE = 'new:message',
-}
-
-export interface INewMessage extends IBaseMessage<INewMessageData> {
-  type: MessageType.NEW_MESSAGE;
-}Docker 开发工作流
-
-### 典型开发流程
-
-1. **启动 Docker 服务**
-   ```bash
-   docker-compose up -d
-   ```
-
-2. **使用 Postman 测试**
-   - 连接到 `ws://localhost:8080/ws`
-   - 发送测试消息
-
-3. **修改代码**
-   - 修改 `src/` 下的文件
-   - Docker 会自动检测文件变化并重启服务
-
-4. **查看日志**
-   ```bash
-   docker-compose logs -f backend
-   ```
-
-5. **停止服务**
-   ```bash
-   docker-compose down
-   ```
-
-### 故障排查
-
-#### 端口被占用
-```bash
-# Windows
-netstat -ano | findstr :8080
-taskkill /PID <进程ID> /F
-
-# 或修改 docker-compose.yml 中的端口映射
-ports:
-  - "8081:8080"  # 改为 8081
-```
-
-#### 容器无法启动
-```bash
-# 查看详细日志
-docker-compose logs backend
-
-# 重新构建镜像
-docker-compose build --no-cache
-docker-compose up
-```
-
-#### 代码修改未生效
-```bash
-# 重启容器
-docker-compose restart
-
-# 或重新构建
-docker-compose up --build
-```
-
-## 部署
-
-### Docker 生产部署
-
-```bash
-# 1. 构建生产镜像
-docker build -t miniprogram-backend:latest .
-
-# 2. 运行容器
-docker run -d \
-  -p 8080:8080 \
-  -e NODE_ENV=production \
-  -e PORT=8080 \
-  --name miniprogram-backend \
-  --restart unless-stopped \
-  miniprogram-backend:latest
-
-# 3. 查看日志
-docker logs -f miniprogram-backend
-```
-
-### 其他部署方式
-
-生产环境建议：
-- 使用 Docker Compose 或 Kubernetes 编排
-- 配置反向代理 (Nginx) 处理 WebSocket 升级
-- 启用 WSS (安全 WebSocket) 协议
-- 设置环境变量 `NODE_ENV=production`
-- 使用 PM2 进程管理（非 Docker 环境）t, message: { data: INewMessageData }): Promise<void> {
-    // 处理逻辑
+  "creator": {
+    "userId": "user_alice",
+    "nickname": "Alice"
   }
 }
 ```
 
-3. **注册处理器** (`src/ws.ts`):
-```typescript
-case MessageType.NEW_MESSAGE:
-  await newMessageHandler.handle(client, message as never);
-  break;
+**成功响应（201）：**
+```json
+{
+  "success": true,
+  "data": {
+    "room": {
+      "roomId": "room_abc123...",
+      "roomCode": "123456",
+      "participants": [
+        {
+          "user": {
+            "userId": "user_alice",
+            "nickname": "Alice"
+          },
+          "joinedAt": 1234567890000
+        }
+      ],
+      "status": "WAITING",
+      "createdAt": 1234567890000
+    }
+  }
+}
 ```
 
-### 添加 HTTP 路由
-
-在 `src/app.ts` 中添加：
-
-```typescript
-app.get('/api/rooms', (req, res) => {
-  const rooms = gameRoomManager.getAvailableRooms();
-  res.json({ rooms });
-});
+**错误响应（400/500）：**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "creator.userId and creator.nickname are required"
+  }
+}
 ```
+
+---
+
+### WebSocket协议
+
+连接URL: `ws://localhost:8080/ws`
+
+#### 消息格式
+
+所有消息都包含：
+```typescript
+{
+  "type": "MESSAGE_TYPE",
+  "data": { /* 消息数据 */ },
+  "timestamp": 1234567890000
+}
+```
+
+---
+
+### 客户端 → 服务器消息
+
+#### 1. JOIN_ROOM - 加入房间
+
+```json
+{
+  "type": "JOIN_ROOM",
+  "data": {
+    "roomCode": "123456",
+    "user": {
+      "userId": "user_bob",
+      "nickname": "Bob"
+    }
+  },
+  "timestamp": 1234567890000
+}
+```
+
+**验证规则：**
+1. ✅ roomCode、user.userId、user.nickname必填
+2. ✅ 房间必须存在
+3. ✅ 房间状态必须是WAITING
+4. ✅ 房间未满（< 2人）
+5. ✅ 用户未加入该房间
+
+---
+
+#### 2. CHAT_SEND - 发送消息
+
+```json
+{
+  "type": "CHAT_SEND",
+  "data": {
+    "content": {
+      "type": "TEXT",
+      "text": "Hello!"
+    }
+  },
+  "timestamp": 1234567890000
+}
+```
+
+**前置条件：**
+- 必须已通过JOIN_ROOM加入房间
+- 房间状态必须是READY（2人）
+
+---
+
+### 服务器 → 客户端消息
+
+#### 1. JOIN_ACK - 加入确认
+
+当用户成功加入或房间状态变化时，**所有参与者**都会收到：
+
+```json
+{
+  "type": "JOIN_ACK",
+  "data": {
+    "room": {
+      "roomId": "room_abc123...",
+      "roomCode": "123456",
+      "participants": [
+        {
+          "user": { "userId": "user_alice", "nickname": "Alice" },
+          "joinedAt": 1234567890000
+        },
+        {
+          "user": { "userId": "user_bob", "nickname": "Bob" },
+          "joinedAt": 1234567891000
+        }
+      ],
+      "status": "READY",
+      "createdAt": 1234567890000
+    }
+  },
+  "timestamp": 1234567891000
+}
+```
+
+---
+
+#### 2. CHAT_RECEIVE - 接收消息
+
+所有参与者都会收到广播：
+
+```json
+{
+  "type": "CHAT_RECEIVE",
+  "data": {
+    "message": {
+      "messageId": "msg_xyz789...",
+      "roomId": "room_abc123...",
+      "sender": {
+        "userId": "user_alice",
+        "nickname": "Alice"
+      },
+      "type": "TEXT",
+      "content": {
+        "type": "TEXT",
+        "text": "Hello!"
+      },
+      "createdAt": 1234567892000
+    }
+  },
+  "timestamp": 1234567892000
+}
+```
+
+---
+
+#### 3. ERROR - 错误消息
+
+```json
+{
+  "type": "ERROR",
+  "data": {
+    "code": "ROOM_NOT_FOUND",
+    "message": "ROOM_NOT_FOUND"
+  },
+  "timestamp": 1234567890000
+}
+```
+
+**错误码：**
+- `INVALID_PAYLOAD` - 无效的消息格式
+- `ROOM_NOT_FOUND` - 房间不存在
+- `ROOM_FULL` - 房间已满
+- `ROOM_CLOSED` - 房间已关闭
+- `NOT_PARTICIPANT` - 不是房间参与者
+- `ROOM_NOT_READY` - 房间未就绪（需要2人才能聊天）
+- `ALREADY_JOINED` - 已加入该房间
+- `INTERNAL_ERROR` - 服务器内部错误
+
+---
+
+## 使用Postman测试
+
+### 准备工作
+
+1. 确保服务器已启动（`npm run dev`）
+2. 打开Postman
+
+### 完整测试流程
+
+> **⚠️ 重要说明**：
+> 1. 创建房间时，creator会在**领域模型**中成为第一个参与者
+> 2. 但creator仍需通过**JOIN_ROOM**建立WebSocket连接才能收发消息
+> 3. JOIN_ROOM对于creator来说是"连接到已加入的房间"，不会重复添加
+
+#### 步骤1: Alice创建房间（HTTP）
+
+**请求：**
+- Method: `POST`
+- URL: `http://localhost:8080/room/create`
+- Headers: `Content-Type: application/json`
+- Body (raw JSON):
+```json
+{
+  "creator": {
+    "userId": "user_alice",
+    "nickname": "Alice"
+  }
+}
+```
+
+**预期响应：**
+- Status: `201 Created`
+- 记下响应中的 `roomCode`（例如："123456"）
+- ✅ Alice在领域模型中成为第一个参与者，状态为`WAITING`
+
+---
+
+#### 步骤2: Alice建立WebSocket连接
+
+**在Postman中：**
+1. 新建 `WebSocket Request`
+2. URL: `ws://localhost:8080/ws`
+3. 点击 `Connect`
+
+连接成功后保持此连接打开（命名为"Alice连接"）
+
+---
+
+#### 步骤3: Alice发送JOIN_ROOM绑定连接
+
+**在Alice连接中发送：**
+```json
+{
+  "type": "JOIN_ROOM",
+  "data": {
+    "roomCode": "123456",
+    "user": {
+      "userId": "user_alice",
+      "nickname": "Alice"
+    }
+  },
+  "timestamp": 1234567890000
+}
+```
+
+**预期接收：**
+```json
+{
+  "type": "JOIN_ACK",
+  "data": {
+    "room": {
+      "roomCode": "123456",
+      "participants": [ /* 1个参与者: Alice */ ],
+      "status": "WAITING"
+    }
+  }
+}
+```
+
+✅ Alice的WebSocket现已绑定到房间，可以接收消息了！
+
+---
+
+#### 步骤4: Bob建立WebSocket连接
+1. 新建另一个 `WebSocket Request`
+2. URL: `ws://localhost:8080/ws`
+3. 点击 `Connect`
+
+保持此连接打开（命名为"Bob连接"）
+
+---
+
+**在Bob连接中发送：**
+```json
+{
+  "type": "JOIN_ROOM",
+  "data": {
+    "roomCode": "123456",
+    "user": {
+      "userId": "user_bob",
+      "nickname": "Bob"
+    }
+  },
+  "timestamp": 1234567891000
+}
+```
+
+**预期：Alice和Bob都会收到：**
+```json
+{
+  "type": "JOIN_ACK",
+  "data": {
+    "room": {
+      "roomCode": "123456",
+      "participants": [ /* 2个参与者: Alice, Bob */ ],
+      "status": "READY"
+    }
+  }
+}
+```
+
+房间状态变为`READY`，现在可以聊天了！🎉
+
+---
+
+#### 步骤6: Alice发送消息（WebSocket）
+```json
+{
+  "type": "CHAT_SEND",
+  "data": {
+    "content": {
+      "type": "TEXT",
+      "text": "Hi Bob! 👋"
+    }
+  },
+  "timestamp": 1234567892000
+}
+```
+
+**预期：Alice和Bob都会收到：**
+```json
+{
+  "type": "CHAT_RECEIVE",
+  "data": {
+    "message": {
+      "sender": {
+        "userId": "user_alice",
+        "nickname": "Alice"
+      },
+      "content": {
+        "type": "TEXT",
+        "text": "Hi Bob! 👋"
+      }
+    }
+  }
+}
+```
+
+---
+
+**在Bob连接中发送：**
+```json
+{
+  "type": "CHAT_SEND",
+  "data": {
+    "content": {
+      "type": "TEXT",
+      "text": "Hello Alice! How are you?"
+    }
+  },
+  "timestamp": 1234567893000
+}
+```
+
+**预期：Alice和Bob都会收到：**
+```json
+{
+  "type": "CHAT_RECEIVE",
+  "data": {
+    "message": {
+      "sender": {
+        "userId": "user_bob",
+        "nickname": "Bob"
+      },
+      "content": {
+        "type": "TEXT",
+        "text": "Hello Alice! How are you?"
+      }
+    }
+  }
+}
+```
+
+---
+
+#### 步骤8: 测试断开连接
+
+```json
+{
+  "type": "JOIN_ACK",
+  "data": {
+    "room": {
+      "participants": [ /* 只剩Alice */ ]
+    }
+  }
+}
+```
+
+如果Alice也断开，房间将被关闭并删除。
+
+---
+
+## 测试场景
+
+### ✅ 正常流程
+1. 创建房间 → WAITING (1人)
+2.# 🔄 替代测试流程（两个独立用户）
+
+如果你想测试两个完全独立的用户都通过JOIN_ROOM加入：
+
+1. **Charlie创建房间（HTTP）**
+2. **Alice建立WebSocket → 发送JOIN_ROOM加入**
+3. **Bob建立WebSocket → 发送JOIN_ROOM加入**
+4. **Alice和Bob聊天**
+
+这种方式下，Charlie只是创建了房间但没有建立WebSocket连接，Alice和Bob是实际的参与者。
+
+---
+
+## 测试场景
+
+### ✅ 正常流程
+1. 创建房间 → creator自动成为第一个参与者 (WAITING)
+2. 第二人通过WebSocket JOIN_ROOM错误场景测试
+
+#### 测试1: 房间满了
+尝试第三个用户加入同一房间，会收到：
+```json
+{
+  "type": "ERROR",
+  "data": {
+    "code": "ROOM_FULL"
+  }
+}
+```
+
+#### 测试2: 在WAITING状态发消息
+只有1人时尝试发送消息，会收到：
+```json
+{
+  "type": "ERROR",
+  "data": {
+    "code": "ROOM_NOT_READY",
+    "message": "Room is not ready for chat (need 2 participants)"
+  }
+}
+```
+
+#### 测试4: Creator绑定连接
+Creator创建房间后，使用JOIN_ROOM绑定WebSocket连接（不会报错）：
+```json
+{
+  "type": "JOIN_ACK",
+  "data": {
+    "room": {
+      "status": "WAITING",
+      "participants": [ /* creator */ ]
+    }
+  }
+}
+```
+
+✅ 这是正常行为，用于绑定WebSocket连接
+
+#### 测试3: 错误的roomCode
+使用不存在的roomCode加入，会收到：
+```json
+{
+  "type": "ERROR",
+  "data": {
+    "code": "ROOM_NOT_FOUND"
+  }
+}
+```
+
+---
+
+## 房间状态机
+
+```
+CREATE (HTTP)
+     ↓
+  WAITING (1人)
+     ↓ 第二人JOIN
+  READY (2人) ← 可以聊天
+     ↓ 有人离开
+  CLOSED (删除)
+```
+
+---
+
+## 开发命令
+
+```bash
+# 启动开发服务器
+npm run dev
+
+# 代码检查
+npm run lint
+
+# 代码格式化
+npm run format
+
+# TypeScript类型检查
+npx tsc --noEmit
+```
+
+---
+
+## 项目结构
+
+```
+backend/
+├── src/
+│   ├── models/              # 领域模型
+│   │   ├── user.ts
+│   │   ├── room.ts
+│   │   └── message.ts
+│   ├── types/               # 类型定义
+│   │   ├── http.ts
+│   │   └── ws-messages.ts
+│   ├── services/            # 业务逻辑
+│   │   ├── room-manager.ts
+│   │   ├── connection-manager.ts
+│   │   └── handlers/
+│   ├── constants/
+│   ├── utils/
+│   ├── app.ts              # Express服务器
+│   ├── ws.ts               # WebSocket服务器
+│   └── index.ts            # 入口文件
+├── .env                     # 环境变量
+└── package.json
+```
+
+---
 
 ## 常见问题
 
-### Q: 如何查看所有活跃的房间？
-A: 可以通过 `gameRoomManager.getAllRooms()` 获取，或添加 HTTP API 接口。
+### Q: 为什么房间只能2个人？
+A: 这是设计规范，符合双人聊天室的定位。
 
-### Q: 心跳包多久发送一次？
-A: 默认 30 秒，可在 `.env` 中通过 `WS_HEARTBEAT_INTERVAL` 配置。
+### Q: 消息会持久化吗？
+A: 当前版本不持久化，断开连接后消息丢失。
 
-### Q: 客户端多久没响应会被断开？
-A: 默认 60 秒，可在 `.env` 中通过 `WS_CLIENT_TIMEOUT` 配置。
+### Q: 可以创建多个房间吗？
+A: 可以！每次调用`POST /room/create`都会创建新房间，通过不同的roomCode区分。
 
-### Q: 如何调试 WebSocket？
-A: 使用 Postman 或浏览器开发者工具的 Network → WS 标签页查看消息。
+### Q: roomCode是如何生成的？
+A: 自动生成6位数字，确保唯一性。
 
-## 部署
+---
 
-生产环境建议：
-- 使用 PM2 或 Docker 部署
-- 配置反向代理 (Nginx) 处理 WebSocket 升级
-- 启用 WSS (安全 WebSocket) 协议
-- 设置环境变量 `NODE_ENV=production`
+## 更多信息
 
-## 许可证
+- 详细架构文档：[ARCHITECTURE.md](./ARCHITECTURE.md)
+- 重构总结：[REFACTOR_SUMMARY.md](./REFACTOR_SUMMARY.md)
+- 规范文档：[../.cursor/rules/06-create-room-and-chat.md](../.cursor/rules/06-create-room-and-chat.md)
 
-MIT
+---
 
+## License
+
+ISC
