@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/
+scripts/
 *.js.map
 *.d.ts.map
 

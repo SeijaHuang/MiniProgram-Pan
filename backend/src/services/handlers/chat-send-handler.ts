@@ -1,7 +1,7 @@
 /**
  * CHAT_SEND Message Handler
  * Handles chat message sending
- * 
+ *
  * CRITICAL: Only allows chat in READY rooms
  * CRITICAL: Validates sender is a participant
  * CRITICAL: Broadcasts to all participants
@@ -16,17 +16,21 @@ import type { IMessage } from '../../models/message';
 import { EMessageType } from '../../models/message';
 import type { ConnectionManager } from '../connection-manager';
 
-export async function handleChatSend(
+export function handleChatSend(
     connectionManager: ConnectionManager,
     connectionId: string,
     message: IChatSendMessage
-): Promise<void> {
+): void {
     try {
         const { content } = message.data;
 
         // Get connection metadata
         const connectionData = connectionManager.getConnection(connectionId);
-        if (!connectionData || !connectionData.userId || !connectionData.roomId) {
+        if (
+            !connectionData ||
+            !connectionData.userId ||
+            !connectionData.roomId
+        ) {
             connectionManager.sendToConnection(connectionId, {
                 type: EWSMessageType.Error,
                 data: {
@@ -68,7 +72,7 @@ export async function handleChatSend(
         }
 
         // Validation: Sender is a participant
-        const sender = room.participants.find((p) => p.user.userId === userId);
+        const sender = room.participants.find(p => p.user.userId === userId);
         if (!sender) {
             connectionManager.sendToConnection(connectionId, {
                 type: EWSMessageType.Error,
@@ -122,7 +126,8 @@ export async function handleChatSend(
             type: EWSMessageType.Error,
             data: {
                 code: EWSErrorCode.InternalError,
-                message: error instanceof Error ? error.message : 'Unknown error',
+                message:
+                    error instanceof Error ? error.message : 'Unknown error',
             },
             timestamp: Date.now(),
         });

@@ -1,7 +1,7 @@
 /**
  * Room Domain Model
  * Represents a two-user chat room
- * 
+ *
  * CRITICAL: Room does NOT store WebSocket or connection info
  * CRITICAL: participants.length must NEVER exceed 2
  * CRITICAL: Room state controls allowed operations

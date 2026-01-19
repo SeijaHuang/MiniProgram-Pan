@@ -1,7 +1,7 @@
 /**
  * JOIN_ROOM Message Handler
  * Handles room join requests via WebSocket
- * 
+ *
  * CRITICAL: Validates all preconditions before allowing join
  * CRITICAL: Broadcasts JOIN_ACK to ALL participants on success
  */
@@ -11,11 +11,11 @@ import { EWSMessageType, EWSErrorCode } from '../../types/ws-messages';
 import { roomManager } from '../room-manager';
 import type { ConnectionManager } from '../connection-manager';
 
-export async function handleJoinRoom(
+export function handleJoinRoom(
     connectionManager: ConnectionManager,
     connectionId: string,
     message: IJoinRoomMessage
-): Promise<void> {
+): void {
     try {
         const { roomCode, user } = message.data;
 
@@ -25,7 +25,8 @@ export async function handleJoinRoom(
                 type: EWSMessageType.Error,
                 data: {
                     code: EWSErrorCode.InvalidPayload,
-                    message: 'roomCode, user.userId, and user.nickname are required',
+                    message:
+                        'roomCode, user.userId, and user.nickname are required',
                 },
                 timestamp: Date.now(),
             });
@@ -47,7 +48,7 @@ export async function handleJoinRoom(
         }
 
         const isAlreadyParticipant = room.participants.some(
-            (p) => p.user.userId === user.userId
+            p => p.user.userId === user.userId
         );
 
         let finalRoom = room;
@@ -88,7 +89,11 @@ export async function handleJoinRoom(
         }
 
         // Bind connection to user and room
-        connectionManager.bindConnection(connectionId, user.userId, finalRoom.roomId);
+        connectionManager.bindConnection(
+            connectionId,
+            user.userId,
+            finalRoom.roomId
+        );
 
         // Broadcast JOIN_ACK to ALL participants
         const joinAckMessage = {
@@ -110,7 +115,8 @@ export async function handleJoinRoom(
             type: EWSMessageType.Error,
             data: {
                 code: EWSErrorCode.InternalError,
-                message: error instanceof Error ? error.message : 'Unknown error',
+                message:
+                    error instanceof Error ? error.message : 'Unknown error',
             },
             timestamp: Date.now(),
         });

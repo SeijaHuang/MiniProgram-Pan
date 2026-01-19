@@ -17,4 +17,3 @@ export const ROOM_CONFIG = {
     MAX_PARTICIPANTS: 2,
     ROOM_CODE_LENGTH: 6,
 } as const;
-

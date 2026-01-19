@@ -1,7 +1,7 @@
 /**
  * Message Domain Model
  * Represents a chat message within a room
- * 
+ *
  * CRITICAL: Every message belongs to exactly one room
  * CRITICAL: Sender must be a participant of that room
  * CRITICAL: Message type must match its content

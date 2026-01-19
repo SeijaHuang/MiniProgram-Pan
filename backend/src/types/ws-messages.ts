@@ -1,13 +1,13 @@
 /**
  * WebSocket Transport Layer Types
  * Defines the protocol for client-server real-time communication
- * 
+ *
  * CRITICAL: WebSocket is used ONLY for:
  * - Joining rooms
  * - Broadcasting messages
  * - Handling disconnects
  * - Sending protocol-level errors
- * 
+ *
  * CRITICAL: Room creation is handled via HTTP
  */
 
@@ -22,7 +22,7 @@ export enum EWSMessageType {
     // Client → Server
     JoinRoom = 'JOIN_ROOM',
     ChatSend = 'CHAT_SEND',
-    
+
     // Server → Client
     JoinAck = 'JOIN_ACK',
     ChatReceive = 'CHAT_RECEIVE',
@@ -128,4 +128,3 @@ export type WSMessage =
     | IJoinAckMessage
     | IChatReceiveMessage
     | IWSErrorMessage;
-

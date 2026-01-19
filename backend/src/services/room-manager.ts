@@ -1,7 +1,7 @@
 /**
  * Room Manager Service
  * Manages room lifecycle and state transitions
- * 
+ *
  * CRITICAL: This is a DOMAIN service - no WebSocket logic
  * CRITICAL: Enforces room state machine: WAITING → READY → CLOSED
  * CRITICAL: Enforces max 2 participants per room
@@ -79,13 +79,13 @@ export class RoomManager {
     /**
      * Join a room
      * CRITICAL: Validates state transitions and participant limits
-     * 
+     *
      * Validations (in order):
      * 1. Room exists
      * 2. Room status allows joining (must be WAITING)
      * 3. Room is not full (max 2 participants)
      * 4. User is not already a participant
-     * 
+     *
      * State transition: WAITING → READY (when 2nd user joins)
      */
     joinRoom(
@@ -111,7 +111,7 @@ export class RoomManager {
 
         // Validation 4: User is not already a participant
         const isAlreadyParticipant = room.participants.some(
-            (p) => p.user.userId === user.userId
+            p => p.user.userId === user.userId
         );
         if (isAlreadyParticipant) {
             return { success: false, error: 'ALREADY_JOINED' };
@@ -142,7 +142,7 @@ export class RoomManager {
     /**
      * Remove participant from room
      * CRITICAL: Handles disconnect cleanup
-     * 
+     *
      * State transition:
      * - If all participants leave → CLOSED
      * - Room is marked for cleanup but not resurrected
@@ -156,7 +156,7 @@ export class RoomManager {
 
         // Remove participant
         room.participants = room.participants.filter(
-            (p) => p.user.userId !== userId
+            p => p.user.userId !== userId
         );
 
         console.log(
@@ -168,7 +168,9 @@ export class RoomManager {
             room.status = ERoomStatus.Closed;
             this.rooms.delete(roomId);
             this.roomCodeToId.delete(room.roomCode);
-            console.log(`[RoomManager] Room ${roomId} CLOSED (no participants)`);
+            console.log(
+                `[RoomManager] Room ${roomId} CLOSED (no participants)`
+            );
             return null;
         }
 
@@ -183,7 +185,7 @@ export class RoomManager {
         if (!room) {
             return false;
         }
-        return room.participants.some((p) => p.user.userId === userId);
+        return room.participants.some(p => p.user.userId === userId);
     }
 
     /**

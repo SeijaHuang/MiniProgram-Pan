@@ -1,7 +1,7 @@
 /**
  * Connection Manager
  * Manages WebSocket connections and their metadata
- * 
+ *
  * CRITICAL: Separates runtime connection data from domain models
  * CRITICAL: Handles connection-to-user-to-room binding
  * CRITICAL: Handles disconnect cleanup
@@ -48,11 +48,7 @@ export class ConnectionManager {
      * Bind connection to user and room
      * CRITICAL: Called after successful JOIN_ROOM
      */
-    bindConnection(
-        connectionId: string,
-        userId: string,
-        roomId: string
-    ): void {
+    bindConnection(connectionId: string, userId: string, roomId: string): void {
         const connection = this.connections.get(connectionId);
         if (!connection) {
             throw new Error(`Connection ${connectionId} not found`);

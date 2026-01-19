@@ -1,7 +1,7 @@
 /**
  * WebSocket Server
  * Handles real-time communication for room joining and chat
- * 
+ *
  * CRITICAL: Room creation is NOT handled here (use HTTP API)
  * CRITICAL: Only handles JOIN_ROOM and CHAT_SEND
  */
@@ -40,7 +40,7 @@ export function initWebSocket(server: HttpServer): void {
 
         // Handle incoming messages
         ws.on('message', (data: RawData) => {
-            handleMessage(connectionId, data);
+            void handleMessage(connectionId, data);
         });
 
         // Handle connection close
@@ -49,7 +49,7 @@ export function initWebSocket(server: HttpServer): void {
         });
 
         // Handle errors
-        ws.on('error', (error) => {
+        ws.on('error', error => {
             console.error(
                 `[WebSocket] Error for connection ${connectionId}:`,
                 error
@@ -61,10 +61,7 @@ export function initWebSocket(server: HttpServer): void {
 /**
  * Handle incoming WebSocket message
  */
-async function handleMessage(
-    connectionId: string,
-    data: RawData
-): Promise<void> {
+function handleMessage(connectionId: string, data: RawData): void {
     try {
         const messageText = rawDataToText(data);
         const message = JSON.parse(messageText) as IWSMessage;
@@ -76,7 +73,7 @@ async function handleMessage(
         // Route message to appropriate handler
         switch (message.type) {
             case EWSMessageType.JoinRoom:
-                await handleJoinRoom(
+                handleJoinRoom(
                     connectionManager,
                     connectionId,
                     message as IJoinRoomMessage
@@ -84,7 +81,7 @@ async function handleMessage(
                 break;
 
             case EWSMessageType.ChatSend:
-                await handleChatSend(
+                handleChatSend(
                     connectionManager,
                     connectionId,
                     message as IChatSendMessage
@@ -96,7 +93,7 @@ async function handleMessage(
                     type: EWSMessageType.Error,
                     data: {
                         code: EWSErrorCode.InvalidPayload,
-                        message: `Unknown message type: ${(message as IWSMessage).type}`,
+                        message: `Unknown message type: ${message.type}`,
                     },
                     timestamp: Date.now(),
                 });
@@ -134,7 +131,7 @@ function rawDataToText(data: RawData): string {
         return Buffer.concat(data).toString('utf-8');
     }
     // ArrayBuffer case
-    return Buffer.from(data as ArrayBuffer).toString('utf-8');
+    return Buffer.from(data).toString('utf-8');
 }
 
 /**
@@ -143,4 +140,3 @@ function rawDataToText(data: RawData): string {
 function generateConnectionId(): string {
     return `conn_${randomBytes(8).toString('hex')}`;
 }
-

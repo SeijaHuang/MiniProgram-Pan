@@ -1,7 +1,7 @@
 /**
  * Express HTTP Server
  * Handles HTTP API endpoints
- * 
+ *
  * CRITICAL: Only room creation is handled via HTTP
  * CRITICAL: All real-time communication is via WebSocket
  */
@@ -30,7 +30,7 @@ app.get('/health', (_req, res) => {
 /**
  * Create room endpoint
  * POST /room/create
- * 
+ *
  * CRITICAL: This is the ONLY way to create a room
  * CRITICAL: Returns room with roomCode for joining
  */
@@ -46,7 +46,8 @@ app.post(
                     success: false,
                     error: {
                         code: EHttpErrorCode.InvalidRequest,
-                        message: 'creator.userId and creator.nickname are required',
+                        message:
+                            'creator.userId and creator.nickname are required',
                     },
                 };
                 res.status(400).json(response);
@@ -69,7 +70,9 @@ app.post(
                 error: {
                     code: EHttpErrorCode.RoomCreateFailed,
                     message:
-                        error instanceof Error ? error.message : 'Unknown error',
+                        error instanceof Error
+                            ? error.message
+                            : 'Unknown error',
                 },
             };
             res.status(500).json(response);
@@ -78,4 +81,3 @@ app.post(
 );
 
 export default app;
-
