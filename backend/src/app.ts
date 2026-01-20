@@ -38,24 +38,8 @@ app.post(
     '/room/create',
     (req: Request<unknown, unknown, ICreateRoomRequest>, res: Response) => {
         try {
-            const { creator } = req.body;
-
-            // Validate request
-            if (!creator || !creator.userId || !creator.nickname) {
-                const response: IBaseResponse<never> = {
-                    success: false,
-                    error: {
-                        code: EHttpErrorCode.InvalidRequest,
-                        message:
-                            'creator.userId and creator.nickname are required',
-                    },
-                };
-                res.status(400).json(response);
-                return;
-            }
-
-            // Create room
-            const room = roomManager.createRoom(creator);
+            // Create room (creator will join via WebSocket)
+            const room = roomManager.createRoom();
 
             // Return success response
             const response: IBaseResponse<ICreateRoomResponseData> = {

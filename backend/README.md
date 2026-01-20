@@ -38,11 +38,156 @@ NODE_ENV=development
 
 ### 3. 启动服务器
 
+#### 开发模式（推荐用于开发调试）
+
 ```bash
 npm run dev
 ```
 
+使用 `ts-node` 直接运行 TypeScript 代码，支持热重载。
+
+#### 生产模式
+
+**第一步：编译 TypeScript**
+
+```bash
+npm run build
+```
+
+这将编译 TypeScript 代码到 `dist/` 目录。
+
+**第二步：运行编译后的代码**
+
+```bash
+npm start
+```
+
+或者直接运行：
+
+```bash
+node dist/index.js
+```
+
 服务器将在 `http://localhost:8080` 启动，WebSocket路径为 `ws://localhost:8080/ws`
+
+### 4. 验证服务器运行
+
+**测试 HTTP API：**
+
+```bash
+curl -X POST http://localhost:8080/room/create \
+  -H "Content-Type: application/json" \
+  -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
+```
+
+**测试 WebSocket：**
+
+使用提供的测试脚本：
+
+```bash
+npm run ws:test
+```
+
+---
+
+## Docker 部署
+
+### 前置要求
+
+- 安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- 确保 Docker Desktop 正在运行
+
+### 快速启动
+
+#### Windows 用户
+
+双击运行 `start-docker.bat` 或在 PowerShell 中执行：
+
+```powershell
+.\start-docker.bat
+```
+
+#### Mac/Linux 用户
+
+```bash
+chmod +x start-docker.sh
+./start-docker.sh
+```
+
+#### 使用 docker-compose 命令
+
+**1. 构建 Docker 镜像**
+
+```bash
+docker-compose build
+```
+
+**2. 启动容器（开发模式，支持热重载）**
+
+```bash
+docker-compose up -d
+```
+
+**3. 查看日志**
+
+```bash
+# 查看所有日志
+docker-compose logs -f
+
+# 只查看后端日志
+docker-compose logs -f backend
+```
+
+**4. 停止服务**
+
+```bash
+docker-compose down
+```
+
+### Docker 常用命令
+
+| 操作 | 命令 |
+|------|------|
+| 构建镜像 | `docker-compose build` |
+| 启动服务 | `docker-compose up -d` |
+| 停止服务 | `docker-compose down` |
+| 查看日志 | `docker-compose logs -f` |
+| 重启服务 | `docker-compose restart` |
+| 重新构建并启动 | `docker-compose up --build -d` |
+| 进入容器 | `docker-compose exec backend sh` |
+| 查看容器状态 | `docker-compose ps` |
+
+### Docker 环境说明
+
+**开发环境（默认）**
+- 使用 `Dockerfile.dev`
+- 支持代码热重载
+- 包含所有开发依赖
+- 源代码通过 volume 挂载
+
+**生产环境**
+- 使用 `Dockerfile`
+- 多阶段构建，优化镜像大小
+- 只包含生产依赖
+- 运行编译后的代码
+
+切换到生产环境：修改 `docker-compose.yml` 中的 `dockerfile: Dockerfile`
+
+### 验证 Docker 部署
+
+```bash
+# 测试 HTTP API
+curl -X POST http://localhost:8080/room/create \
+  -H "Content-Type: application/json" \
+  -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
+
+# 查看容器状态
+docker-compose ps
+```
+
+详细的 Docker 部署文档请查看 [DOCKER.md](DOCKER.md)
+
+---
 
 ## API文档
 
@@ -553,17 +698,34 @@ CREATE (HTTP)
 
 ## 开发命令
 
+## 可用脚本命令
+
 ```bash
-# 启动开发服务器
+# 开发模式（使用 ts-node 直接运行）
 npm run dev
+
+# 编译 TypeScript 到 dist/
+npm run build
+
+# 运行编译后的代码（生产模式）
+npm start
 
 # 代码检查
 npm run lint
 
+# 自动修复代码问题
+npm run lint:fix
+
 # 代码格式化
 npm run format
 
-# TypeScript类型检查
+# 检查代码格式
+npm run format:check
+
+# WebSocket 测试脚本
+npm run ws:test
+
+# TypeScript 类型检查（不生成文件）
 npx tsc --noEmit
 ```
 
@@ -614,8 +776,6 @@ A: 自动生成6位数字，确保唯一性。
 
 ## 更多信息
 
-- 详细架构文档：[ARCHITECTURE.md](./ARCHITECTURE.md)
-- 重构总结：[REFACTOR_SUMMARY.md](./REFACTOR_SUMMARY.md)
 - 规范文档：[../.cursor/rules/06-create-room-and-chat.md](../.cursor/rules/06-create-room-and-chat.md)
 
 ---

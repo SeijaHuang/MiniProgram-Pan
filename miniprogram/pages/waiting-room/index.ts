@@ -1,5 +1,12 @@
 // pages/waiting-room/index.ts
 
+import { roomService } from '../../services/room-service';
+import { roomWebSocketService } from '../../services/room-websocket-service';
+import { wsManager } from '../../services/websocket-manager';
+import type { IUser } from '../../models/user';
+import type { IRoom } from '../../models/room';
+import { ERoomStatus } from '../../models/room';
+
 /**
  * 视图模式类型
  * - entry: 入口模式，显示两个主按钮
@@ -39,6 +46,9 @@ interface IWaitingRoomPageData {
     joinButtonAnimation: WechatMiniprogram.AnimationExportResult;
     cancelButtonAnimation: WechatMiniprogram.AnimationExportResult;
     confirmButtonAnimation: WechatMiniprogram.AnimationExportResult;
+    // 用户和房间信息
+    currentUser: IUser | null;
+    currentRoom: IRoom | null;
 }
 
 /**
@@ -47,7 +57,6 @@ interface IWaitingRoomPageData {
 interface IWaitingRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     waitingTextTimer: number | null;
     countdownTimer: number | null;
-    mockGuestTimer: number | null;
     hostButtonAnim: WechatMiniprogram.Animation | null;
     joinButtonAnim: WechatMiniprogram.Animation | null;
     cancelButtonAnim: WechatMiniprogram.Animation | null;
@@ -77,18 +86,6 @@ const WAITING_TEXTS: string[] = [
 
 const INITIAL_COUNTDOWN_TIME = 3;
 
-/**
- * 生成6位随机房间号
- */
-function generateRoomCode(): string {
-    const chars = '0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-}
-
 Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     data: {
         viewMode: 'entry',
@@ -113,12 +110,14 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         joinButtonAnimation: {} as WechatMiniprogram.AnimationExportResult,
         cancelButtonAnimation: {} as WechatMiniprogram.AnimationExportResult,
         confirmButtonAnimation: {} as WechatMiniprogram.AnimationExportResult,
+        // 用户和房间信息
+        currentUser: null,
+        currentRoom: null,
     },
 
     // 定时器引用
     waitingTextTimer: null,
     countdownTimer: null,
-    mockGuestTimer: null,
     // 动画实例
     hostButtonAnim: null,
     joinButtonAnim: null,
@@ -127,6 +126,8 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
     onLoad(): void {
         this.initAnimations();
+        this.initWebSocket();
+        this.initUser();
     },
 
     onShow(): void {
@@ -135,10 +136,58 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
     onUnload(): void {
         this.clearAllTimers();
+        // 断开 WebSocket 连接将由服务器处理用户离开
     },
 
     onHide(): void {
         this.clearAllTimers();
+    },
+
+    /**
+     * 初始化 WebSocket 连接
+     */
+    initWebSocket(): void {
+        wsManager.connect({
+            onConnect: () => {
+                console.log('[WaitingRoom] WebSocket connected');
+            },
+            onDisconnect: () => {
+                console.log('[WaitingRoom] WebSocket disconnected');
+                void wx.showToast({ title: '连接已断开', icon: 'error' });
+            },
+            onError: error => {
+                console.error('[WaitingRoom] WebSocket error:', error);
+                void wx.showToast({ title: '连接错误', icon: 'error' });
+            },
+        });
+
+        roomWebSocketService.initialize((room: IRoom) => {
+            this.handleRoomJoined(room);
+        });
+    },
+
+    /**
+     * 初始化用户信息
+     */
+    initUser(): void {
+        const userId = wx.getStorageSync('userId') || this.generateUserId();
+        const nickname = wx.getStorageSync('nickname') || '匿名用户';
+
+        if (!wx.getStorageSync('userId')) {
+            wx.setStorageSync('userId', userId);
+            wx.setStorageSync('nickname', nickname);
+        }
+
+        this.setData({
+            currentUser: { userId, nickname },
+        });
+    },
+
+    /**
+     * 生成用户 ID
+     */
+    generateUserId(): string {
+        return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     },
 
     /**
@@ -174,10 +223,6 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         if (this.countdownTimer) {
             clearInterval(this.countdownTimer);
             this.countdownTimer = null;
-        }
-        if (this.mockGuestTimer) {
-            clearTimeout(this.mockGuestTimer);
-            this.mockGuestTimer = null;
         }
     },
 
@@ -243,22 +288,48 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             'hostButtonAnimation'
         );
 
-        // 生成房间号并切换到房主等待模式
-        const roomCode = generateRoomCode();
-
         setTimeout(() => {
+            void this.createRoom();
+        }, 200);
+    },
+
+    /**
+     * 创建房间
+     */
+    async createRoom(): Promise<void> {
+        const { currentUser } = this.data;
+        if (!currentUser) {
+            void wx.showToast({ title: '用户信息错误', icon: 'error' });
+            return;
+        }
+
+        void wx.showLoading({ title: '创建房间中...' });
+
+        try {
+            const room = await roomService.createRoom();
+
+            void wx.hideLoading();
+
             this.setData({
+                currentRoom: room,
+                roomCode: room.roomCode,
                 viewMode: 'host_waiting',
-                roomCode: roomCode,
-                waitingTextIndex: 0,
                 currentWaitingText: WAITING_TEXTS[0],
+                waitingTextIndex: 0,
             });
 
-            // 启动等待文案轮播
             this.startWaitingTextCarousel();
-            // 启动模拟对方加入（5-10秒后）
-            this.startMockGuestJoin();
-        }, 200);
+
+            // 房主也需要通过 WebSocket 加入房间
+            roomWebSocketService.joinRoom(room.roomCode, currentUser);
+        } catch (error) {
+            void wx.hideLoading();
+            console.error('[WaitingRoom] Create room failed:', error);
+            void wx.showToast({
+                title: error instanceof Error ? error.message : '创建房间失败',
+                icon: 'error',
+            });
+        }
     },
 
     /**
@@ -351,50 +422,33 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             return;
         }
 
-        // Mock 验证逻辑
-        // 模拟不同场景：
-        // - 房间号以 0 开头：房间不存在
-        // - 房间号以 9 开头：房间已满
-        // - 房间号以 8 开头：房间已开始
-        // - 其他：加入成功
+        const { currentUser } = this.data;
+        if (!currentUser) {
+            void wx.showToast({ title: '用户信息错误', icon: 'error' });
+            return;
+        }
+
+        // 通过 WebSocket 加入房间
+        this.setData({
+            errorType: null,
+            errorMessage: '',
+        });
+
+        void wx.showLoading({ title: '加入房间中...' });
+
+        // 发送加入房间消息
+        roomWebSocketService.joinRoom(roomCodeInput, currentUser);
+
+        // 设置超时处理
         setTimeout(() => {
-            if (roomCodeInput.startsWith('0')) {
+            if (!this.data.currentRoom) {
+                void wx.hideLoading();
                 this.setData({
                     errorType: 'not_found',
-                    errorMessage: ERROR_MESSAGES.not_found,
+                    errorMessage: '加入超时，请重试',
                 });
-                return;
             }
-
-            if (roomCodeInput.startsWith('9')) {
-                this.setData({
-                    errorType: 'full',
-                    errorMessage: ERROR_MESSAGES.full,
-                });
-                return;
-            }
-
-            if (roomCodeInput.startsWith('8')) {
-                this.setData({
-                    errorType: 'started',
-                    errorMessage: ERROR_MESSAGES.started,
-                });
-                return;
-            }
-
-            // 加入成功
-            this.setData({
-                showJoinModal: false,
-                inputFocus: false,
-                viewMode: 'guest_waiting',
-                roomCode: roomCodeInput,
-            });
-
-            // 模拟匹配成功，启动倒计时
-            setTimeout(() => {
-                this.startCountdown();
-            }, 1500);
-        }, 500);
+        }, 5000);
     },
 
     /**
@@ -421,6 +475,35 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     },
 
     /**
+     * 处理房间加入成功
+     */
+    handleRoomJoined(room: IRoom): void {
+        void wx.hideLoading();
+
+        this.setData({
+            currentRoom: room,
+            roomCode: room.roomCode,
+        });
+
+        // 如果是访客加入
+        if (this.data.viewMode !== 'host_waiting') {
+            this.onCloseModal();
+            this.setData({
+                viewMode: 'guest_waiting',
+            });
+        }
+
+        // 检查房间是否已满员（2人）
+        if (
+            room.participants.length >= 2 &&
+            room.status === ERoomStatus.Ready
+        ) {
+            // 启动倒计时，准备进入聊天室
+            this.startCountdown();
+        }
+    },
+
+    /**
      * 启动等待文案轮播
      */
     startWaitingTextCarousel(): void {
@@ -435,22 +518,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
                 waitingTextIndex: nextIndex,
                 currentWaitingText: WAITING_TEXTS[nextIndex],
             });
-        }, 3000);
-    },
-
-    /**
-     * 启动模拟对方加入（Mock）
-     */
-    startMockGuestJoin(): void {
-        // 5-10秒后模拟对方加入
-        const delay = 10000 + Math.random() * 5000;
-
-        this.mockGuestTimer = setTimeout(() => {
-            if (this.data.viewMode === 'host_waiting') {
-                this.clearAllTimers();
-                this.startCountdown();
-            }
-        }, delay);
+        }, 3000) as unknown as number;
     },
 
     /**
@@ -477,26 +545,34 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
             if (currentCount <= 0) {
                 this.clearAllTimers();
-                // 跳转到聊天房间页面，带上 roomId
-                const { roomCode, viewMode } = this.data;
-                const role = viewMode === 'host_waiting' ? 'A' : 'B';
-                wx.navigateTo({
-                    url: `/pages/chat-room/index?roomId=${roomCode}&role=${role}`,
-                    fail: err => {
-                        console.error('跳转失败:', err);
-                        void wx.showToast({
-                            title: '跳转失败',
-                            icon: 'error',
-                        });
-                    },
-                });
+                // 跳转到聊天房间页面，带上 roomCode
+                const { currentRoom, currentUser } = this.data;
+                if (currentRoom && currentUser) {
+                    // 判断角色：第一个加入的是 A，第二个是 B
+                    const role =
+                        currentRoom.participants[0].user.userId ===
+                        currentUser.userId
+                            ? 'A'
+                            : 'B';
+
+                    void wx.navigateTo({
+                        url: `/pages/chat-room/index?roomCode=${currentRoom.roomCode}&role=${role}`,
+                        fail: err => {
+                            console.error('跳转失败:', err);
+                            void wx.showToast({
+                                title: '跳转失败',
+                                icon: 'error',
+                            });
+                        },
+                    });
+                }
             } else {
                 this.triggerHapticFeedback();
                 this.setData({
                     countdown: currentCount,
                 });
             }
-        }, 1000);
+        }, 1000) as unknown as number;
     },
 
     /**

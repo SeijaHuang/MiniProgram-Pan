@@ -11,6 +11,7 @@ import { randomBytes } from 'crypto';
 import type { IRoom, IParticipant } from '../models/room';
 import type { IUser } from '../models/user';
 import { ERoomStatus } from '../models/room';
+import { EWSErrorCode } from '../types/ws-messages';
 
 export class RoomManager {
     private static instance: RoomManager;
@@ -28,22 +29,18 @@ export class RoomManager {
 
     /**
      * Create a new room
-     * CRITICAL: Room is created with WAITING status and creator as first participant
+     * CRITICAL: Room is created EMPTY - users must JOIN via WebSocket
+     * CRITICAL: Initial status is WAITING with 0 participants
      */
-    createRoom(creator: IUser): IRoom {
+    createRoom(): IRoom {
         const roomId = this.generateRoomId();
         const roomCode = this.generateRoomCode();
         const now = Date.now();
 
-        const participant: IParticipant = {
-            user: creator,
-            joinedAt: now,
-        };
-
         const room: IRoom = {
             roomId,
             roomCode,
-            participants: [participant],
+            participants: [], // Empty - users will join via WebSocket
             status: ERoomStatus.Waiting,
             createdAt: now,
         };
@@ -52,7 +49,7 @@ export class RoomManager {
         this.roomCodeToId.set(roomCode, roomId);
 
         console.log(
-            `[RoomManager] Room created: ${roomId} (code: ${roomCode}) by user: ${creator.userId}`
+            `[RoomManager] Room created: ${roomId} (code: ${roomCode}) - waiting for participants`
         );
 
         return room;
@@ -86,7 +83,9 @@ export class RoomManager {
      * 3. Room is not full (max 2 participants)
      * 4. User is not already a participant
      *
-     * State transition: WAITING → READY (when 2nd user joins)
+     * State transitions:
+     * - 0 → 1 participant: remains WAITING
+     * - 1 → 2 participants: WAITING → READY
      */
     joinRoom(
         roomCode: string,
@@ -96,17 +95,17 @@ export class RoomManager {
 
         // Validation 1: Room exists
         if (!room) {
-            return { success: false, error: 'ROOM_NOT_FOUND' };
+            return { success: false, error: EWSErrorCode.RoomNotFound };
         }
 
         // Validation 2: Room status allows joining
         if (room.status !== ERoomStatus.Waiting) {
-            return { success: false, error: 'ROOM_CLOSED' };
+            return { success: false, error: EWSErrorCode.RoomClosed };
         }
 
         // Validation 3: Room is not full
         if (room.participants.length >= 2) {
-            return { success: false, error: 'ROOM_FULL' };
+            return { success: false, error: EWSErrorCode.RoomFull };
         }
 
         // Validation 4: User is not already a participant
@@ -114,7 +113,7 @@ export class RoomManager {
             p => p.user.userId === user.userId
         );
         if (isAlreadyParticipant) {
-            return { success: false, error: 'ALREADY_JOINED' };
+            return { success: false, error: EWSErrorCode.AlreadyJoined };
         }
 
         // Add participant
@@ -124,17 +123,17 @@ export class RoomManager {
         };
         room.participants.push(participant);
 
-        // State transition: WAITING → READY
+        // State transition: WAITING → READY (when 2nd user joins)
         if (room.participants.length === 2) {
             room.status = ERoomStatus.Ready;
             console.log(
                 `[RoomManager] Room ${room.roomId} is now READY (2 participants)`
             );
+        } else {
+            console.log(
+                `[RoomManager] User ${user.userId} joined room ${room.roomId} (${room.participants.length}/2)`
+            );
         }
-
-        console.log(
-            `[RoomManager] User ${user.userId} joined room ${room.roomId}`
-        );
 
         return { success: true, room };
     }
