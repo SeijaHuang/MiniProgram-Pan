@@ -1,12 +1,16 @@
 /**
  * Chat Room Page - 对簿公堂 / 语音申冤页
- * 本地状态机实现，不依赖后端
  */
+
+import { chatService } from '../../services/chat-service';
+import type { IMessage } from '../../models/message';
+import { EMessageType } from '../../models/message';
+import { EWSErrorCode } from '../../types/websocket-common';
 
 type Phase = 'SPEAKER_A' | 'SPEAKER_B' | 'DONE';
 type Role = 'A' | 'B';
 
-interface IMessage {
+interface IDisplayMessage {
     id: number;
     role: Role;
     content: string;
@@ -22,7 +26,7 @@ interface IReaction {
 
 interface IChatRoomPageData {
     // 房间标识
-    roomId: string;
+    roomCode: string;
 
     // 核心状态机字段
     phase: Phase;
@@ -41,7 +45,7 @@ interface IChatRoomPageData {
     isRecording: boolean;
 
     // 消息列表（语音转文字）
-    messages: IMessage[];
+    messages: IDisplayMessage[];
 
     // 表情系统
     reactions: IReaction[];
@@ -85,7 +89,7 @@ const REACTION_LANES = [0, 1, 2];
 
 Page<IChatRoomPageData, IChatRoomCustomOption>({
     data: {
-        roomId: '',
+        roomCode: '',
 
         phase: 'SPEAKER_A',
         localRole: 'A',
@@ -113,12 +117,11 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
     onLoad(options): void {
         // 解析页面参数
-        const roomId = options.roomId ?? '';
+        const roomCode = options.roomCode ?? '';
         const localRole: Role = options.role === 'B' ? 'B' : 'A';
 
-        // 校验 roomId
-        // TODO: 后续对接 WebSocket，校验 roomId
-        if (!roomId) {
+        // 校验 roomCode
+        if (!roomCode) {
             void wx.showToast({ title: '房间号无效', icon: 'error' });
             setTimeout(() => {
                 void wx.navigateBack();
@@ -131,7 +134,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const canReact: boolean = !canSpeak;
 
         this.setData({
-            roomId,
+            roomCode,
             localRole,
             totalPerTurn: TOTAL_PER_TURN,
             remaining: TOTAL_PER_TURN,
@@ -140,6 +143,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             canReact,
             countdownClass: this.getCountdownClass(TOTAL_PER_TURN),
         });
+
+        // 初始化聊天服务
+        this.initChatService();
 
         // 初始化录音管理器
         this.initRecorderManager();
@@ -214,6 +220,47 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
+     * 初始化聊天服务
+     */
+    initChatService(): void {
+        chatService.initialize(
+            (message: IMessage) => {
+                this.handleMessageReceived(message);
+            },
+            (code: EWSErrorCode, errorMessage: string) => {
+                console.error('[ChatRoom] Chat error:', code, errorMessage);
+                void wx.showToast({ title: errorMessage, icon: 'error' });
+            }
+        );
+    },
+
+    /**
+     * 处理接收到的消息
+     */
+    handleMessageReceived(message: IMessage): void {
+        const { localRole } = this.data;
+        const displayMessage: IDisplayMessage = {
+            id: this.messageIdCounter++,
+            role:
+                message.sender.userId === wx.getStorageSync('userId')
+                    ? localRole
+                    : localRole === 'A'
+                      ? 'B'
+                      : 'A',
+            content:
+                message.type === EMessageType.Text &&
+                message.content.type === EMessageType.Text
+                    ? message.content.text
+                    : '[语音消息]',
+            timestamp: message.createdAt,
+        };
+
+        this.setData({
+            messages: [...this.data.messages, displayMessage],
+        });
+    },
+
+    /**
      * 初始化录音管理器
      */
     initRecorderManager(): void {
@@ -245,7 +292,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         this.timerId = setInterval(() => {
             this.tick();
-        }, 1000);
+        }, 1000) as unknown as number;
     },
 
     /**
@@ -381,16 +428,16 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 停止录音
      */
     stopRecording(): void {
-        const audio = wx.createInnerAudioContext();
-        this.recorderManager?.onStop(res => {
-            audio.src = res.tempFilePath;
-            audio.play();
-        });
-
         if (this.recorderManager && this.data.isRecording) {
             this.recorderManager.stop();
-        } else {
-            audio.stop();
+
+            // TODO: 后续实现语音上传和识别
+            // 当前仅支持文字消息
+            void wx.showToast({
+                title: '语音功能开发中',
+                icon: 'none',
+                duration: 1500,
+            });
         }
     },
 
@@ -434,7 +481,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         const timeoutId = setTimeout(() => {
             this.removeReaction(id);
-        }, duration);
+        }, duration) as unknown as number;
 
         this.reactionTimeouts.push(timeoutId);
 
@@ -488,7 +535,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const id: number = ++this.messageIdCounter;
         const timestamp: number = Date.now();
 
-        const newMessage: IMessage = {
+        const newMessage: IDisplayMessage = {
             id,
             role,
             content,
@@ -498,5 +545,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         this.setData({
             messages: [...this.data.messages, newMessage],
         });
+
+        // 发送到服务器
+        if (role === this.data.localRole) {
+            chatService.sendTextMessage(content);
+        }
     },
 });

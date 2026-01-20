@@ -3,7 +3,6 @@
  * Handles room creation via HTTP API
  */
 
-import type { IUser } from '../models/user';
 import type { IRoom } from '../models/room';
 import type { ICreateRoomResponse } from '../types/room-api';
 import { BACKEND_CONFIG } from '../constants/config';
@@ -11,15 +10,13 @@ import { BACKEND_CONFIG } from '../constants/config';
 class RoomService {
     /**
      * Create a new chat room
-     * @param creator The user creating the room
      * @returns Promise with room data
      */
-    async createRoom(creator: IUser): Promise<IRoom> {
+    async createRoom(): Promise<IRoom> {
         return new Promise<IRoom>((resolve, reject) => {
             wx.request({
                 url: `${BACKEND_CONFIG.HTTP_BASE_URL}/room/create`,
                 method: 'POST',
-                data: { creator },
                 header: {
                     'content-type': 'application/json',
                 },
