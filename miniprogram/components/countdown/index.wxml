@@ -1,0 +1,13 @@
+<!--components/countdown/index.wxml-->
+<view
+    wx:if="{{ visible }}"
+    class="countdown-mask"
+    catchtouchmove="preventTouchMove"
+>
+    <view class="countdown">
+        <view class="countdown__number" animation="{{ animationData }}">
+            <text>{{ currentCount }}</text>
+        </view>
+        <text class="countdown__text">{{ subtext }}</text>
+    </view>
+</view>

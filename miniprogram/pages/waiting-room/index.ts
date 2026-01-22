@@ -5,7 +5,6 @@ import { roomWebSocketService } from '../../services/room-websocket-service';
 import { wsManager } from '../../services/websocket-manager';
 import type { IUser } from '../../models/user';
 import type { IRoom } from '../../models/room';
-import { ERoomStatus } from '../../models/room';
 
 /**
  * 视图模式类型
@@ -38,9 +37,6 @@ interface IWaitingRoomPageData {
     waitingTextIndex: number;
     waitingTexts: string[];
     currentWaitingText: string;
-    // 倒计时相关
-    showCountdown: boolean;
-    countdown: number;
     // 按钮动画
     hostButtonAnimation: WechatMiniprogram.AnimationExportResult;
     joinButtonAnimation: WechatMiniprogram.AnimationExportResult;
@@ -56,7 +52,6 @@ interface IWaitingRoomPageData {
  */
 interface IWaitingRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     waitingTextTimer: number | null;
-    countdownTimer: number | null;
     hostButtonAnim: WechatMiniprogram.Animation | null;
     joinButtonAnim: WechatMiniprogram.Animation | null;
     cancelButtonAnim: WechatMiniprogram.Animation | null;
@@ -84,8 +79,6 @@ const WAITING_TEXTS: string[] = [
     '等待你的"冤家"上线...',
 ];
 
-const INITIAL_COUNTDOWN_TIME = 3;
-
 Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     data: {
         viewMode: 'entry',
@@ -102,9 +95,6 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         waitingTextIndex: 0,
         waitingTexts: WAITING_TEXTS,
         currentWaitingText: WAITING_TEXTS[0],
-        // 倒计时相关
-        showCountdown: false,
-        countdown: 3,
         // 按钮动画
         hostButtonAnimation: {} as WechatMiniprogram.AnimationExportResult,
         joinButtonAnimation: {} as WechatMiniprogram.AnimationExportResult,
@@ -117,7 +107,6 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
     // 定时器引用
     waitingTextTimer: null,
-    countdownTimer: null,
     // 动画实例
     hostButtonAnim: null,
     joinButtonAnim: null,
@@ -220,9 +209,10 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             clearInterval(this.waitingTextTimer);
             this.waitingTextTimer = null;
         }
-        if (this.countdownTimer) {
-            clearInterval(this.countdownTimer);
-            this.countdownTimer = null;
+        // 停止倒计时组件
+        const countdownComponent = this.selectComponent('#countdown');
+        if (countdownComponent) {
+            countdownComponent.stop();
         }
     },
 
@@ -478,6 +468,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      * 处理房间加入成功
      */
     handleRoomJoined(room: IRoom): void {
+        console.log(room);
         void wx.hideLoading();
 
         this.setData({
@@ -495,8 +486,9 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
         // 检查房间是否已满员（2人）
         if (
-            room.participants.length >= 2 &&
-            room.status === ERoomStatus.Ready
+            // room.participants.length >= 2 &&
+            // room.status === ERoomStatus.Ready
+            room
         ) {
             // 启动倒计时，准备进入聊天室
             this.startCountdown();
@@ -525,54 +517,48 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      * 启动倒计时
      */
     startCountdown(): void {
-        // 防止重复调用，先清除已有的倒计时定时器
-        if (this.countdownTimer) {
-            clearInterval(this.countdownTimer);
-            this.countdownTimer = null;
+        const countdownComponent = this.selectComponent('#countdown');
+        if (countdownComponent) {
+            countdownComponent.start();
         }
+    },
 
-        this.setData({
-            showCountdown: true,
-            countdown: INITIAL_COUNTDOWN_TIME,
-        });
+    /**
+     * 倒计时完成回调
+     */
+    onCountdownComplete(): void {
+        this.clearAllTimers();
+        // 跳转到聊天房间页面，带上 roomCode
+        const { currentRoom, currentUser } = this.data;
+        if (currentRoom && currentUser) {
+            // 判断角色：第一个加入的是 A，第二个是 B
+            // const role =
+            //     currentRoom.participants[0].user.userId ===
+            //     currentUser.userId
+            //         ? 'A'
+            //         : 'B';
 
-        this.triggerHapticFeedback();
-
-        let currentCount = INITIAL_COUNTDOWN_TIME;
-
-        this.countdownTimer = setInterval(() => {
-            currentCount -= 1;
-
-            if (currentCount <= 0) {
-                this.clearAllTimers();
-                // 跳转到聊天房间页面，带上 roomCode
-                const { currentRoom, currentUser } = this.data;
-                if (currentRoom && currentUser) {
-                    // 判断角色：第一个加入的是 A，第二个是 B
-                    const role =
-                        currentRoom.participants[0].user.userId ===
-                        currentUser.userId
-                            ? 'A'
-                            : 'B';
-
-                    void wx.navigateTo({
-                        url: `/pages/chat-room/index?roomCode=${currentRoom.roomCode}&role=${role}`,
-                        fail: err => {
-                            console.error('跳转失败:', err);
-                            void wx.showToast({
-                                title: '跳转失败',
-                                icon: 'error',
-                            });
-                        },
+            // void wx.navigateTo({
+            //     url: `/pages/chat-room/index?roomCode=${currentRoom.roomCode}&role=${role}`,
+            //     fail: err => {
+            //         console.error('跳转失败:', err);
+            //         void wx.showToast({
+            //             title: '跳转失败',
+            //             icon: 'error',
+            //         });
+            //     },
+            // });
+            void wx.navigateTo({
+                url: `/pages/drum/index`,
+                fail: err => {
+                    console.error('跳转失败:', err);
+                    void wx.showToast({
+                        title: '跳转失败',
+                        icon: 'error',
                     });
-                }
-            } else {
-                this.triggerHapticFeedback();
-                this.setData({
-                    countdown: currentCount,
-                });
-            }
-        }, 1000) as unknown as number;
+                },
+            });
+        }
     },
 
     /**
