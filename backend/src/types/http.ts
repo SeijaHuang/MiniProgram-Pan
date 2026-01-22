@@ -3,8 +3,9 @@
  * DTOs for HTTP communication
  */
 
-import type { IUser } from '../models/user';
-import type { IRoom } from '../models/room';
+import type { IUser } from '../models/entities/user';
+import type { IRoom } from '../models/entities/room';
+import type { IBaseResponse } from '../models/dto/response/base.response.dto';
 
 /**
  * HTTP Error Codes
@@ -16,16 +17,9 @@ export enum EHttpErrorCode {
 }
 
 /**
- * Base HTTP Response
+ * Re-export base response for HTTP usage
  */
-export interface IBaseResponse<T> {
-    success: boolean;
-    data?: T;
-    error?: {
-        code: EHttpErrorCode;
-        message?: string;
-    };
-}
+export type { IBaseResponse }
 
 /**
  * Create Room Request

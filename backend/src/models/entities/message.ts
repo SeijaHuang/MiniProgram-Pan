@@ -13,7 +13,7 @@ export enum EMessageType {
     Text = 'TEXT',
 }
 
-export type MessageContent = {
+export type IMessageContent = {
     type: EMessageType.Text;
     text: string;
 };
@@ -23,6 +23,6 @@ export interface IMessage {
     roomId: string;
     sender: IUser;
     type: EMessageType;
-    content: MessageContent;
+    content: IMessageContent;
     createdAt: number;
 }

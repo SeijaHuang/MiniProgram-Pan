@@ -8,10 +8,10 @@
  */
 
 import { randomBytes } from 'crypto';
-import type { IRoom, IParticipant } from '../models/room';
-import type { IUser } from '../models/user';
-import { ERoomStatus } from '../models/room';
-import { EWSErrorCode } from '../types/ws-messages';
+import type { IRoom, IParticipant } from '../../models/entities/room';
+import type { IUser } from '../../models/entities/user';
+import { ERoomStatus } from '../../models/entities/room';
+import { EWSErrorCode } from '../../types/ws-messages';
 
 export class RoomManager {
     private static instance: RoomManager;
