@@ -1,6 +1,6 @@
 /**
  * Message Response DTO
- * 
+ *
  * YAGNI: Only what we need for current use case
  */
 

@@ -15,11 +15,11 @@ import type { Request, Response, NextFunction } from 'express';
 /**
  * Request logger middleware
  * Logs all incoming requests
- * 
+ *
  * Example usage:
  * ```typescript
  * import { requestLogger } from './middlewares/logging/request-logger.middleware';
- * 
+ *
  * app.use(requestLogger);
  * ```
  */

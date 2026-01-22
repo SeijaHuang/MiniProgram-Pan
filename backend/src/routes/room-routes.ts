@@ -17,6 +17,6 @@ const router = Router();
  * Create room endpoint
  * POST /room/create
  */
-router.post('/create', RoomController.createRoom);
+router.post('/create', RoomController.createRoom.bind(RoomController));
 
 export default router;

@@ -10,13 +10,11 @@
  */
 
 import type { Request, Response } from 'express';
-import type {
-    ICreateRoomRequest,
-    IBaseResponse,
-    ICreateRoomResponseData,
-} from '../types/http';
+import type { IBaseResponse, ICreateRoomResponseData } from '../types/http';
 import { EHttpErrorCode } from '../types/http';
 import { roomService } from '../services/core/room/room.service';
+import { CreateRoomRequestSchema } from '../models/schemas/http-request.schema';
+import type { ICreateRoomDto } from '../models/dto/request/create-room.dto';
 
 export class RoomController {
     /**
@@ -24,25 +22,28 @@ export class RoomController {
      * POST /room/create
      */
     static createRoom(
-        req: Request<unknown, unknown, ICreateRoomRequest>,
+        req: Request<unknown, unknown, ICreateRoomDto>,
         res: Response
     ): void {
         try {
-            const { creator } = req.body;
-
-            // Validate creator
-            if (!creator || !creator.userId) {
+            // Validate request body with Zod
+            const validation = CreateRoomRequestSchema.safeParse(req.body);
+            if (!validation.success) {
+                const errors = validation.error.issues;
+                const errorMessage = errors[0]?.message ?? 'Invalid request';
                 const response: IBaseResponse<never> = {
                     success: false,
                     error: {
                         code: EHttpErrorCode.InvalidRequest,
-                        message: 'creator.userId is required',
+                        message: errorMessage,
                     },
                 };
                 res.status(400).json(response);
                 return;
             }
 
+            // Type-safe: validation.data is typed as ICreateRoomDto
+            const { creator } = validation.data;
             const room = roomService.createRoom(creator.userId);
 
             const response: IBaseResponse<ICreateRoomResponseData> = {
@@ -51,17 +52,16 @@ export class RoomController {
             };
 
             res.status(201).json(response);
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('[RoomController] Room creation failed:', error);
 
+            const errorMessage =
+                error instanceof Error ? error.message : 'Unknown error';
             const response: IBaseResponse<never> = {
                 success: false,
                 error: {
                     code: EHttpErrorCode.RoomCreateFailed,
-                    message:
-                        error instanceof Error
-                            ? error.message
-                            : 'Unknown error',
+                    message: errorMessage,
                 },
             };
 

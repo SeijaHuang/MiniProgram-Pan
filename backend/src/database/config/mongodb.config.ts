@@ -42,19 +42,21 @@ export function getMongoDBConfig(): IMongoDBConfig {
 
 /**
  * Connect to MongoDB
- * 
+ *
  * Example usage:
  * ```typescript
  * import mongoose from 'mongoose';
  * import { connectMongoDB } from './config/mongodb.config';
- * 
+ *
  * await connectMongoDB();
  * ```
  */
-export async function connectMongoDB(): Promise<void> {
+export function connectMongoDB(): Promise<void> {
     // TODO: Implement MongoDB connection when mongoose is installed
     // const mongoose = require('mongoose');
     // const config = getMongoDBConfig();
     // await mongoose.connect(config.uri, config.options);
-    throw new Error('MongoDB not configured yet - install mongoose first');
+    return Promise.reject(
+        new Error('MongoDB not configured yet - install mongoose first')
+    );
 }

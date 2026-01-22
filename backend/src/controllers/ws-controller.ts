@@ -23,8 +23,8 @@ import type {
     IWSMessage,
     IJoinRoomMessage,
     IChatSendMessage,
-} from '../types/ws-messages';
-import { EWSMessageType, EWSErrorCode } from '../types/ws-messages';
+} from '../types/websocket';
+import { EWSMessageType, EWSErrorCode } from '../types/websocket';
 
 export class WebSocketController {
     /**
@@ -149,7 +149,9 @@ export class WebSocketController {
      * Cleans up connection and updates room state
      */
     static handleDisconnect(connectionId: string): void {
-        console.log(`[WebSocketController] Client disconnected: ${connectionId}`);
+        console.log(
+            `[WebSocketController] Client disconnected: ${connectionId}`
+        );
         connectionManager.handleDisconnect(connectionId);
     }
 

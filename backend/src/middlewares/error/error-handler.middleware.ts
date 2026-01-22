@@ -28,11 +28,11 @@ export class AppError extends Error {
 /**
  * Error handler middleware
  * Must be registered last in middleware chain
- * 
+ *
  * Example usage in app.ts:
  * ```typescript
  * import { errorHandler } from './middlewares/error/error-handler.middleware';
- * 
+ *
  * app.use(errorHandler);
  * ```
  */
@@ -40,14 +40,13 @@ export function errorHandler(
     err: Error | AppError,
     req: Request,
     res: Response,
-    next: NextFunction
+    _next: NextFunction
 ): void {
     // Determine status code
     const statusCode = err instanceof AppError ? err.statusCode : 500;
 
     // Determine error code
-    const code =
-        err instanceof AppError ? err.code : 'INTERNAL_SERVER_ERROR';
+    const code = err instanceof AppError ? err.code : 'INTERNAL_SERVER_ERROR';
 
     // Log error
     console.error('[ErrorHandler]', {

@@ -4,11 +4,12 @@
  *
  * ARCHITECTURE: Request DTO
  * - Defines the shape of client request data
- * - Used for validation and type safety
+ * - Used for type safety in controllers
+ * - Zod schema validates at runtime
  */
 
 import type { IUser } from '../../entities/user';
 
 export interface ICreateRoomDto {
-    creator?: IUser;
+    creator: IUser;
 }

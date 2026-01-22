@@ -9,11 +9,12 @@
  * - Does NOT format or send WebSocket messages
  */
 
-import type { IJoinRoomMessage } from '../../types/ws-messages';
-import { EWSErrorCode } from '../../types/ws-messages';
+import type { IJoinRoomMessage } from '../../types/websocket';
+import { EWSErrorCode } from '../../types/websocket';
 import { roomManager } from '../websocket/room-manager';
 import type { ConnectionManager } from '../websocket/connection-manager';
 import type { IRoom } from '../../models/entities/room';
+import { JoinRoomDataSchema } from '../../models/schemas/ws-message.schema';
 
 export interface IJoinRoomResult {
     success: true;
@@ -33,16 +34,18 @@ export function handleJoinRoom(
     connectionId: string,
     message: IJoinRoomMessage
 ): TJoinRoomHandlerResult {
-    const { roomCode, user } = message.data;
-
-    // Validation 1: Payload schema is valid
-    if (!roomCode || !user || !user.userId || !user.nickname) {
+    // Validation: Payload schema is valid
+    const validation = JoinRoomDataSchema.safeParse(message.data);
+    if (!validation.success) {
+        const firstError = validation.error.issues[0];
         return {
             success: false,
             code: EWSErrorCode.InvalidPayload,
-            message: 'roomCode, user.userId, and user.nickname are required',
+            message: firstError?.message ?? 'Invalid payload',
         };
     }
+
+    const { roomCode, user } = validation.data;
 
     // Check if user is already a participant (e.g., room creator)
     const room = roomManager.getRoomByCode(roomCode);

@@ -1,16 +1,17 @@
 /**
  * Validation Middleware
- * Generic validation middleware for request validation
+ * Generic validation middleware for request validation using Zod
  *
  * ARCHITECTURE: Middleware Layer
- * - Validates request body, params, query against schemas
+ * - Validates request body, params, query against Zod schemas
  * - Returns standardized error responses
- * - Can integrate with libraries like Joi, Yup, or Zod
+ * - Type-safe validation
  *
- * FUTURE: Integrate with validation library (Zod recommended)
+ * For WebSocket message validation, see models/schemas/ws-message.schema.ts
  */
 
 import type { Request, Response, NextFunction } from 'express';
+import type { z } from 'zod';
 
 /**
  * Validation result
@@ -22,21 +23,32 @@ export interface IValidationResult {
 
 /**
  * Generic validation middleware factory
- * 
+ *
  * Example usage:
  * ```typescript
  * import { validate } from './middlewares/validation/validation.middleware';
- * import { createRoomSchema } from './middlewares/validation/schemas/room.schema';
- * 
- * router.post('/create', validate(createRoomSchema), RoomController.createRoom);
+ * import { CreateRoomRequestSchema } from './models/schemas/http-request.schema';
+ *
+ * router.post('/create', validate(CreateRoomRequestSchema), RoomController.createRoom);
  * ```
  */
-export function validate(
-    schema: unknown // TODO: Replace with actual schema type (Zod, Joi, etc.)
-) {
+export function validate(schema: z.ZodTypeAny) {
     return (req: Request, res: Response, next: NextFunction): void => {
-        // TODO: Implement validation when validation library is integrated
-        // For now, just pass through
+        const result = schema.safeParse(req.body);
+        if (!result.success) {
+            const errors = result.error.issues;
+            const errorMessage = errors[0]?.message ?? 'Validation failed';
+            res.status(400).json({
+                success: false,
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: errorMessage,
+                    details: errors,
+                },
+            });
+            return;
+        }
+        req.body = result.data;
         next();
     };
 }
@@ -44,9 +56,23 @@ export function validate(
 /**
  * Validate request body
  */
-export function validateBody(schema: unknown) {
+export function validateBody(schema: z.ZodTypeAny) {
     return (req: Request, res: Response, next: NextFunction): void => {
-        // TODO: Validate req.body against schema
+        const result = schema.safeParse(req.body);
+        if (!result.success) {
+            const errors = result.error.issues;
+            const errorMessage = errors[0]?.message ?? 'Invalid request body';
+            res.status(400).json({
+                success: false,
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: errorMessage,
+                    details: errors,
+                },
+            });
+            return;
+        }
+        req.body = result.data;
         next();
     };
 }
@@ -54,9 +80,23 @@ export function validateBody(schema: unknown) {
 /**
  * Validate request params
  */
-export function validateParams(schema: unknown) {
+export function validateParams(schema: z.ZodTypeAny) {
     return (req: Request, res: Response, next: NextFunction): void => {
-        // TODO: Validate req.params against schema
+        const result = schema.safeParse(req.params);
+        if (!result.success) {
+            const errors = result.error.issues;
+            const errorMessage = errors[0]?.message ?? 'Invalid request params';
+            res.status(400).json({
+                success: false,
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: errorMessage,
+                    details: errors,
+                },
+            });
+            return;
+        }
+        Object.assign(req.params, result.data);
         next();
     };
 }
@@ -64,9 +104,23 @@ export function validateParams(schema: unknown) {
 /**
  * Validate request query
  */
-export function validateQuery(schema: unknown) {
+export function validateQuery(schema: z.ZodTypeAny) {
     return (req: Request, res: Response, next: NextFunction): void => {
-        // TODO: Validate req.query against schema
+        const result = schema.safeParse(req.query);
+        if (!result.success) {
+            const errors = result.error.issues;
+            const errorMessage = errors[0]?.message ?? 'Invalid request query';
+            res.status(400).json({
+                success: false,
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: errorMessage,
+                    details: errors,
+                },
+            });
+            return;
+        }
+        Object.assign(req.query, result.data);
         next();
     };
 }

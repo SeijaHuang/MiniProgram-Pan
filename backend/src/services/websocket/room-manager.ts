@@ -11,7 +11,7 @@ import { randomBytes } from 'crypto';
 import type { IRoom, IParticipant } from '../../models/entities/room';
 import type { IUser } from '../../models/entities/user';
 import { ERoomStatus } from '../../models/entities/room';
-import { EWSErrorCode } from '../../types/ws-messages';
+import { EWSErrorCode } from '../../types/websocket';
 
 export class RoomManager {
     private static instance: RoomManager;

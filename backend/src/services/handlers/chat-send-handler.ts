@@ -10,13 +10,14 @@
  */
 
 import { randomBytes } from 'crypto';
-import type { IChatSendMessage } from '../../types/ws-messages';
-import { EWSErrorCode } from '../../types/ws-messages';
+import type { IChatSendMessage } from '../../types/websocket';
+import { EWSErrorCode } from '../../types/websocket';
 import { roomManager } from '../websocket/room-manager';
 import { ERoomStatus } from '../../models/entities/room';
 import type { IMessage } from '../../models/entities/message';
 import { EMessageType } from '../../models/entities/message';
 import type { ConnectionManager } from '../websocket/connection-manager';
+import { ChatSendDataSchema } from '../../models/schemas/ws-message.schema';
 
 export interface IChatSendResult {
     success: true;
@@ -37,15 +38,22 @@ export function handleChatSend(
     connectionId: string,
     message: IChatSendMessage
 ): TChatSendHandlerResult {
-    const { content } = message.data;
+    // Validation: Payload schema is valid
+    const validation = ChatSendDataSchema.safeParse(message.data);
+    if (!validation.success) {
+        const firstError = validation.error.issues[0];
+        return {
+            success: false,
+            code: EWSErrorCode.InvalidPayload,
+            message: firstError?.message ?? 'Invalid payload',
+        };
+    }
+
+    const { content } = validation.data;
 
     // Get connection metadata
     const connectionData = connectionManager.getConnection(connectionId);
-    if (
-        !connectionData ||
-        !connectionData.userId ||
-        !connectionData.roomId
-    ) {
+    if (!connectionData || !connectionData.userId || !connectionData.roomId) {
         return {
             success: false,
             code: EWSErrorCode.NotParticipant,
@@ -53,7 +61,8 @@ export function handleChatSend(
         };
     }
 
-    const { userId, roomId } = connectionData;
+    const userId: string = connectionData.userId;
+    const roomId: string = connectionData.roomId;
 
     // Validation: Room exists
     const room = roomManager.getRoomById(roomId);
@@ -81,15 +90,6 @@ export function handleChatSend(
             success: false,
             code: EWSErrorCode.NotParticipant,
             message: 'You are not a participant of this room',
-        };
-    }
-
-    // Validation: Content is valid
-    if (!content || !content.text || content.type !== EMessageType.Text) {
-        return {
-            success: false,
-            code: EWSErrorCode.InvalidPayload,
-            message: 'Invalid message content',
         };
     }
 
