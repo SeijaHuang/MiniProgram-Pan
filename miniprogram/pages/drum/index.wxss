@@ -1,24 +1,366 @@
 /* pages/drum/index.wxss */
 
+/* ========================================
+   Page Container
+   ======================================== */
 .drum-page {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     width: 750rpx;
     min-height: 100vh;
     box-sizing: border-box;
-    background: linear-gradient(180deg, #B43ACB 0%, #FF3D8E 100%);
+    padding: 40rpx 30rpx;
+    padding-top: 60rpx;
+    background: linear-gradient(135deg, #FF2E63 0%, #FF4D8D 35%, #FF8A5B 70%, #FFC75F 100%);
+    position: relative;
+    overflow: hidden;
 }
 
-.drum-page__title {
-    font-size: 48rpx;
-    font-weight: bold;
+/* ========================================
+   Header Section
+   ======================================== */
+.drum-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 40rpx;
+}
+
+.drum-header__title {
+    font-size: 40rpx;
+    font-weight: 800;
     color: #ffffff;
-    margin-bottom: 20rpx;
+    text-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.35);
+    letter-spacing: 4rpx;
 }
 
-.drum-page__subtitle {
+.drum-header__timer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20rpx;
+}
+
+.drum-header__timer-label {
+    font-size: 24rpx;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.drum-header__timer-value {
+    font-size: 56rpx;
+    font-weight: 900;
+    color: #FFE66D;
+    text-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================
+   Score Section
+   ======================================== */
+.drum-score {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 20rpx;
+    margin-bottom: 60rpx;
+}
+
+.drum-score__player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 240rpx;
+}
+
+.drum-score__player--left {
+    align-items: flex-start;
+}
+
+.drum-score__player--right {
+    align-items: flex-end;
+}
+
+.drum-score__avatar {
+    width: 80rpx;
+    height: 80rpx;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12rpx;
+    border: 4rpx solid rgba(255, 255, 255, 0.4);
+}
+
+.drum-score__avatar-emoji {
+    font-size: 40rpx;
+}
+
+.drum-score__name {
+    font-size: 26rpx;
+    color: #ffffff;
+    margin-bottom: 8rpx;
+    max-width: 200rpx;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.drum-score__value {
+    font-size: 48rpx;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.3);
+    margin-bottom: 12rpx;
+}
+
+.drum-score__progress {
+    width: 200rpx;
+    height: 20rpx;
+    border-radius: 10rpx;
+    background: rgba(0, 0, 0, 0.25);
+    border: 4rpx solid #000000;
+    overflow: hidden;
+}
+
+.drum-score__progress-bar {
+    height: 100%;
+    border-radius: 6rpx;
+}
+
+.drum-score__progress-bar--a {
+    background: linear-gradient(90deg, #4D96FF, #6DB3F2);
+}
+
+.drum-score__progress-bar--b {
+    background: linear-gradient(90deg, #FF006E, #FF4D8D);
+}
+
+.drum-score__vs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 30rpx;
+}
+
+.drum-score__vs-text {
+    font-size: 36rpx;
+    font-weight: 900;
+    color: #FFE66D;
+    text-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.4);
+}
+
+/* ========================================
+   Fly Text Layer
+   ======================================== */
+.drum-fly-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.drum-fly-text {
+    position: absolute;
+    pointer-events: none;
+}
+
+.drum-fly-text__content {
+    font-size: 36rpx;
+    font-weight: 700;
+    color: #FFE66D;
+    text-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.5);
+}
+
+/* ========================================
+   Drum Button
+   ======================================== */
+.drum-button-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 40rpx;
+    z-index: 5;
+}
+
+.drum-button {
+    width: 280rpx;
+    height: 280rpx;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #FF5252, #FF3B3B 40%, #B80000 100%);
+    border: 10rpx solid #FFD93D;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+        0 0 0 10rpx rgba(255, 217, 61, 0.3),
+        0 20rpx 40rpx rgba(0, 0, 0, 0.4),
+        inset 0 -10rpx 20rpx rgba(0, 0, 0, 0.3),
+        inset 0 10rpx 20rpx rgba(255, 255, 255, 0.2);
+}
+
+.drum-button--active {
+    opacity: 1;
+}
+
+.drum-button--disabled {
+    opacity: 0.6;
+}
+
+.drum-button__text {
+    font-size: 96rpx;
+    font-weight: 900;
+    color: #FFD93D;
+    text-shadow: 0 6rpx 0 #8B0000, 0 8rpx 16rpx rgba(0, 0, 0, 0.4);
+}
+
+/* ========================================
+   Hint Text
+   ======================================== */
+.drum-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 20rpx;
+}
+
+.drum-hint__text {
+    font-size: 28rpx;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.3);
+    text-align: center;
+    letter-spacing: 2rpx;
+}
+
+/* ========================================
+   Prepare Countdown Overlay
+   ======================================== */
+.drum-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.drum-overlay--visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.drum-overlay__content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.drum-overlay__countdown {
+    font-size: 160rpx;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 0 8rpx 20rpx rgba(0, 0, 0, 0.4);
+}
+
+.drum-overlay__hint {
+    font-size: 32rpx;
+    color: #FFE66D;
+    letter-spacing: 4rpx;
+    margin-top: 30rpx;
+    text-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================
+   Result Overlay
+   ======================================== */
+.drum-result {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.drum-result--visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.drum-result__card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60rpx 80rpx;
+    background: linear-gradient(135deg, #2D2D2D 0%, #1A1A1A 100%);
+    border-radius: 32rpx;
+    border: 4rpx solid #FFD93D;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+        0 0 60rpx rgba(255, 217, 61, 0.4),
+        0 20rpx 40rpx rgba(0, 0, 0, 0.5);
+}
+
+.drum-result__glow {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 217, 61, 0.15) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.drum-result__title {
+    font-size: 48rpx;
+    font-weight: 900;
+    color: #FFD93D;
+    text-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.4);
+    margin-bottom: 16rpx;
+    z-index: 1;
+}
+
+.drum-result__subtitle {
+    font-size: 32rpx;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 30rpx;
+    z-index: 1;
+}
+
+.drum-result__scores {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+.drum-result__score {
     font-size: 28rpx;
     color: rgba(255, 255, 255, 0.8);
+}
+
+.drum-result__score-divider {
+    font-size: 28rpx;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0 20rpx;
 }

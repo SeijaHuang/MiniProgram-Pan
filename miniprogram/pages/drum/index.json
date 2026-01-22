@@ -1,6 +1,7 @@
 {
     "usingComponents": {},
-    "navigationBarTitleText": "击鼓抢麦",
-    "navigationBarBackgroundColor": "#B43ACB",
-    "navigationBarTextStyle": "white"
+    "navigationBarTitleText": "震天鼓抢麦",
+    "navigationBarBackgroundColor": "#FF2E63",
+    "navigationBarTextStyle": "white",
+    "disableScroll": true
 }
