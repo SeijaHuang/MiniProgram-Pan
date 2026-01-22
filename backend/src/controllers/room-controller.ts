@@ -28,7 +28,22 @@ export class RoomController {
         res: Response
     ): void {
         try {
-            const room = roomService.createRoom();
+            const { creator } = req.body;
+
+            // Validate creator
+            if (!creator || !creator.userId) {
+                const response: IBaseResponse<never> = {
+                    success: false,
+                    error: {
+                        code: EHttpErrorCode.InvalidRequest,
+                        message: 'creator.userId is required',
+                    },
+                };
+                res.status(400).json(response);
+                return;
+            }
+
+            const room = roomService.createRoom(creator.userId);
 
             const response: IBaseResponse<ICreateRoomResponseData> = {
                 success: true,

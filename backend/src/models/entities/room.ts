@@ -23,6 +23,7 @@ export interface IParticipant {
 export interface IRoom {
     roomId: string;
     roomCode: string;
+    hostUserId: string;
     participants: IParticipant[];
     status: ERoomStatus;
     createdAt: number;

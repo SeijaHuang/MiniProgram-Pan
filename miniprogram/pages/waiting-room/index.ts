@@ -5,7 +5,7 @@ import { roomWebSocketService } from '../../services/room-websocket-service';
 import { wsManager } from '../../services/websocket-manager';
 import type { IUser } from '../../models/user';
 import type { IRoom } from '../../models/room';
-import { ERoomStatus } from '../../models/room';
+import { ERoomStatus, isRoomHost } from '../../models/room';
 
 /**
  * 视图模式类型
@@ -306,7 +306,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         void wx.showLoading({ title: '创建房间中...' });
 
         try {
-            const room = await roomService.createRoom();
+            const room = await roomService.createRoom(currentUser);
 
             void wx.hideLoading();
 
@@ -320,7 +320,12 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
             this.startWaitingTextCarousel();
 
-            // 房主也需要通过 WebSocket 加入房间
+            console.log(
+                `[WaitingRoom] Room created - Code: ${room.roomCode}, Host: ${currentUser.userId}`
+            );
+
+            // CRITICAL: 房主创建房间后立即通过 WebSocket 加入
+            // 后端已记录 hostUserId，前端通过该字段判断是否为房主
             roomWebSocketService.joinRoom(room.roomCode, currentUser);
         } catch (error) {
             void wx.hideLoading();
@@ -545,18 +550,18 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
             if (currentCount <= 0) {
                 this.clearAllTimers();
-                // 跳转到聊天房间页面，带上 roomCode
+                // 跳转到聊天房间页面，带上 roomCode 和 isHost
                 const { currentRoom, currentUser } = this.data;
                 if (currentRoom && currentUser) {
-                    // 判断角色：第一个加入的是 A，第二个是 B
-                    const role =
-                        currentRoom.participants[0].user.userId ===
-                        currentUser.userId
-                            ? 'A'
-                            : 'B';
+                    // 判断是否为房主（使用后端返回的 hostUserId）
+                    const isHost = isRoomHost(currentRoom, currentUser.userId);
+
+                    console.log(
+                        `[WaitingRoom] Navigating to chat room - isHost: ${isHost}, UserId: ${currentUser.userId}, HostUserId: ${currentRoom.hostUserId}`
+                    );
 
                     void wx.navigateTo({
-                        url: `/pages/chat-room/index?roomCode=${currentRoom.roomCode}&role=${role}`,
+                        url: `/pages/chat-room/index?roomCode=${currentRoom.roomCode}&isHost=${isHost}`,
                         fail: err => {
                             console.error('跳转失败:', err);
                             void wx.showToast({
