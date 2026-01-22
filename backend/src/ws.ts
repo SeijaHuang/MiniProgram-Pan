@@ -1,23 +1,19 @@
 /**
  * WebSocket Server
- * Handles real-time communication for room joining and chat
+ * Configures WebSocket server and connection handling
  *
- * CRITICAL: Room creation is NOT handled here (use HTTP API)
- * CRITICAL: Only handles JOIN_ROOM and CHAT_SEND
+ * ARCHITECTURE: Application setup
+ * - Initializes WebSocket server
+ * - Registers connection event handlers
+ * - Delegates message handling to controller
+ * - Does NOT contain business logic
  */
 
-import { Server, type WebSocket, type RawData } from 'ws';
+import { Server, type WebSocket } from 'ws';
 import type { Server as HttpServer } from 'http';
 import { randomBytes } from 'crypto';
-import { connectionManager } from './services/connection-manager';
-import { handleJoinRoom } from './services/handlers/join-room-handler';
-import { handleChatSend } from './services/handlers/chat-send-handler';
-import type {
-    IWSMessage,
-    IJoinRoomMessage,
-    IChatSendMessage,
-} from './types/ws-messages';
-import { EWSMessageType, EWSErrorCode } from './types/ws-messages';
+import { connectionManager } from './services/websocket/connection-manager';
+import { WebSocketController } from './controllers/ws-controller';
 import { WS_CONFIG } from './constants/config';
 
 export function initWebSocket(server: HttpServer): void {
@@ -38,14 +34,14 @@ export function initWebSocket(server: HttpServer): void {
             `[WebSocket] Client connected: ${connectionId} (Total: ${connectionManager.getAllConnections().length})`
         );
 
-        // Handle incoming messages
-        ws.on('message', (data: RawData) => {
-            void handleMessage(connectionId, data);
+        // Handle incoming messages - delegate to controller
+        ws.on('message', data => {
+            WebSocketController.handleMessage(connectionId, data);
         });
 
-        // Handle connection close
+        // Handle connection close - delegate to controller
         ws.on('close', () => {
-            handleDisconnect(connectionId);
+            WebSocketController.handleDisconnect(connectionId);
         });
 
         // Handle errors
@@ -56,82 +52,6 @@ export function initWebSocket(server: HttpServer): void {
             );
         });
     });
-}
-
-/**
- * Handle incoming WebSocket message
- */
-function handleMessage(connectionId: string, data: RawData): void {
-    try {
-        const messageText = rawDataToText(data);
-        const message = JSON.parse(messageText) as IWSMessage;
-
-        console.log(
-            `[WebSocket] Received ${message.type} from ${connectionId}`
-        );
-
-        // Route message to appropriate handler
-        switch (message.type) {
-            case EWSMessageType.JoinRoom:
-                handleJoinRoom(
-                    connectionManager,
-                    connectionId,
-                    message as IJoinRoomMessage
-                );
-                break;
-
-            case EWSMessageType.ChatSend:
-                handleChatSend(
-                    connectionManager,
-                    connectionId,
-                    message as IChatSendMessage
-                );
-                break;
-
-            default:
-                connectionManager.sendToConnection(connectionId, {
-                    type: EWSMessageType.Error,
-                    data: {
-                        code: EWSErrorCode.InvalidPayload,
-                        message: `Unknown message type: ${message.type}`,
-                    },
-                    timestamp: Date.now(),
-                });
-        }
-    } catch (error) {
-        console.error('[WebSocket] Message handling error:', error);
-        connectionManager.sendToConnection(connectionId, {
-            type: EWSMessageType.Error,
-            data: {
-                code: EWSErrorCode.InternalError,
-                message:
-                    error instanceof Error ? error.message : 'Unknown error',
-            },
-            timestamp: Date.now(),
-        });
-    }
-}
-
-/**
- * Handle connection disconnect
- */
-function handleDisconnect(connectionId: string): void {
-    console.log(`[WebSocket] Client disconnected: ${connectionId}`);
-    connectionManager.handleDisconnect(connectionId);
-}
-
-/**
- * Convert RawData to text
- */
-function rawDataToText(data: RawData): string {
-    if (Buffer.isBuffer(data)) {
-        return data.toString('utf-8');
-    }
-    if (Array.isArray(data)) {
-        return Buffer.concat(data).toString('utf-8');
-    }
-    // ArrayBuffer case
-    return Buffer.from(data).toString('utf-8');
 }
 
 /**

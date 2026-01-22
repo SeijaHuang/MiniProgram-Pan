@@ -1,19 +1,15 @@
 /**
  * Express HTTP Server
- * Handles HTTP API endpoints
+ * Configures Express app and routes
  *
- * CRITICAL: Only room creation is handled via HTTP
- * CRITICAL: All real-time communication is via WebSocket
+ * ARCHITECTURE: Application setup
+ * - Configures Express middleware
+ * - Registers routes
+ * - Does NOT contain business logic or route handlers
  */
 
-import express, { type Request, type Response } from 'express';
-import type {
-    ICreateRoomRequest,
-    IBaseResponse,
-    ICreateRoomResponseData,
-} from './types/http';
-import { EHttpErrorCode } from './types/http';
-import { roomManager } from './services/room-manager';
+import express from 'express';
+import roomRoutes from './routes/room-routes';
 
 const app = express();
 
@@ -28,40 +24,9 @@ app.get('/health', (_req, res) => {
 });
 
 /**
- * Create room endpoint
- * POST /room/create
- *
- * CRITICAL: This is the ONLY way to create a room
- * CRITICAL: Returns room with roomCode for joining
+ * Room routes
+ * /room/*
  */
-app.post(
-    '/room/create',
-    (req: Request<unknown, unknown, ICreateRoomRequest>, res: Response) => {
-        try {
-            // Create room (creator will join via WebSocket)
-            const room = roomManager.createRoom();
-
-            // Return success response
-            const response: IBaseResponse<ICreateRoomResponseData> = {
-                success: true,
-                data: { room },
-            };
-            res.status(201).json(response);
-        } catch (error) {
-            console.error('[HTTP] Room creation failed:', error);
-            const response: IBaseResponse<never> = {
-                success: false,
-                error: {
-                    code: EHttpErrorCode.RoomCreateFailed,
-                    message:
-                        error instanceof Error
-                            ? error.message
-                            : 'Unknown error',
-                },
-            };
-            res.status(500).json(response);
-        }
-    }
-);
+app.use('/room', roomRoutes);
 
 export default app;

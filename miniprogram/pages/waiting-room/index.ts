@@ -5,7 +5,7 @@ import { roomWebSocketService } from '../../services/room-websocket-service';
 import { wsManager } from '../../services/websocket-manager';
 import type { IUser } from '../../models/user';
 import type { IRoom } from '../../models/room';
-import { ERoomStatus } from '../../models/room';
+import { ERoomStatus, isRoomHost } from '../../models/room';
 
 /**
  * 视图模式类型
@@ -61,6 +61,8 @@ interface IWaitingRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     joinButtonAnim: WechatMiniprogram.Animation | null;
     cancelButtonAnim: WechatMiniprogram.Animation | null;
     confirmButtonAnim: WechatMiniprogram.Animation | null;
+    isCreatingRoom: boolean;
+    isJoiningRoom: boolean;
 }
 
 /**
@@ -123,6 +125,9 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     joinButtonAnim: null,
     cancelButtonAnim: null,
     confirmButtonAnim: null,
+    // 请求锁
+    isCreatingRoom: false,
+    isJoiningRoom: false,
 
     onLoad(): void {
         this.initAnimations();
@@ -297,16 +302,23 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      * 创建房间
      */
     async createRoom(): Promise<void> {
+        // 防止重复请求
+        if (this.isCreatingRoom) {
+            console.warn('[WaitingRoom] Room creation already in progress');
+            return;
+        }
+
         const { currentUser } = this.data;
         if (!currentUser) {
             void wx.showToast({ title: '用户信息错误', icon: 'error' });
             return;
         }
 
+        this.isCreatingRoom = true;
         void wx.showLoading({ title: '创建房间中...' });
 
         try {
-            const room = await roomService.createRoom();
+            const room = await roomService.createRoom(currentUser);
 
             void wx.hideLoading();
 
@@ -320,7 +332,12 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
             this.startWaitingTextCarousel();
 
-            // 房主也需要通过 WebSocket 加入房间
+            console.log(
+                `[WaitingRoom] Room created - Code: ${room.roomCode}, Host: ${currentUser.userId}`
+            );
+
+            // CRITICAL: 房主创建房间后立即通过 WebSocket 加入
+            // 后端已记录 hostUserId，前端通过该字段判断是否为房主
             roomWebSocketService.joinRoom(room.roomCode, currentUser);
         } catch (error) {
             void wx.hideLoading();
@@ -329,6 +346,9 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
                 title: error instanceof Error ? error.message : '创建房间失败',
                 icon: 'error',
             });
+        } finally {
+            // 释放请求锁
+            this.isCreatingRoom = false;
         }
     },
 
@@ -404,6 +424,12 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      * 确认加入房间
      */
     onConfirmJoin(): void {
+        // 防止重复请求
+        if (this.isJoiningRoom) {
+            console.warn('[WaitingRoom] Join request already in progress');
+            return;
+        }
+
         const { roomCodeInput } = this.data;
 
         this.triggerHapticFeedback();
@@ -434,6 +460,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             errorMessage: '',
         });
 
+        this.isJoiningRoom = true;
         void wx.showLoading({ title: '加入房间中...' });
 
         // 发送加入房间消息
@@ -443,6 +470,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         setTimeout(() => {
             if (!this.data.currentRoom) {
                 void wx.hideLoading();
+                this.isJoiningRoom = false;
                 this.setData({
                     errorType: 'not_found',
                     errorMessage: '加入超时，请重试',
@@ -479,6 +507,9 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      */
     handleRoomJoined(room: IRoom): void {
         void wx.hideLoading();
+
+        // 释放加入房间的请求锁
+        this.isJoiningRoom = false;
 
         this.setData({
             currentRoom: room,
@@ -545,18 +576,18 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
             if (currentCount <= 0) {
                 this.clearAllTimers();
-                // 跳转到聊天房间页面，带上 roomCode
+                // 跳转到聊天房间页面，带上 roomCode 和 isHost
                 const { currentRoom, currentUser } = this.data;
                 if (currentRoom && currentUser) {
-                    // 判断角色：第一个加入的是 A，第二个是 B
-                    const role =
-                        currentRoom.participants[0].user.userId ===
-                        currentUser.userId
-                            ? 'A'
-                            : 'B';
+                    // 判断是否为房主（使用后端返回的 hostUserId）
+                    const isHost = isRoomHost(currentRoom, currentUser.userId);
+
+                    console.log(
+                        `[WaitingRoom] Navigating to chat room - isHost: ${isHost}, UserId: ${currentUser.userId}, HostUserId: ${currentRoom.hostUserId}`
+                    );
 
                     void wx.navigateTo({
-                        url: `/pages/chat-room/index?roomCode=${currentRoom.roomCode}&role=${role}`,
+                        url: `/pages/chat-room/index?roomCode=${currentRoom.roomCode}&isHost=${isHost}`,
                         fail: err => {
                             console.error('跳转失败:', err);
                             void wx.showToast({
