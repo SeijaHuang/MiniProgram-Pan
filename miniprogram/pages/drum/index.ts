@@ -4,11 +4,11 @@
  *
  * State Machine:
  * INIT -> PREPARE_COUNTDOWN -> RUNNING -> RESULT
+ *
+ * 简化版本：进入页面直接开始倒计时，暂不连接后端
  */
 
-import { wsManager } from '../../services/websocket-manager';
 import {
-    setServerTimeOffset,
     nowServerMs,
     getTimeRemainingMs,
     resetServerTimeOffset,
@@ -24,23 +24,8 @@ import {
     vibrateCountdown,
     vibrateLong,
 } from '../../utils/haptic';
-import {
-    initAudioPool,
-    playDrumSound,
-    destroyAudioPool,
-} from '../../utils/audio';
-import {
-    EDrumMessageType,
-    TPlayerRole,
-    TDrumMessage,
-    parseDrumMessage,
-    createTapMessage,
-    IDrumReadyData,
-    IDrumStartData,
-    IDrumTapData,
-    IDrumResultData,
-    IPeerLeftData,
-} from '../../types/drum-websocket';
+import { playDrumSound, destroyAudioPool } from '../../utils/audio';
+import { TPlayerRole } from '../../types/drum-websocket';
 
 /** Game phase states */
 type TGamePhase = 'INIT' | 'PREPARE_COUNTDOWN' | 'RUNNING' | 'RESULT';
@@ -95,19 +80,15 @@ interface IDrumPageData {
     resultTitle: string;
     resultSubtitle: string;
     resultVisible: boolean;
-
-    // Mock mode
-    isMockMode: boolean;
 }
 
-/** Page options interface */
+/** Page options interface (from waiting-room navigation) */
 interface IDrumPageOptions {
     roomId?: string;
     selfRole?: TPlayerRole;
     hostRole?: TPlayerRole;
     playerAName?: string;
     playerBName?: string;
-    mock?: string;
 }
 
 interface PrivateState {
@@ -165,8 +146,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         resultTitle: '',
         resultSubtitle: '',
         resultVisible: false,
-
-        isMockMode: false,
     },
 
     // Private state (not in data)
@@ -187,16 +166,17 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     onLoad(options: IDrumPageOptions): void {
         console.log('[DrumRoom] onLoad', options);
 
-        // Initialize audio pool
-        initAudioPool();
+        // TODO：Initialize audio pool
+        // initAudioPool();
 
-        // Parse options
-        const roomId: string = options.roomId || 'mock-room';
+        // Parse options from previous page (waiting-room)
+        const roomId: string = options.roomId || 'room-001';
         const selfRole: TPlayerRole = (options.selfRole as TPlayerRole) || 'A';
         const hostRole: TPlayerRole = (options.hostRole as TPlayerRole) || 'A';
-        const playerAName: string = options.playerAName || '玩家A';
-        const playerBName: string = options.playerBName || '玩家B';
-        const isMockMode: boolean = options.mock === '1';
+        const playerAName: string =
+            decodeURIComponent(options.playerAName || '') || '玩家A';
+        const playerBName: string =
+            decodeURIComponent(options.playerBName || '') || '玩家B';
 
         this.setData({
             roomId,
@@ -204,15 +184,10 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             hostRole,
             playerAName,
             playerBName,
-            isMockMode,
         });
 
-        if (isMockMode) {
-            console.log('[DrumRoom] Running in mock mode');
-            this._initMockMode();
-        } else {
-            this._setupWebSocketHandlers();
-        }
+        // 直接开始游戏流程（暂不连接后端）
+        this._startGame();
     },
 
     /**
@@ -222,101 +197,22 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         console.log('[DrumRoom] onUnload');
         this._clearAllTimers();
         destroyAudioPool();
-
-        if (!this.data.isMockMode) {
-            // Remove WS handlers if needed
-        }
     },
 
     /**
-     * Initialize mock mode for testing without backend
+     * Start game flow
+     * 进入页面后直接开始游戏流程
      */
-    _initMockMode(): void {
-        // Reset server time offset for mock mode
+    _startGame(): void {
+        console.log('[DrumRoom] Starting game');
+
+        // Reset time offset (use local time)
         resetServerTimeOffset();
 
-        // Simulate server ready after short delay
-        setTimeout(() => {
-            const mockReadyData: IDrumReadyData = {
-                roomId: this.data.roomId,
-                serverTimeMs: Date.now(),
-                hostRole: this.data.hostRole,
-                playerAName: this.data.playerAName,
-                playerBName: this.data.playerBName,
-            };
-            this._handleDrumReady(mockReadyData);
-
-            // Simulate start after another short delay
-            setTimeout(() => {
-                const startAtMs: number = nowServerMs() + PREPARE_DURATION_MS;
-                const mockStartData: IDrumStartData = {
-                    roomId: this.data.roomId,
-                    startAtMs,
-                };
-                this._handleDrumStart(mockStartData);
-            }, 500);
-        }, 300);
-    },
-
-    /**
-     * Setup WebSocket message handlers
-     */
-    _setupWebSocketHandlers(): void {
-        wsManager.updateCallbacks({
-            onMessage: (rawData: string) => {
-                const message: TDrumMessage | null = parseDrumMessage(rawData);
-                if (!message) return;
-
-                switch (message.type) {
-                    case EDrumMessageType.DrumReady:
-                        this._handleDrumReady(message.data);
-                        break;
-                    case EDrumMessageType.DrumStart:
-                        this._handleDrumStart(message.data);
-                        break;
-                    case EDrumMessageType.DrumTap:
-                        this._handleDrumTap(message.data);
-                        break;
-                    case EDrumMessageType.DrumResult:
-                        this._handleDrumResult(message.data);
-                        break;
-                    case EDrumMessageType.PeerLeft:
-                        this._handlePeerLeft(message.data);
-                        break;
-                }
-            },
-            onDisconnect: () => {
-                console.warn('[DrumRoom] WebSocket disconnected');
-                // Could show reconnecting UI here
-            },
-        });
-    },
-
-    /**
-     * Handle DRUM_READY message
-     */
-    _handleDrumReady(data: IDrumReadyData): void {
-        console.log('[DrumRoom] Received DRUM_READY', data);
-
-        // Sync server time
-        setServerTimeOffset(data.serverTimeMs);
-
-        this.setData({
-            roomId: data.roomId,
-            hostRole: data.hostRole,
-            playerAName: data.playerAName,
-            playerBName: data.playerBName,
-        });
-    },
-
-    /**
-     * Handle DRUM_START message
-     */
-    _handleDrumStart(data: IDrumStartData): void {
-        console.log('[DrumRoom] Received DRUM_START', data);
-
-        this._startAtMs = data.startAtMs;
-        this._endAtMs = data.startAtMs + RUNNING_DURATION_MS;
+        // Calculate timing
+        const startAtMs: number = nowServerMs() + PREPARE_DURATION_MS;
+        this._startAtMs = startAtMs;
+        this._endAtMs = startAtMs + RUNNING_DURATION_MS;
 
         // Enter prepare countdown phase
         this.setData({
@@ -326,51 +222,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         });
 
         this._startPrepareCountdown();
-    },
-
-    /**
-     * Handle DRUM_TAP message (opponent's tap)
-     */
-    _handleDrumTap(data: IDrumTapData): void {
-        // Only process opponent's taps
-        if (data.role === this.data.selfRole) return;
-
-        const scoreKey: 'scoreA' | 'scoreB' =
-            data.role === 'A' ? 'scoreA' : 'scoreB';
-        const newScore: number = this.data[scoreKey] + data.delta;
-
-        this._updateScore(data.role, newScore);
-    },
-
-    /**
-     * Handle DRUM_RESULT message
-     */
-    _handleDrumResult(data: IDrumResultData): void {
-        console.log('[DrumRoom] Received DRUM_RESULT', data);
-
-        // Stop running phase
-        this._clearAllTimers();
-
-        this.setData({
-            scoreA: data.scoreA,
-            scoreB: data.scoreB,
-        });
-
-        this._updateProgress();
-        this._showResult(data.winnerRole);
-    },
-
-    /**
-     * Handle PEER_LEFT message
-     */
-    _handlePeerLeft(data: IPeerLeftData): void {
-        console.log('[DrumRoom] Received PEER_LEFT', data);
-
-        // Current player wins by default
-        this._clearAllTimers();
-
-        const winnerRole: TPlayerRole = data.leftRole === 'A' ? 'B' : 'A';
-        this._showResult(winnerRole);
     },
 
     /**
@@ -433,10 +284,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             runningLeftMs: RUNNING_DURATION_MS,
         });
 
-        // Start mock opponent if in mock mode
-        if (this.data.isMockMode) {
-            this._startMockOpponent();
-        }
+        // 模拟对手点击（用于本地测试）
+        this._startMockOpponent();
 
         // Update countdown every 100ms for smooth display
         this._runningTimer = setInterval(() => {
@@ -469,20 +318,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         // Flush any pending taps
         this._flushPendingTaps();
 
-        if (this.data.isMockMode) {
-            // In mock mode, calculate result locally
-            this._calculateLocalResult();
-        } else {
-            // Wait for server result (with timeout fallback)
-            setTimeout(() => {
-                if (this.data.phase !== 'RESULT') {
-                    console.warn(
-                        '[DrumRoom] Result timeout, calculating locally'
-                    );
-                    this._calculateLocalResult();
-                }
-            }, 800);
-        }
+        // 直接计算结果（暂不等待服务器）
+        this._calculateLocalResult();
     },
 
     /**
@@ -688,7 +525,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     },
 
     /**
-     * Queue tap for batched WS send
+     * Queue tap for batched send (预留给后端对接)
      */
     _queueTap(): void {
         this._pendingDelta++;
@@ -701,23 +538,19 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     },
 
     /**
-     * Flush pending taps to server
+     * Flush pending taps (暂不发送到服务器)
      */
     _flushPendingTaps(): void {
         if (this._pendingDelta === 0) return;
 
-        const delta: number = this._pendingDelta;
+        // 暂存 delta 用于后续后端对接
+        const _delta: number = this._pendingDelta;
         this._pendingDelta = 0;
         this._tapFlushTimer = null;
 
-        if (!this.data.isMockMode && wsManager.isConnected()) {
-            const message = createTapMessage(
-                this.data.roomId,
-                this.data.selfRole,
-                delta
-            );
-            wsManager.send(message);
-        }
+        // TODO: 后端对接时发送到服务器
+        // wsManager.send(createTapMessage(this.data.roomId, this.data.selfRole, delta));
+        console.log('[DrumRoom] Flushed taps:', _delta);
     },
 
     /**
