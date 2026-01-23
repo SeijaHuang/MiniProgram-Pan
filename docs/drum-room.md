@@ -2,10 +2,10 @@
 
 基于《Drum Room（震天鼓抢麦）PRD v1.0》梳理的实现文档，对应页面代码位于：
 
-- `miniprogram/pages/drum/index.json`
-- `miniprogram/pages/drum/index.wxml`
-- `miniprogram/pages/drum/index.wxss`
-- `miniprogram/pages/drum/index.ts`
+- `miniprogram/pages/drum-room/index.json`
+- `miniprogram/pages/drum-room/index.wxml`
+- `miniprogram/pages/drum-room/index.wxss`
+- `miniprogram/pages/drum-room/index.ts`
 
 本文档用于在产品、设计、前端之间对齐「Drum Room」的目标、布局和交互细节。
 
@@ -16,7 +16,7 @@
 | 项目     | 说明                            |
 | -------- | ------------------------------- |
 | 页面名称 | Drum Room（震天鼓抢麦）         |
-| 页面路径 | `/pages/drum/index`             |
+| 页面路径 | `/pages/drum-room/index`        |
 | 页面类型 | 抢先发言权对抗模块              |
 | 进入方式 | Waiting Room 双方就位后自动跳转 |
 | 退出方式 | 抢麦结束后自动跳转至 Chat Room  |
@@ -518,10 +518,10 @@ if (scoreA > scoreB) {
 ## 17. 相关文件一览
 
 - **页面实现**:
-    - 结构: `miniprogram/pages/drum/index.wxml`
-    - 样式: `miniprogram/pages/drum/index.wxss`
-    - 逻辑: `miniprogram/pages/drum/index.ts`
-    - 配置: `miniprogram/pages/drum/index.json`
+    - 结构: `miniprogram/pages/drum-room/index.wxml`
+    - 样式: `miniprogram/pages/drum-room/index.wxss`
+    - 逻辑: `miniprogram/pages/drum-room/index.ts`
+    - 配置: `miniprogram/pages/drum-room/index.json`
 - **产品文档**:
     - 原始 PRD: `Drum_Room_PRD_v1.0.md`
     - 本实现文档: `docs/drum-room.md`

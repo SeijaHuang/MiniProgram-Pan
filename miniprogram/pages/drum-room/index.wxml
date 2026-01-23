@@ -1,4 +1,4 @@
-<!--pages/drum/index.wxml-->
+<!--pages/drum-room/index.wxml-->
 <view class="drum-page" animation="{{ containerAnimationData }}">
     <view class="page-container">
         <view class="section-container">

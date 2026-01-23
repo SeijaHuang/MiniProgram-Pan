@@ -549,7 +549,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             //     },
             // });
             void wx.navigateTo({
-                url: `/pages/drum/index`,
+                url: `/pages/drum-room/index`,
                 fail: err => {
                     console.error('跳转失败:', err);
                     void wx.showToast({

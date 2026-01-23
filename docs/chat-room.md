@@ -2,10 +2,10 @@
 
 基于《Chat Room（对簿公堂）功能 PRD v1.0》梳理的实现文档，对应页面代码位于：
 
-- `miniprogram/pages/drum/index.json`
-- `miniprogram/pages/drum/index.wxml`
-- `miniprogram/pages/drum/index.wxss`
-- `miniprogram/pages/drum/index.ts`
+- `miniprogram/pages/drum-room/index.json`
+- `miniprogram/pages/drum-room/index.wxml`
+- `miniprogram/pages/drum-room/index.wxss`
+- `miniprogram/pages/drum-room/index.ts`
 
 本文档用于在产品、设计、前端之间对齐「Chat Room」的目标、布局和交互细节。
 
@@ -16,7 +16,7 @@
 | 项目     | 说明                           |
 | -------- | ------------------------------ |
 | 页面名称 | Chat Room（对簿公堂）          |
-| 页面路径 | `/pages/drum/index`            |
+| 页面路径 | `/pages/drum-room/index`       |
 | 页面类型 | 核心对簿与情绪释放页面         |
 | 进入方式 | 等待页倒计时结束后自动跳转     |
 | 退出方式 | 双方完成发言后跳转至 AI 分析页 |

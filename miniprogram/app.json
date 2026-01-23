@@ -2,7 +2,7 @@
     "pages": [
         "pages/welcome/index",
         "pages/waiting-room/index",
-        "pages/drum/index",
+        "pages/drum-room/index",
         "pages/chat-room/index"
     ],
     "window": {

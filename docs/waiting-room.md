@@ -234,7 +234,7 @@ onClick() {
 双方就位后，自动跳转到：
 
 ```
-/pages/drum/index
+/pages/drum-room/index
 ```
 
 （Drum Room - 震天鼓抢麦页面，包含 3 秒准备倒计时和 5 秒抢麦竞争）
