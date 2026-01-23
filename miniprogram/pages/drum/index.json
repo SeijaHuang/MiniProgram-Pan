@@ -3,7 +3,6 @@
         "countdown": "/components/countdown/index"
     },
     "navigationBarTitleText": "震天鼓抢麦",
-    "navigationBarBackgroundColor": "#FF2E63",
-    "navigationBarTextStyle": "white",
-    "disableScroll": true
+    "disableScroll": true,
+    "navigationStyle": "custom"
 }

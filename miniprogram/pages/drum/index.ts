@@ -88,11 +88,11 @@ interface PrivateState {
     _startAtMs: number;
     _endAtMs: number;
 
-    _runningTimer: number | null;
-    _flyTextTimer: number | null;
-    _resultTimer: number | null;
-    _tapFlushTimer: number | null;
-    _mockOpponentTimer: number | null;
+    _runningTimer: ReturnType<typeof setInterval> | null;
+    _flyTextTimer: ReturnType<typeof setInterval> | null;
+    _resultTimer: ReturnType<typeof setInterval> | null;
+    _tapFlushTimer: ReturnType<typeof setInterval> | null;
+    _mockOpponentTimer: ReturnType<typeof setInterval> | null;
 
     _pendingDelta: number;
     _lastShakeTime: number;
@@ -100,11 +100,11 @@ interface PrivateState {
 
 /** Game timing constants */
 const PREPARE_DURATION_MS: number = 3000;
-const RUNNING_DURATION_MS: number = 5000;
+const RUNNING_DURATION_MS: number = 500000;
 const RESULT_DISPLAY_MS: number = 2000;
 const TAP_THROTTLE_MS: number = 100;
 const FLY_TEXT_DURATION_MS: number = 800;
-const MAX_SCORE_FOR_PROGRESS: number = 50;
+const MAX_SCORE_FOR_PROGRESS: number = 100;
 
 Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     data: {
@@ -113,8 +113,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         selfRole: 'A',
         hostRole: 'A',
-        playerAName: '玩家A',
-        playerBName: '玩家B',
+        playerAName: '',
+        playerBName: '',
 
         runningLeftMs: RUNNING_DURATION_MS,
         runningLeftSec: 5,
@@ -162,9 +162,9 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         const selfRole: TPlayerRole = (options.selfRole as TPlayerRole) || 'A';
         const hostRole: TPlayerRole = (options.hostRole as TPlayerRole) || 'A';
         const playerAName: string =
-            decodeURIComponent(options.playerAName || '') || '玩家A';
+            decodeURIComponent(options.playerAName || '') || '小冤家';
         const playerBName: string =
-            decodeURIComponent(options.playerBName || '') || '玩家B';
+            decodeURIComponent(options.playerBName || '') || '家冤小';
 
         this.setData({
             roomId,
@@ -234,7 +234,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         this.setData({
             phase: 'RUNNING',
             tapEnabled: true,
-            runningLeftSec: 5,
+            runningLeftSec: 500,
             runningLeftMs: RUNNING_DURATION_MS,
         });
 
@@ -253,7 +253,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
                     runningLeftSec: Math.ceil(remaining / 1000),
                 });
             }
-        }, 100) as unknown as number;
+        }, 100);
     },
 
     /**
@@ -322,16 +322,15 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Navigate to chat room after delay
         this._resultTimer = setTimeout(() => {
-            const { roomId, scoreA, scoreB } = this.data;
-            const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&scoreA=${scoreA}&scoreB=${scoreB}`;
-
-            wx.redirectTo({
-                url,
-                fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
-                    console.error('[DrumRoom] Navigate failed:', err);
-                },
-            });
-        }, RESULT_DISPLAY_MS) as unknown as number;
+            // const { roomId, scoreA, scoreB } = this.data;
+            // const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&scoreA=${scoreA}&scoreB=${scoreB}`;
+            // wx.redirectTo({
+            //     url,
+            //     fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
+            //         console.error('[DrumRoom] Navigate failed:', err);
+            //     },
+            // });
+        }, RESULT_DISPLAY_MS);
     },
 
     /**
@@ -487,7 +486,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         if (this._tapFlushTimer === null) {
             this._tapFlushTimer = setTimeout(() => {
                 this._flushPendingTaps();
-            }, TAP_THROTTLE_MS) as unknown as number;
+            }, TAP_THROTTLE_MS);
         }
     },
 
@@ -528,7 +527,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
                 this._updateScore(opponentRole, newScore);
             }
-        }, 150) as unknown as number;
+        }, 150);
     },
 
     /**
