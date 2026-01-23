@@ -100,7 +100,7 @@ interface PrivateState {
 
 /** Game timing constants */
 const PREPARE_DURATION_MS: number = 3000;
-const RUNNING_DURATION_MS: number = 500000;
+const RUNNING_DURATION_MS: number = 5000;
 const RESULT_DISPLAY_MS: number = 2000;
 const TAP_THROTTLE_MS: number = 100;
 const FLY_TEXT_DURATION_MS: number = 800;
@@ -322,14 +322,14 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Navigate to chat room after delay
         this._resultTimer = setTimeout(() => {
-            // const { roomId, scoreA, scoreB } = this.data;
-            // const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&scoreA=${scoreA}&scoreB=${scoreB}`;
-            // wx.redirectTo({
-            //     url,
-            //     fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
-            //         console.error('[DrumRoom] Navigate failed:', err);
-            //     },
-            // });
+            const { roomId, scoreA, scoreB } = this.data;
+            const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&scoreA=${scoreA}&scoreB=${scoreB}`;
+            wx.redirectTo({
+                url,
+                fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
+                    console.error('[DrumRoom] Navigate failed:', err);
+                },
+            });
         }, RESULT_DISPLAY_MS);
     },
 
@@ -460,7 +460,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             id: generateFlyTextId(),
             text: getRandomFlyText(),
             x: 375 + trajectory.offsetX, // Center of screen (750/2) + offset
-            y: 450 + trajectory.offsetY, // Above drum
+            y: 700 + trajectory.offsetY, // Above drum
             rotate: trajectory.rotate,
             opacity: 1,
         };

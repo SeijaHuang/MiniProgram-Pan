@@ -56,8 +56,8 @@ export function getRandomTrajectory(): {
     rotate: number;
 } {
     return {
-        offsetX: getRandomInRange(-60, 60), // rpx offset from center
-        offsetY: getRandomInRange(-30, 30), // initial y offset
+        offsetX: getRandomInRange(-100, 100), // rpx offset from center
+        offsetY: getRandomInRange(-80, 80), // initial y offset
         rotate: getRandomInRange(-25, 25), // rotation degrees
     };
 }
