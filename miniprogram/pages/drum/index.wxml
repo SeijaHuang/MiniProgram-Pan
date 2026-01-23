@@ -76,16 +76,13 @@
         </text>
     </view>
 
-    <!-- Prepare Countdown Overlay -->
-    <view class="drum-overlay {{ overlayVisible ? 'drum-overlay--visible' : '' }}">
-        <view class="drum-overlay__content">
-            <text
-                class="drum-overlay__countdown"
-                animation="{{ countdownAnimationData }}"
-            >{{ prepareCount }}</text>
-            <text class="drum-overlay__hint">准备击鼓抢麦</text>
-        </view>
-    </view>
+    <!-- Prepare Countdown Component -->
+    <countdown
+        id="countdown"
+        duration="{{ 3 }}"
+        subtext="准备击鼓抢麦"
+        bind:complete="onCountdownComplete"
+    />
 
     <!-- Result Overlay -->
     <view class="drum-result {{ resultVisible ? 'drum-result--visible' : '' }}">

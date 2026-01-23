@@ -19,11 +19,7 @@ import {
     generateFlyTextId,
     getRandomInt,
 } from '../../utils/random';
-import {
-    vibrateShort,
-    vibrateCountdown,
-    vibrateLong,
-} from '../../utils/haptic';
+import { vibrateShort, vibrateLong } from '../../utils/haptic';
 import { playDrumSound, destroyAudioPool } from '../../utils/audio';
 import { TPlayerRole } from '../../types/drum-websocket';
 
@@ -53,8 +49,6 @@ interface IDrumPageData {
     playerBName: string;
 
     // Countdown
-    overlayVisible: boolean;
-    prepareCount: number;
     runningLeftMs: number;
     runningLeftSec: number;
 
@@ -70,7 +64,6 @@ interface IDrumPageData {
     // Animations
     drumAnimationData: WechatMiniprogram.AnimationExportResult | null;
     containerAnimationData: WechatMiniprogram.AnimationExportResult | null;
-    countdownAnimationData: WechatMiniprogram.AnimationExportResult | null;
 
     // Fly texts
     flyTexts: IFlyText[];
@@ -95,7 +88,6 @@ interface PrivateState {
     _startAtMs: number;
     _endAtMs: number;
 
-    _prepareTimer: number | null;
     _runningTimer: number | null;
     _flyTextTimer: number | null;
     _resultTimer: number | null;
@@ -124,8 +116,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         playerAName: '玩家A',
         playerBName: '玩家B',
 
-        overlayVisible: false,
-        prepareCount: 3,
         runningLeftMs: RUNNING_DURATION_MS,
         runningLeftSec: 5,
 
@@ -138,7 +128,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         drumAnimationData: null,
         containerAnimationData: null,
-        countdownAnimationData: null,
 
         flyTexts: [],
 
@@ -151,7 +140,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     // Private state (not in data)
     _startAtMs: 0,
     _endAtMs: 0,
-    _prepareTimer: null,
     _runningTimer: null,
     _flyTextTimer: null,
     _resultTimer: null,
@@ -217,55 +205,22 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         // Enter prepare countdown phase
         this.setData({
             phase: 'PREPARE_COUNTDOWN',
-            overlayVisible: true,
-            prepareCount: 3,
         });
 
-        this._startPrepareCountdown();
+        // Start countdown component
+        const countdown: WechatMiniprogram.Component.TrivialInstance | null =
+            this.selectComponent('#countdown');
+        if (countdown) {
+            countdown.start();
+        }
     },
 
     /**
-     * Start 3-second prepare countdown
+     * Handle countdown complete event
      */
-    _startPrepareCountdown(): void {
-        let count: number = 3;
-
-        // Initial countdown animation
-        this._animateCountdownNumber(count);
-        vibrateCountdown();
-
-        this._prepareTimer = setInterval(() => {
-            count--;
-
-            if (count > 0) {
-                this.setData({ prepareCount: count });
-                this._animateCountdownNumber(count);
-                vibrateCountdown();
-            } else {
-                // Countdown finished, start running phase
-                this._clearTimer('_prepareTimer');
-                this._startRunningPhase();
-            }
-        }, 1000) as unknown as number;
-    },
-
-    /**
-     * Animate countdown number (scale + opacity)
-     */
-    _animateCountdownNumber(num: number): void {
-        const animation: WechatMiniprogram.Animation = wx.createAnimation({
-            duration: 300,
-            timingFunction: 'ease-out',
-        });
-
-        // Scale from 1.2 to 1.0, fade in
-        animation.scale(1.2, 1.2).opacity(0).step({ duration: 0 });
-        animation.scale(1.0, 1.0).opacity(1).step({ duration: 300 });
-
-        this.setData({
-            prepareCount: num,
-            countdownAnimationData: animation.export(),
-        });
+    onCountdownComplete(): void {
+        console.log('[DrumRoom] Countdown complete');
+        this._startRunningPhase();
     },
 
     /**
@@ -278,7 +233,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         this.setData({
             phase: 'RUNNING',
-            overlayVisible: false,
             tapEnabled: true,
             runningLeftSec: 5,
             runningLeftMs: RUNNING_DURATION_MS,
@@ -582,7 +536,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      */
     _clearTimer(
         timerName:
-            | '_prepareTimer'
             | '_runningTimer'
             | '_flyTextTimer'
             | '_resultTimer'
@@ -600,7 +553,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Clear all timers
      */
     _clearAllTimers(): void {
-        this._clearTimer('_prepareTimer');
         this._clearTimer('_runningTimer');
         this._clearTimer('_flyTextTimer');
         this._clearTimer('_resultTimer');
