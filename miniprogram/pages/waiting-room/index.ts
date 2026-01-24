@@ -5,6 +5,7 @@ import { roomWebSocketService } from '../../services/room-websocket-service';
 import { wsManager } from '../../services/websocket-manager';
 import type { IUser } from '../../models/user';
 import type { IRoom } from '../../models/room';
+import { ERoomStatus } from '../../models/room';
 
 /**
  * 视图模式类型
@@ -486,9 +487,8 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
         // 检查房间是否已满员（2人）
         if (
-            // room.participants.length >= 2 &&
-            // room.status === ERoomStatus.Ready
-            room
+            room.participants.length >= 2 &&
+            room.status === ERoomStatus.Ready
         ) {
             // 启动倒计时，准备进入聊天室
             this.startCountdown();
@@ -528,26 +528,9 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      */
     onCountdownComplete(): void {
         this.clearAllTimers();
-        // 跳转到聊天房间页面，带上 roomCode
+        // 跳转到击鼓抢麦房间页面
         const { currentRoom, currentUser } = this.data;
         if (currentRoom && currentUser) {
-            // 判断角色：第一个加入的是 A，第二个是 B
-            // const role =
-            //     currentRoom.participants[0].user.userId ===
-            //     currentUser.userId
-            //         ? 'A'
-            //         : 'B';
-
-            // void wx.navigateTo({
-            //     url: `/pages/chat-room/index?roomCode=${currentRoom.roomCode}&role=${role}`,
-            //     fail: err => {
-            //         console.error('跳转失败:', err);
-            //         void wx.showToast({
-            //             title: '跳转失败',
-            //             icon: 'error',
-            //         });
-            //     },
-            // });
             void wx.navigateTo({
                 url: `/pages/drum-room/index`,
                 fail: err => {
