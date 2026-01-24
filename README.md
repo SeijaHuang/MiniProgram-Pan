@@ -22,7 +22,7 @@ miniprogram/
 ├── pages/              # 页面目录
 │   ├── welcome/        # 欢迎页（首页）
 │   ├── waiting-room/   # 房间创建 & 等待页
-│   ├── drum/           # 击鼓页面
+│   ├── drum/           # Drum Room（震天鼓抢麦）页面
 │   ├── chat-room/      # Chat Room（对簿公堂）页面
 │   └── logs/           # 日志页
 ├── components/         # 组件目录（自定义组件）
@@ -161,7 +161,8 @@ npm run format:check
 项目包含以下页面的详细实现文档：
 
 - **欢迎页（Welcome）**: `docs/welcome.md` - 首页入口，包含角色展示和主 CTA 按钮
-- **等待页（Waiting Room）**: `docs/waiting-room.md` - 房间创建和等待对方加入的页面
+- **等待页（Waiting Room）**: `docs/waiting-room.md` - 房间创建和等待对方加入的页面，双方就位后自动跳转至 Drum Room
+- **Drum Room（震天鼓抢麦）**: `docs/drum-room.md` - 抢先发言权对抗模块，通过 5 秒快速点击竞争决定谁先申冤
 - **Chat Room（对簿公堂）**: `docs/chat-room.md` - 核心对簿与情绪释放页面，支持双方轮流语音申冤、表情互动和倒计时控制
 
 每个页面文档包含：
@@ -187,6 +188,15 @@ npm run format:check
 
 详细使用方法和 API 说明请参考 `docs/components.md`。
 
+## 页面流程
+
+完整的用户流程如下：
+
+1. **Welcome（欢迎页）** → 用户进入小程序，点击「我要申冤！」
+2. **Waiting Room（等待页）** → 创建房间或加入房间，等待对方加入
+3. **Drum Room（震天鼓抢麦）** → 3秒准备倒计时 + 5秒快速点击竞争，决定谁先发言
+4. **Chat Room（对簿公堂）** → 双方轮流语音申冤，表情互动，完成对簿流程
+
 ## 开发注意事项
 
 1. **不使用任何第三方框架**: 项目仅使用微信小程序原生 API
@@ -195,6 +205,7 @@ npm run format:check
 4. **动画实现**: 统一使用 `wx.createAnimation`，不使用 CSS 动画
 5. **实时通信**: 使用 WebSocket 实现双人实时互动
 6. **页面复用**: Waiting Room 页面同时服务于创建者和被邀请者，通过角色判断显示不同按钮
+7. **Drum Room 核心**: 通过快速点击竞争制造情绪升温，结果明确不可逆
 
 ## 文件说明
 

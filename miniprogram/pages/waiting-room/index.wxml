@@ -159,11 +159,11 @@
         </view>
     </view>
 
-    <!-- 倒计时遮罩 -->
-    <view wx:if="{{ showCountdown }}" class="waiting-room__countdown-mask">
-        <view class="waiting-room__countdown">
-            <text class="waiting-room__countdown-number">{{ countdown }}</text>
-            <text class="waiting-room__countdown-text">即将开庭</text>
-        </view>
-    </view>
+    <!-- 倒计时组件 -->
+    <countdown
+        id="countdown"
+        duration="{{ 3 }}"
+        subtext="即将开庭"
+        bindcomplete="onCountdownComplete"
+    ></countdown>
 </view>

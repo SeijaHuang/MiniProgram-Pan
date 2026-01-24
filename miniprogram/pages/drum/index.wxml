@@ -1,5 +1,0 @@
-<!--pages/drum/index.wxml-->
-<view class="drum-page">
-    <text class="drum-page__title">{{ placeholder }}</text>
-    <text class="drum-page__subtitle">此页面待实现</text>
-</view>

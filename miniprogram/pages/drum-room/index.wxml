@@ -1,0 +1,105 @@
+<!--pages/drum-room/index.wxml-->
+<view class="drum-page" animation="{{ containerAnimationData }}">
+    <view class="page-container">
+        <view class="section-container">
+        <!-- Header Section -->
+        <view class="drum-header">
+            <text class="drum-header__title">震天鼓抢麦</text>
+            <view class="drum-header__timer" wx:if="{{ phase === 'RUNNING' }}">
+                <text class="drum-header__timer-label">剩余时间</text>
+                <text class="drum-header__timer-value">{{ runningLeftSec }}秒</text>
+            </view>
+        </view>
+
+        <!-- Score Section -->
+        <view class="drum-score">
+            <!-- Player A -->
+            <view class="drum-score__player drum-score__player--left">
+                <view class="drum-score__avatar">
+                    <text class="drum-score__avatar-emoji">👤</text>
+                </view>
+                <text class="drum-score__name">{{ playerAName }}</text>
+                <text class="drum-score__value">{{ scoreA }}</text>
+                <view class="drum-score__progress">
+                    <view class="drum-score__progress-bar drum-score__progress-bar--a"
+                          style="width: {{ progressA }}%;"></view>
+                </view>
+            </view>
+
+            <!-- VS -->
+            <view class="drum-score__vs">
+                <text class="drum-score__vs-text">VS</text>
+            </view>
+
+            <!-- Player B -->
+            <view class="drum-score__player drum-score__player--right">
+                <view class="drum-score__avatar">
+                    <text class="drum-score__avatar-emoji">👤</text>
+                </view>
+                <text class="drum-score__name">{{ playerBName }}</text>
+                <text class="drum-score__value">{{ scoreB }}</text>
+                <view class="drum-score__progress">
+                    <view class="drum-score__progress-bar drum-score__progress-bar--b"
+                          style="width: {{ progressB }}%;"></view>
+                </view>
+            </view>
+        </view>
+
+        </view>
+
+        <!-- Fly Text Layer -->
+        <view class="drum-fly-layer">
+            <view
+                wx:for="{{ flyTexts }}"
+                wx:key="id"
+                class="drum-fly-text"
+                style="left: {{ item.x }}rpx; top: {{ item.y }}rpx; transform: rotate({{ item.rotate }}deg);"
+            >
+                <text class="drum-fly-text__content">{{ item.text }}</text>
+            </view>
+        </view>
+
+        <!-- Drum Button -->
+        <view class="drum-button-container">
+            <view
+                class="drum-button {{ tapEnabled ? 'drum-button--active' : 'drum-button--disabled' }}"
+                animation="{{ drumAnimationData }}"
+                bindtap="onDrumTap"
+            >
+                <text class="drum-button__text">冤</text>
+            </view>
+        </view>
+
+        <!-- Hint Text -->
+        <view class="drum-hint">
+            <text class="drum-hint__text" wx:if="{{ phase === 'RUNNING' }}">
+                5秒内疯狂点击！谁点得多谁先冤！
+            </text>
+            <text class="drum-hint__text" wx:elif="{{ phase === 'INIT' }}">
+                等待开始...
+            </text>
+        </view>
+
+        <!-- Prepare Countdown Component -->
+        <countdown
+            id="countdown"
+            duration="{{ 3 }}"
+            subtext="准备击鼓抢麦"
+            bind:complete="onCountdownComplete"
+        />
+
+        <!-- Result Overlay -->
+        <view class="drum-result {{ resultVisible ? 'drum-result--visible' : '' }}">
+            <view class="drum-result__card">
+                <view class="drum-result__glow"></view>
+                <text class="drum-result__title">{{ resultTitle }}</text>
+                <text class="drum-result__subtitle">{{ resultSubtitle }}</text>
+                <view class="drum-result__scores">
+                    <text class="drum-result__score">{{ playerAName }}: {{ scoreA }}</text>
+                    <text class="drum-result__score-divider">-</text>
+                    <text class="drum-result__score">{{ playerBName }}: {{ scoreB }}</text>
+                </view>
+            </view>
+        </view>
+    </view>
+</view>

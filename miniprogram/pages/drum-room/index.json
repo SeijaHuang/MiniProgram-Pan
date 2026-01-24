@@ -1,0 +1,8 @@
+{
+    "usingComponents": {
+        "countdown": "/components/countdown/index"
+    },
+    "navigationBarTitleText": "震天鼓抢麦",
+    "disableScroll": true,
+    "navigationStyle": "custom"
+}

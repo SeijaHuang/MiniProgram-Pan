@@ -1,4 +1,12 @@
 /**app.wxss**/
+page,
+view,
+text,
+image,
+scroll-view {
+    box-sizing: border-box;
+}
+
 .container {
   height: 100%;
   display: flex;
