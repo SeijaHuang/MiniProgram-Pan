@@ -8,10 +8,10 @@
  */
 
 import { randomBytes } from 'crypto';
-import type { IRoom, IParticipant } from '../models/room';
-import type { IUser } from '../models/user';
-import { ERoomStatus } from '../models/room';
-import { EWSErrorCode } from '../types/ws-messages';
+import type { IRoom, IParticipant } from '../../models/entities/room';
+import type { IUser } from '../../models/entities/user';
+import { ERoomStatus } from '../../models/entities/room';
+import { EWSErrorCode } from '../../types/websocket';
 
 export class RoomManager {
     private static instance: RoomManager;
@@ -31,8 +31,9 @@ export class RoomManager {
      * Create a new room
      * CRITICAL: Room is created EMPTY - users must JOIN via WebSocket
      * CRITICAL: Initial status is WAITING with 0 participants
+     * CRITICAL: hostUserId is set at creation time
      */
-    createRoom(): IRoom {
+    createRoom(hostUserId: string): IRoom {
         const roomId = this.generateRoomId();
         const roomCode = this.generateRoomCode();
         const now = Date.now();
@@ -40,6 +41,7 @@ export class RoomManager {
         const room: IRoom = {
             roomId,
             roomCode,
+            hostUserId,
             participants: [], // Empty - users will join via WebSocket
             status: ERoomStatus.Waiting,
             createdAt: now,
@@ -49,7 +51,7 @@ export class RoomManager {
         this.roomCodeToId.set(roomCode, roomId);
 
         console.log(
-            `[RoomManager] Room created: ${roomId} (code: ${roomCode}) - waiting for participants`
+            `[RoomManager] Room created: ${roomId} (code: ${roomCode}, host: ${hostUserId}) - waiting for participants`
         );
 
         return room;

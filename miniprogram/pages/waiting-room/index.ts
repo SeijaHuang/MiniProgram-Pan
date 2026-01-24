@@ -57,6 +57,8 @@ interface IWaitingRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     joinButtonAnim: WechatMiniprogram.Animation | null;
     cancelButtonAnim: WechatMiniprogram.Animation | null;
     confirmButtonAnim: WechatMiniprogram.Animation | null;
+    isCreatingRoom: boolean;
+    isJoiningRoom: boolean;
 }
 
 /**
@@ -113,6 +115,9 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     joinButtonAnim: null,
     cancelButtonAnim: null,
     confirmButtonAnim: null,
+    // 请求锁
+    isCreatingRoom: false,
+    isJoiningRoom: false,
 
     onLoad(): void {
         this.initAnimations();
@@ -288,16 +293,23 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      * 创建房间
      */
     async createRoom(): Promise<void> {
+        // 防止重复请求
+        if (this.isCreatingRoom) {
+            console.warn('[WaitingRoom] Room creation already in progress');
+            return;
+        }
+
         const { currentUser } = this.data;
         if (!currentUser) {
             void wx.showToast({ title: '用户信息错误', icon: 'error' });
             return;
         }
 
+        this.isCreatingRoom = true;
         void wx.showLoading({ title: '创建房间中...' });
 
         try {
-            const room = await roomService.createRoom();
+            const room = await roomService.createRoom(currentUser);
 
             void wx.hideLoading();
 
@@ -311,7 +323,12 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
             this.startWaitingTextCarousel();
 
-            // 房主也需要通过 WebSocket 加入房间
+            console.log(
+                `[WaitingRoom] Room created - Code: ${room.roomCode}, Host: ${currentUser.userId}`
+            );
+
+            // CRITICAL: 房主创建房间后立即通过 WebSocket 加入
+            // 后端已记录 hostUserId，前端通过该字段判断是否为房主
             roomWebSocketService.joinRoom(room.roomCode, currentUser);
         } catch (error) {
             void wx.hideLoading();
@@ -320,6 +337,9 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
                 title: error instanceof Error ? error.message : '创建房间失败',
                 icon: 'error',
             });
+        } finally {
+            // 释放请求锁
+            this.isCreatingRoom = false;
         }
     },
 
@@ -395,6 +415,12 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      * 确认加入房间
      */
     onConfirmJoin(): void {
+        // 防止重复请求
+        if (this.isJoiningRoom) {
+            console.warn('[WaitingRoom] Join request already in progress');
+            return;
+        }
+
         const { roomCodeInput } = this.data;
 
         this.triggerHapticFeedback();
@@ -425,6 +451,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             errorMessage: '',
         });
 
+        this.isJoiningRoom = true;
         void wx.showLoading({ title: '加入房间中...' });
 
         // 发送加入房间消息
@@ -434,6 +461,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         setTimeout(() => {
             if (!this.data.currentRoom) {
                 void wx.hideLoading();
+                this.isJoiningRoom = false;
                 this.setData({
                     errorType: 'not_found',
                     errorMessage: '加入超时，请重试',
@@ -471,6 +499,9 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     handleRoomJoined(room: IRoom): void {
         console.log(room);
         void wx.hideLoading();
+
+        // 释放加入房间的请求锁
+        this.isJoiningRoom = false;
 
         this.setData({
             currentRoom: room,

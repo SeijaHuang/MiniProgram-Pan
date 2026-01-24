@@ -10,15 +10,22 @@ import { BACKEND_CONFIG } from '../constants/config';
 class RoomService {
     /**
      * Create a new chat room
+     * @param creator - The user creating the room
      * @returns Promise with room data
      */
-    async createRoom(): Promise<IRoom> {
+    async createRoom(creator: {
+        userId: string;
+        nickname: string;
+    }): Promise<IRoom> {
         return new Promise<IRoom>((resolve, reject) => {
             wx.request({
                 url: `${BACKEND_CONFIG.HTTP_BASE_URL}/room/create`,
                 method: 'POST',
                 header: {
                     'content-type': 'application/json',
+                },
+                data: {
+                    creator,
                 },
                 success: res => {
                     if (res.statusCode === 201) {

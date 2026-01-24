@@ -16,6 +16,8 @@
 - ✅ 房间状态机：WAITING → READY → CLOSED
 - ✅ 完整的错误处理和验证
 - ✅ TypeScript类型安全
+- ✅ 三层架构设计，职责分离
+- ✅ Repository模式，支持未来数据库集成
 
 ## 快速开始
 
@@ -731,30 +733,252 @@ npx tsc --noEmit
 
 ---
 
-## 项目结构
+## 架构设计
+
+### 三层架构 (Three-Tier Architecture)
+
+本项目采用清晰的三层架构设计，将路由、控制器、业务逻辑和数据访问完全分离。
+
+```
+┌─────────────────────────────────────────────┐
+│         Presentation Layer                  │
+│  Routes → Controllers                       │
+│  - HTTP 路由定义                            │
+│  - WebSocket 消息路由                       │
+│  - 请求/响应格式化                          │
+└─────────────────┬───────────────────────────┘
+                  │
+┌─────────────────▼───────────────────────────┐
+│        Business Logic Layer                 │
+│  Services                                   │
+│  - 核心业务逻辑                             │
+│  - 业务规则验证                             │
+│  - 流程编排                                 │
+└─────────────────┬───────────────────────────┘
+                  │
+┌─────────────────▼───────────────────────────┐
+│       Data Access Layer                     │
+│  Repositories (未来支持)                    │
+│  - 数据库操作封装                           │
+│  - CRUD 抽象                                │
+└─────────────────────────────────────────────┘
+```
+
+### 核心设计原则
+
+#### 1. 职责分离 (Separation of Concerns)
+- **Routes**: 只定义URL路径和HTTP方法
+- **Controllers**: 只处理请求/响应，不包含业务逻辑
+- **Services**: 只处理业务逻辑，不直接发送响应
+- **Repositories**: 只负责数据访问（未来）
+
+#### 2. 依赖方向
+```
+Routes → Controllers → Services → Repositories
+```
+
+高层模块不依赖低层模块细节，都依赖抽象接口。
+
+#### 3. 可测试性
+每层可独立测试，无需Mock整个技术栈：
+- Services 可以不依赖 HTTP/WebSocket 测试
+- Controllers 可以Mock Services 测试
+- Routes 通过集成测试验证
+
+### 项目结构
 
 ```
 backend/
 ├── src/
-│   ├── models/              # 领域模型
-│   │   ├── user.ts
-│   │   ├── room.ts
-│   │   └── message.ts
-│   ├── types/               # 类型定义
-│   │   ├── http.ts
-│   │   └── ws-messages.ts
-│   ├── services/            # 业务逻辑
-│   │   ├── room-manager.ts
-│   │   ├── connection-manager.ts
-│   │   └── handlers/
-│   ├── constants/
-│   ├── utils/
-│   ├── app.ts              # Express服务器
-│   ├── ws.ts               # WebSocket服务器
-│   └── index.ts            # 入口文件
-├── .env                     # 环境变量
-└── package.json
+│   ├── routes/                      # 🔵 路由层
+│   │   └── room-routes.ts           # 房间路由定义
+│   │
+│   ├── controllers/                 # 🟢 控制器层
+│   │   ├── room-controller.ts       # HTTP 请求处理
+│   │   └── ws-controller.ts         # WebSocket 消息路由
+│   │
+│   ├── services/                    # 🟡 服务层
+│   │   ├── core/                    # 核心业务服务
+│   │   │   └── room/
+│   │   │       ├── room.service.ts       # 房间业务逻辑
+│   │   │       └── room-crud.service.ts  # 房间 CRUD (未来)
+│   │   ├── websocket/               # WebSocket 专用服务
+│   │   │   ├── connection-manager.ts
+│   │   │   └── room-manager.ts
+│   │   └── handlers/                # 业务逻辑处理器
+│   │       ├── join-room-handler.ts
+│   │       └── chat-send-handler.ts
+│   │
+│   ├── repositories/                # 🟣 数据访问层 (预留)
+│   │   └── base/
+│   │       └── base.repository.interface.ts
+│   │
+│   ├── models/                      # 数据模型
+│   │   ├── entities/                # 数据库实体
+│   │   │   ├── room.ts
+│   │   │   ├── user.ts
+│   │   │   └── message.ts
+│   │   ├── dto/                     # 数据传输对象
+│   │   │   ├── request/
+│   │   │   └── response/
+│   │   ├── interfaces/              # TypeScript 接口
+│   │   └── enums/                   # 枚举类型
+│   │
+│   ├── middlewares/                 # 中间件
+│   │   ├── validation/              # 请求验证
+│   │   ├── error/                   # 错误处理
+│   │   └── logging/                 # 日志记录
+│   │
+│   ├── database/                    # 数据库配置 (预留)
+│   │   ├── config/
+│   │   ├── migrations/
+│   │   └── schemas/
+│   │
+│   ├── types/                       # 类型定义
+│   │   ├── http.ts                  # HTTP 相关类型
+│   │   ├── ws-messages.ts           # WebSocket 消息类型
+│   │   └── common.ts                # 通用类型
+│   │
+│   ├── constants/                   # 常量
+│   │   └── config.ts
+│   │
+│   ├── utils/                       # 工具函数
+│   │   ├── validators/              # 验证函数
+│   │   ├── formatters/              # 格式化函数
+│   │   └── helpers/                 # 辅助函数
+│   │
+│   ├── config/                      # 配置文件
+│   │   ├── app.config.ts
+│   │   └── websocket.config.ts
+│   │
+│   ├── app.ts                       # Express 应用配置
+│   ├── ws.ts                        # WebSocket 应用配置
+│   └── index.ts                     # 应用入口
+│
+├── tests/                           # 测试目录
+│   ├── unit/                        # 单元测试
+│   ├── integration/                 # 集成测试
+│   └── e2e/                         # 端到端测试
+│
+├── .env                             # 环境变量
+├── package.json
+├── tsconfig.json
+└── README.md
 ```
+
+### 数据流向示例
+
+#### HTTP 请求：创建房间
+
+```
+用户请求
+    ↓
+POST /room/create (routes/room-routes.ts)
+    ↓
+RoomController.createRoom (controllers/room-controller.ts)
+    ↓ 验证请求
+    ↓ 调用服务
+RoomService.createRoom (services/core/room/room.service.ts)
+    ↓ 业务逻辑
+    ↓ 调用仓储 (未来)
+RoomRepository.create (repositories/room/room.repository.ts)
+    ↓
+数据库 (未来)
+    ↓
+返回结果 ← 格式化响应 ← Controller ← Service ← Repository
+```
+
+#### WebSocket 消息：加入房间
+
+```
+客户端消息 JOIN_ROOM
+    ↓
+WebSocket 连接 (ws.ts)
+    ↓
+WebSocketController.handleMessage (controllers/ws-controller.ts)
+    ↓ 解析消息类型
+    ↓ 路由到 Handler
+handleJoinRoom (services/handlers/join-room-handler.ts)
+    ↓ 验证业务规则
+    ↓ 返回结果 (不发送响应)
+WebSocketController
+    ↓ 格式化 JOIN_ACK
+    ↓ 广播给所有参与者
+所有客户端 ← JOIN_ACK
+```
+
+### 关键特性
+
+#### ✅ 业务逻辑与传输协议分离
+```typescript
+// ❌ 错误：业务逻辑直接发送响应
+function handleJoinRoom(...) {
+    connectionManager.sendToConnection(...);  // 耦合！
+}
+
+// ✅ 正确：业务逻辑返回结果
+function handleJoinRoom(...): Result {
+    return { success: true, room };  // Controller 处理响应
+}
+```
+
+#### ✅ Controller 不包含业务逻辑
+```typescript
+// ✅ Controller 只处理请求/响应
+export class RoomController {
+    static createRoom(req, res) {
+        const room = roomService.createRoom();  // 调用 Service
+        res.json({ success: true, data: { room } });  // 格式化响应
+    }
+}
+```
+
+#### ✅ Service 可复用
+```typescript
+// 同一个业务逻辑可用于不同协议
+// HTTP
+app.post('/room/join', (req, res) => {
+    const result = roomService.joinRoom(...);  // 复用
+    res.json(result);
+});
+
+// WebSocket
+ws.on('message', (msg) => {
+    const result = roomService.joinRoom(...);  // 复用
+    ws.send(result);
+});
+```
+
+### 未来扩展计划
+
+#### 1. 数据持久化
+- [ ] 添加 MongoDB/PostgreSQL 支持
+- [ ] 实现 Repository 层
+- [ ] 数据库迁移和种子数据
+
+#### 2. 认证授权
+- [ ] JWT 认证中间件
+- [ ] 用户权限管理
+- [ ] WebSocket 连接验证
+
+#### 3. 缓存层
+- [ ] Redis 集成
+- [ ] 房间状态缓存
+- [ ] 消息队列
+
+#### 4. 测试覆盖
+- [ ] 单元测试 (Services, Handlers)
+- [ ] 集成测试 (API, WebSocket)
+- [ ] E2E 测试
+
+### 架构文档
+
+详细的架构设计和最佳实践请参阅：
+- [MODULAR-ARCHITECTURE.md](MODULAR-ARCHITECTURE.md) - 模块化架构详解
+- [ARCHITECTURE-GUIDE.md](ARCHITECTURE-GUIDE.md) - 架构快速参考
+- [ARCHITECTURE.md](ARCHITECTURE.md) - 系统架构概览
+
+---
 
 ---
 
