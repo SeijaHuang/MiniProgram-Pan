@@ -74,6 +74,19 @@
         - 黑色描边和投影效果
         - 支持动画绑定和初始状态控制
 
+## 服务文档
+
+### 服务索引
+
+- **文件**: `services.md`
+- **功能**: `miniprogram/services` 目录下的业务服务层说明
+- **包含服务**:
+    - **WebSocket Manager** (`websocket-manager.ts`) - WebSocket 连接与重连管理
+    - **Room Service** (`room-service.ts`) - HTTP 创建房间
+    - **Room WebSocket Service** (`room-websocket-service.ts`) - WebSocket 加入房间与 JOIN_ACK
+    - **Chat Service** (`chat-service.ts`) - 文本消息发送与 CHAT_RECEIVE
+    - **Drum Service** (`drum-service.ts`) - 抢麦点击与对抗结果消息
+
 ## 文档结构说明
 
 每个页面文档包含以下章节：

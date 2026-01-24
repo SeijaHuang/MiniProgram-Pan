@@ -5,7 +5,9 @@
  * State Machine:
  * INIT -> PREPARE_COUNTDOWN -> RUNNING -> RESULT
  *
- * 简化版本：进入页面直接开始倒计时，暂不连接后端
+ * WebSocket Messages:
+ * - Send: DRUM_TAP (batched taps)
+ * - Receive: DRUM_TAP (opponent), DRUM_RESULT (final result), PEER_LEFT
  */
 
 import {
@@ -22,6 +24,7 @@ import {
 import { vibrateShort, vibrateLong } from '../../utils/haptic';
 import { playDrumSound, destroyAudioPool } from '../../utils/audio';
 import { TPlayerRole } from '../../types/drum-websocket';
+import { drumService } from '../../services/drum-service';
 
 /** Game phase states */
 type TGamePhase = 'INIT' | 'PREPARE_COUNTDOWN' | 'RUNNING' | 'RESULT';
@@ -91,10 +94,7 @@ interface PrivateState {
     _runningTimer: ReturnType<typeof setInterval> | null;
     _flyTextTimer: ReturnType<typeof setInterval> | null;
     _resultTimer: ReturnType<typeof setInterval> | null;
-    _tapFlushTimer: ReturnType<typeof setInterval> | null;
-    _mockOpponentTimer: ReturnType<typeof setInterval> | null;
 
-    _pendingDelta: number;
     _lastShakeTime: number;
 }
 
@@ -102,7 +102,6 @@ interface PrivateState {
 const PREPARE_DURATION_MS: number = 3000;
 const RUNNING_DURATION_MS: number = 5000;
 const RESULT_DISPLAY_MS: number = 2000;
-const TAP_THROTTLE_MS: number = 100;
 const FLY_TEXT_DURATION_MS: number = 800;
 const MAX_SCORE_FOR_PROGRESS: number = 100;
 
@@ -143,10 +142,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     _runningTimer: null,
     _flyTextTimer: null,
     _resultTimer: null,
-    _pendingDelta: 0,
-    _tapFlushTimer: null,
     _lastShakeTime: 0,
-    _mockOpponentTimer: null,
 
     /**
      * Page lifecycle: onLoad
@@ -174,7 +170,25 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             playerBName,
         });
 
-        // 直接开始游戏流程（暂不连接后端）
+        // Initialize drum service with handlers
+        drumService.initialize(
+            roomId,
+            selfRole,
+            (role: TPlayerRole, delta: number) => {
+                this._handleOpponentTap(role, delta);
+            },
+            (winnerRole: TPlayerRole) => {
+                this._handleServerResult(winnerRole);
+            },
+            (leftRole: TPlayerRole) => {
+                this._handlePeerLeft(leftRole);
+            },
+            (message: string) => {
+                console.error('[DrumRoom] Service error:', message);
+            }
+        );
+
+        // Start game flow
         this._startGame();
     },
 
@@ -185,6 +199,9 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         console.log('[DrumRoom] onUnload');
         this._clearAllTimers();
         destroyAudioPool();
+
+        // Cleanup drum service
+        drumService.cleanup();
     },
 
     /**
@@ -238,9 +255,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             runningLeftMs: RUNNING_DURATION_MS,
         });
 
-        // 模拟对手点击（用于本地测试）
-        this._startMockOpponent();
-
         // Update countdown every 100ms for smooth display
         this._runningTimer = setInterval(() => {
             const remaining: number = getTimeRemainingMs(this._endAtMs);
@@ -270,7 +284,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         });
 
         // Flush any pending taps
-        this._flushPendingTaps();
+        drumService.flushPendingTaps();
 
         // 直接计算结果（暂不等待服务器）
         this._calculateLocalResult();
@@ -352,7 +366,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         this._triggerTapFeedback();
 
         // Queue tap for WS send
-        this._queueTap();
+        drumService.queueTap();
     },
 
     /**
@@ -478,68 +492,10 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     },
 
     /**
-     * Queue tap for batched send (预留给后端对接)
-     */
-    _queueTap(): void {
-        this._pendingDelta++;
-
-        if (this._tapFlushTimer === null) {
-            this._tapFlushTimer = setTimeout(() => {
-                this._flushPendingTaps();
-            }, TAP_THROTTLE_MS);
-        }
-    },
-
-    /**
-     * Flush pending taps (暂不发送到服务器)
-     */
-    _flushPendingTaps(): void {
-        if (this._pendingDelta === 0) return;
-
-        // 暂存 delta 用于后续后端对接
-        const _delta: number = this._pendingDelta;
-        this._pendingDelta = 0;
-        this._tapFlushTimer = null;
-
-        // TODO: 后端对接时发送到服务器
-        // wsManager.send(createTapMessage(this.data.roomId, this.data.selfRole, delta));
-        console.log('[DrumRoom] Flushed taps:', _delta);
-    },
-
-    /**
-     * Start mock opponent tapping
-     */
-    _startMockOpponent(): void {
-        this._mockOpponentTimer = setInterval(() => {
-            if (this.data.phase !== 'RUNNING') {
-                this._clearTimer('_mockOpponentTimer');
-                return;
-            }
-
-            // Random opponent tap (0 or 1)
-            const shouldTap: boolean = Math.random() > 0.3;
-            if (shouldTap) {
-                const opponentRole: TPlayerRole =
-                    this.data.selfRole === 'A' ? 'B' : 'A';
-                const scoreKey: 'scoreA' | 'scoreB' =
-                    opponentRole === 'A' ? 'scoreA' : 'scoreB';
-                const newScore: number = this.data[scoreKey] + 1;
-
-                this._updateScore(opponentRole, newScore);
-            }
-        }, 150);
-    },
-
-    /**
      * Clear a specific timer
      */
     _clearTimer(
-        timerName:
-            | '_runningTimer'
-            | '_flyTextTimer'
-            | '_resultTimer'
-            | '_tapFlushTimer'
-            | '_mockOpponentTimer'
+        timerName: '_runningTimer' | '_flyTextTimer' | '_resultTimer'
     ): void {
         if (this[timerName] !== null) {
             clearInterval(this[timerName]);
@@ -555,7 +511,46 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         this._clearTimer('_runningTimer');
         this._clearTimer('_flyTextTimer');
         this._clearTimer('_resultTimer');
-        this._clearTimer('_tapFlushTimer');
-        this._clearTimer('_mockOpponentTimer');
+    },
+
+    /**
+     * Handle peer left event
+     */
+    _handlePeerLeft(_leftRole: TPlayerRole): void {
+        void wx.showToast({
+            title: '对方已离开',
+            icon: 'none',
+        });
+    },
+
+    /**
+     * Handle opponent tap event from server
+     */
+    _handleOpponentTap(role: TPlayerRole, delta: number): void {
+        // Only update if it's the opponent's tap
+        if (role === this.data.selfRole) {
+            return;
+        }
+
+        const scoreKey: 'scoreA' | 'scoreB' =
+            role === 'A' ? 'scoreA' : 'scoreB';
+        const newScore: number = this.data[scoreKey] + delta;
+
+        this._updateScore(role, newScore);
+    },
+
+    /**
+     * Handle server result message
+     */
+    _handleServerResult(winnerRole: TPlayerRole): void {
+        // Clear timers and show result from server
+        this._clearAllTimers();
+
+        this.setData({
+            tapEnabled: false,
+            runningLeftSec: 0,
+        });
+
+        this._showResult(winnerRole);
     },
 });
