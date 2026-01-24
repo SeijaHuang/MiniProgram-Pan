@@ -36,6 +36,9 @@ miniprogram/
 ├── pages/              # Each page = directory with .ts/.wxml/.wxss/.json
 ├── components/         # Reusable components (same 4-file structure)
 ├── services/           # Business logic, API calls
+├── models/             # Domain object interfaces (IUser, IRoom, IMessage)
+├── types/              # API/WebSocket contract types
+├── constants/          # Centralized configuration (config.ts)
 ├── utils/              # Pure utility functions
 └── assets/             # Static assets (images, etc.)
 ```
