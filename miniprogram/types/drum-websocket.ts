@@ -21,9 +21,6 @@ export enum EDrumMessageType {
 
     // Server -> Client: Final result
     DrumResult = 'DRUM_RESULT',
-
-    // Server -> Client: Peer disconnected
-    PeerLeft = 'PEER_LEFT',
 }
 
 /**
@@ -113,19 +110,6 @@ export interface IDrumResultMessage extends IDrumMessage<IDrumResultData> {
 }
 
 /**
- * PEER_LEFT: Opponent disconnected
- * Server -> Client
- */
-export interface IPeerLeftData {
-    roomId: string;
-    leftRole: TPlayerRole;
-}
-
-export interface IPeerLeftMessage extends IDrumMessage<IPeerLeftData> {
-    type: EDrumMessageType.PeerLeft;
-}
-
-/**
  * Union type for all drum messages
  */
 export type TDrumMessage =
@@ -133,8 +117,7 @@ export type TDrumMessage =
     | IDrumStartMessage
     | IDrumTapMessage
     | IDrumFinishMessage
-    | IDrumResultMessage
-    | IPeerLeftMessage;
+    | IDrumResultMessage;
 
 /**
  * Parse incoming WebSocket message as drum message

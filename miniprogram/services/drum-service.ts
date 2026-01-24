@@ -4,7 +4,7 @@
  *
  * Responsibilities:
  * - Send tap messages (batched)
- * - Receive and parse drum messages (DRUM_TAP, DRUM_RESULT, PEER_LEFT)
+ * - Receive and parse drum messages (DRUM_TAP, DRUM_RESULT)
  * - Handle drum-related errors
  */
 
@@ -23,9 +23,6 @@ type DrumTapHandler = (role: TPlayerRole, delta: number) => void;
 /** Handler for game result events */
 type DrumResultHandler = (winnerRole: TPlayerRole) => void;
 
-/** Handler for peer left events */
-type PeerLeftHandler = (leftRole: TPlayerRole) => void;
-
 /** Handler for errors */
 type DrumErrorHandler = (message: string) => void;
 
@@ -35,7 +32,6 @@ const TAP_THROTTLE_MS: number = 150;
 class DrumService {
     private tapHandler: DrumTapHandler | null = null;
     private resultHandler: DrumResultHandler | null = null;
-    private peerLeftHandler: PeerLeftHandler | null = null;
     private errorHandler: DrumErrorHandler | null = null;
 
     /** Batched tap state */
@@ -52,14 +48,12 @@ class DrumService {
         selfRole: TPlayerRole,
         onTap: DrumTapHandler,
         onResult: DrumResultHandler,
-        onPeerLeft: PeerLeftHandler,
         onError: DrumErrorHandler
     ): void {
         this.currentRoomId = roomId;
         this.currentRole = selfRole;
         this.tapHandler = onTap;
         this.resultHandler = onResult;
-        this.peerLeftHandler = onPeerLeft;
         this.errorHandler = onError;
 
         wsManager.updateCallbacks({
@@ -81,7 +75,6 @@ class DrumService {
 
         this.tapHandler = null;
         this.resultHandler = null;
-        this.peerLeftHandler = null;
         this.errorHandler = null;
 
         wsManager.updateCallbacks({
@@ -151,10 +144,6 @@ class DrumService {
                 this.handleResult(message.data.winnerRole);
                 break;
 
-            case EDrumMessageType.PeerLeft:
-                this.handlePeerLeft(message.data.leftRole);
-                break;
-
             default:
                 break;
         }
@@ -175,16 +164,6 @@ class DrumService {
     private handleResult(winnerRole: TPlayerRole): void {
         if (this.resultHandler) {
             this.resultHandler(winnerRole);
-        }
-    }
-
-    /**
-     * Handle peer left event
-     */
-    private handlePeerLeft(leftRole: TPlayerRole): void {
-        console.log('[DrumService] Peer left:', leftRole);
-        if (this.peerLeftHandler) {
-            this.peerLeftHandler(leftRole);
         }
     }
 

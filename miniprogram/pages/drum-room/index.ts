@@ -7,7 +7,7 @@
  *
  * WebSocket Messages:
  * - Send: DRUM_TAP (batched taps)
- * - Receive: DRUM_TAP (opponent), DRUM_RESULT (final result), PEER_LEFT
+ * - Receive: DRUM_TAP (opponent), DRUM_RESULT (final result)
  */
 
 import {
@@ -179,9 +179,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             },
             (winnerRole: TPlayerRole) => {
                 this._handleServerResult(winnerRole);
-            },
-            (leftRole: TPlayerRole) => {
-                this._handlePeerLeft(leftRole);
             },
             (message: string) => {
                 console.error('[DrumRoom] Service error:', message);
@@ -511,16 +508,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         this._clearTimer('_runningTimer');
         this._clearTimer('_flyTextTimer');
         this._clearTimer('_resultTimer');
-    },
-
-    /**
-     * Handle peer left event
-     */
-    _handlePeerLeft(_leftRole: TPlayerRole): void {
-        void wx.showToast({
-            title: '对方已离开',
-            icon: 'none',
-        });
     },
 
     /**
