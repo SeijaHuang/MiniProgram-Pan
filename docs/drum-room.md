@@ -233,15 +233,38 @@ text-shadow: 0 6rpx 0 #8b0000;
 
 ---
 
-## 7. 时间与胜负规则
+## 7. 游戏状态机与胜负规则
 
-### 7.1 时间规则
+### 7.1 状态枚举
 
-- **准备倒计时**：3 秒（不可跳过）
-- **抢麦时间**：5 秒
-- **倒计时结束即锁定结果** - 不可再点击
+```typescript
+type TGamePhase =
+    | 'INIT' // 初始化状态
+    | 'PREPARE_COUNTDOWN' // 3秒准备倒计时
+    | 'RUNNING' // 5秒抢麦中
+    | 'RESULT'; // 结果展示
+```
 
-### 7.2 判定逻辑
+### 7.2 状态流转
+
+```
+INIT（页面加载）
+  → 启动游戏逻辑
+  → PREPARE_COUNTDOWN（3秒倒计时，不可点击）
+  → onCountdownComplete
+  → RUNNING（5秒抢麦，可点击）
+  → 倒计时归零或游戏结束
+  → RESULT（展示结果2秒）
+  → 自动跳转 Chat Room
+```
+
+### 7.3 时间规则
+
+- **准备倒计时**：3 秒（不可跳过，使用 countdown 组件）
+- **抢麦时间**：5 秒（实时更新倒计时，每 100ms 刷新）
+- **结果展示**：2 秒（展示后自动跳转）
+
+### 7.4 判定逻辑
 
 ```typescript
 if (scoreA > scoreB) {
@@ -249,25 +272,26 @@ if (scoreA > scoreB) {
 } else if (scoreB > scoreA) {
     winner = B;
 } else {
-    winner = 房主; // 平局时房主胜
+    winner = hostRole; // 平局时房主胜
 }
 ```
 
 **实现位置**：
 
-- TS: `determineWinner()` 方法
-- 服务端同步判定结果
+- TS: `_calculateLocalResult()` 方法（本地计算）
+- 服务端同步判定结果（待对接）
 
-### 7.3 分数同步
+### 7.5 分数同步
 
-- **本地计数** - 每次点击立即更新本地分数
-- **服务端校验** - 通过 WebSocket 发送点击事件，服务端验证并同步
+- **本地计数** - 每次点击立即更新本地分数（`onDrumTap()`）
+- **批量发送** - 通过 `drumService.queueTap()` 批量发送点击（节流 150ms）
 - **实时更新** - 双方分数实时显示在进度条上方
 
 **实现位置**：
 
-- TS: `sendClickEvent()` 方法，发送 WebSocket 消息
-- 监听服务端分数同步消息
+- TS: `_queueTap()` / `_flushPendingTaps()` 方法
+- 服务层：`drumService.queueTap()` / `drumService.flushPendingTaps()`
+- 对手点击：`_handleOpponentTap()` 方法监听 DRUM_TAP 消息
 
 ---
 
@@ -347,48 +371,129 @@ if (scoreA > scoreB) {
 
 ## 11. WebSocket 集成
 
-### 11.1 消息类型
+### 11.1 服务引用
+
+Drum Room 使用以下服务层：
+
+- **WebSocket 管理器**: `miniprogram/services/websocket-manager.ts`
+    - 职责：维护 WebSocket 连接、心跳、重连
+- **Drum 服务**: `miniprogram/services/drum-service.ts`
+    - 职责：批量发送点击、接收对手点击、处理游戏结果
+
+### 11.2 消息类型定义
+
+**消息类型枚举** (`types/drum-websocket.ts`):
 
 ```typescript
-// 点击事件
-{
-    type: 'drum:click',
-    userId: string,
-    timestamp: number,
-}
-
-// 分数同步
-{
-    type: 'drum:score',
-    scores: {
-        playerA: number,
-        playerB: number,
-    },
-}
-
-// 倒计时同步
-{
-    type: 'drum:countdown',
-    remainingTime: number,
-    phase: 'prepare' | 'competing' | 'finished',
-}
-
-// 结果判定
-{
-    type: 'drum:result',
-    winner: string,
-    scores: {
-        playerA: number,
-        playerB: number,
-    },
+enum EDrumMessageType {
+    DrumReady = 'DRUM_READY', // Server -> Client: 房间就绪，同步时间
+    DrumStart = 'DRUM_START', // Server -> Client: 游戏开始信号
+    DrumTap = 'DRUM_TAP', // 双向: 点击事件
+    DrumFinish = 'DRUM_FINISH', // Server -> Client: 游戏结束信号
+    DrumResult = 'DRUM_RESULT', // Server -> Client: 最终结果
+    PeerLeft = 'PEER_LEFT', // Server -> Client: 对手离开
 }
 ```
 
-### 11.2 生命周期管理
+### 11.3 消息结构
 
-- **onLoad**: 初始化 WebSocket 连接，注册消息监听，开始准备倒计时
-- **onShow**: 恢复页面状态，检查连接状态
-- **onUnload**: 取消 WebSocket 监听，清理定时器
+**DRUM_TAP（点击事件）**:
+
+```typescript
+// Client -> Server & Server -> Client
+{
+    type: 'DRUM_TAP',
+    data: {
+        roomId: string,
+        role: 'A' | 'B',
+        delta: number,         // 批量点击次数
+        clientTimeMs: number,
+    },
+    timestamp: number,
+}
+```
+
+**DRUM_RESULT（游戏结果）**:
+
+```typescript
+// Server -> Client
+{
+    type: 'DRUM_RESULT',
+    data: {
+        roomId: string,
+        scoreA: number,
+        scoreB: number,
+        winnerRole: 'A' | 'B',
+    },
+    timestamp: number,
+}
+```
+
+**PEER_LEFT（对手离开）**:
+
+```typescript
+// Server -> Client
+{
+    type: 'PEER_LEFT',
+    data: {
+        roomId: string,
+        leftRole: 'A' | 'B',
+    },
+    timestamp: number,
+}
+```
+
+### 11.4 服务层使用
+
+**初始化**:
+
+```typescript
+drumService.initialize(
+    roomId,
+    selfRole,
+    (role, delta) => {
+        /* 处理对手点击 */
+    },
+    winnerRole => {
+        /* 处理游戏结果 */
+    },
+    leftRole => {
+        /* 处理对手离开 */
+    },
+    message => {
+        /* 处理错误 */
+    }
+);
+```
+
+**发送点击**:
+
+```typescript
+// 点击时调用（自动批量发送）
+drumService.queueTap();
+
+// 强制发送（倒计时结束时）
+drumService.flushPendingTaps();
+```
+
+**清理**:
+
+```typescript
+// 页面卸载时
+drumService.cleanup();
+```
+
+### 11.5 生命周期管理
+
+- **onLoad**:
+    - 初始化音效池（预留）
+    - 解析页面参数（roomId, selfRole, hostRole, playerNames）
+    - 通过 `wsManager.updateCallbacks` 注册 WebSocket 消息回调
+    - 启动游戏流程（`_startGame()`）
+- **onUnload**:
+    - 清理所有定时器（`_clearAllTimers()`）
+    - 销毁音效池（`destroyAudioPool()`）
+    - 清除 WebSocket 消息回调（`wsManager.updateCallbacks({ onMessage: undefined })`）
 
 ---
 
@@ -495,22 +600,40 @@ if (scoreA > scoreB) {
 
 ## 16. 实现状态
 
-### 当前状态（2026-01-22）
+### 当前状态（2026-01-24）
 
-- ⏳ **待实现** - 基础布局和倒计时
-- ⏳ **待实现** - 震天鼓按钮和点击反馈
-- ⏳ **待实现** - 分数同步和进度条
-- ⏳ **待实现** - 结果展示和跳转
-- ⏳ **待实现** - WebSocket 状态同步
-- ⏳ **待实现** - 异常处理和优化
+- ✅ **已完成** - 基础布局和倒计时
+    - 页面整体结构（标题、倒计时、进度条、震天鼓按钮）
+    - 3秒准备倒计时（使用 countdown 组件）
+    - 5秒抢麦倒计时（实时更新，每 100ms 刷新）
+- ✅ **已完成** - 震天鼓按钮和点击反馈
+    - 按钮缩放动画（`wx.createAnimation`）
+    - 容器抖动动画（节流 50ms）
+    - 震动反馈（`vibrateShort`）
+    - 音效播放（`playDrumSound`）
+    - 随机飞字动画（800ms 生命周期）
+- ✅ **已完成** - 分数同步和进度条
+    - 本地分数实时更新
+    - 进度条平滑更新（基于分数比例）
+    - 批量发送点击（节流 150ms）
+- ✅ **已完成** - 结果展示和跳转
+    - 胜负判定逻辑（分数比较，平局房主胜）
+    - 结果遮罩层（胜者/败者文案）
+    - 2秒后自动跳转至 Chat Room（`wx.redirectTo`）
+- ⏳ **待对接** - WebSocket 后端集成
+    - 前端已实现消息发送和接收逻辑
+    - 后端 drum 消息类型处理待实现
+- ⏳ **待完善** - 异常处理和优化
+    - 对手掉线处理（已有 PEER_LEFT 监听）
+    - 网络延迟兜底策略
 
 ### 后续规划
 
-1. ⏳ **第一阶段**: 基础布局和倒计时实现
-2. ⏳ **第二阶段**: 震天鼓按钮和点击反馈
-3. ⏳ **第三阶段**: 分数同步和进度条
-4. ⏳ **第四阶段**: 结果展示和跳转
-5. ⏳ **第五阶段**: WebSocket 状态同步
+1. ✅ **第一阶段**: 基础布局和倒计时实现
+2. ✅ **第二阶段**: 震天鼓按钮和点击反馈
+3. ✅ **第三阶段**: 分数同步和进度条
+4. ✅ **第四阶段**: 结果展示和跳转
+5. ⏳ **第五阶段**: WebSocket 后端对接（后端需实现 drum 消息类型处理）
 6. ⏳ **第六阶段**: 异常处理和优化
 
 ---
@@ -522,14 +645,24 @@ if (scoreA > scoreB) {
     - 样式: `miniprogram/pages/drum-room/index.wxss`
     - 逻辑: `miniprogram/pages/drum-room/index.ts`
     - 配置: `miniprogram/pages/drum-room/index.json`
+- **组件**:
+    - 倒计时组件: `miniprogram/components/countdown/`
+- **服务层**:
+    - WebSocket 管理: `miniprogram/services/websocket-manager.ts`
+    - Drum 服务: `miniprogram/services/drum-service.ts`
+- **类型定义**:
+    - Drum WebSocket: `miniprogram/types/drum-websocket.ts`
+- **工具函数**:
+    - 时间同步: `miniprogram/utils/time.ts`
+    - 随机工具: `miniprogram/utils/random.ts`
+    - 触觉反馈: `miniprogram/utils/haptic.ts`
+    - 音效播放: `miniprogram/utils/audio.ts`
 - **产品文档**:
     - 原始 PRD: `Drum_Room_PRD_v1.0.md`
     - 本实现文档: `docs/drum-room.md`
-- **相关服务**:
-    - WebSocket 管理: `miniprogram/services/websocket-manager.ts`
-    - 房间服务: `miniprogram/services/room-service.ts`
+    - 服务层说明: `docs/services.md`
 - **资源文件**:
-    - 音效: `miniprogram/assets/sounds/drum.mp3`（需添加）
+    - 音效: 待添加至 `miniprogram/assets/sounds/`
 
 ---
 

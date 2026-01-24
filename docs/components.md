@@ -86,7 +86,105 @@
 
 ---
 
-### 2. Styled Title（样式化标题组件）
+### 2. Countdown（倒计时组件）
+
+- **文件路径**: `miniprogram/components/countdown/`
+- **组件名称**: `countdown`
+- **功能**: 全屏倒计时遮罩组件，用于页面跳转前的倒计时
+
+#### 属性（Properties）
+
+| 属性名     | 类型   | 默认值     | 必填 | 说明                   |
+| ---------- | ------ | ---------- | ---- | ---------------------- |
+| `duration` | Number | 3          | 否   | 倒计时时长（秒）       |
+| `subtext`  | String | '即将开庭' | 否   | 倒计时下方显示的副文案 |
+
+#### 事件（Events）
+
+| 事件名     | 说明             | 回调参数 |
+| ---------- | ---------------- | -------- |
+| `complete` | 倒计时结束时触发 | -        |
+
+#### 方法（Methods）
+
+| 方法名  | 说明             | 参数 | 返回值 |
+| ------- | ---------------- | ---- | ------ |
+| `start` | 开始倒计时       | -    | -      |
+| `stop`  | 停止并隐藏倒计时 | -    | -      |
+
+#### 使用示例
+
+```xml
+<!-- 页面 WXML -->
+<countdown
+    id="countdown"
+    duration="3"
+    subtext="即将开庭"
+    bindcomplete="onCountdownComplete"
+></countdown>
+```
+
+```typescript
+// 页面 TS
+Page({
+    // 启动倒计时
+    startCountdown(): void {
+        const countdownComponent = this.selectComponent('#countdown');
+        if (countdownComponent) {
+            countdownComponent.start();
+        }
+    },
+
+    // 倒计时完成回调
+    onCountdownComplete(): void {
+        console.log('倒计时结束');
+        // 执行跳转逻辑
+        wx.navigateTo({
+            url: '/pages/next-page/index',
+        });
+    },
+
+    // 停止倒计时
+    stopCountdown(): void {
+        const countdownComponent = this.selectComponent('#countdown');
+        if (countdownComponent) {
+            countdownComponent.stop();
+        }
+    },
+});
+```
+
+#### 样式特性
+
+- **全屏遮罩**：
+    - 黑色半透明背景（`rgba(0, 0, 0, 0.85)`）
+    - 覆盖整个屏幕（`position: fixed, z-index: 9999`）
+    - 阻止事件穿透（`catchtouchmove`）
+
+- **倒计时数字**：
+    - 特大号字体（240rpx）
+    - 白色文字 + 黑色描边（8rpx）
+    - 右下投影效果（16rpx 20rpx）
+    - 缩放入场动画（从 1.5 到 1.0，时长 300ms）
+
+- **副文案**：
+    - 亮黄色文字（`#ffe66d`）
+    - 字号 32rpx
+    - 显示在倒计时数字下方
+
+- **动画效果**：
+    - 数字变化时：缩放动画（使用 `wx.createAnimation`）
+    - 震动反馈：每秒跳动时触发 `wx.vibrateShort({ type: 'heavy' })`
+
+#### 使用场景
+
+- Waiting Room 双方就位后的倒计时（3秒后跳转 Drum Room）
+- Drum Room 准备倒计时（3秒后开始抢麦）
+- 其他需要倒计时的页面跳转场景
+
+---
+
+### 3. Styled Title（样式化标题组件）
 
 - **文件路径**: `miniprogram/components/styled-title/`
 - **组件名称**: `styled-title`
@@ -195,12 +293,17 @@ Component({
 
 ## 相关文件
 
-- 组件实现：
-    - `miniprogram/components/styled-button/`
-    - `miniprogram/components/styled-title/`
-- 使用示例：
-    - `miniprogram/pages/welcome/index.wxml`
-    - `miniprogram/pages/waiting-room/index.wxml`
-- 开发规范：
+- **组件实现**：
+    - `miniprogram/components/styled-button/` - 样式化按钮
+    - `miniprogram/components/countdown/` - 倒计时组件
+    - `miniprogram/components/styled-title/` - 样式化标题
+- **使用示例**：
+    - `miniprogram/pages/welcome/index.wxml` - 使用 styled-button、styled-title
+    - `miniprogram/pages/waiting-room/index.wxml` - 使用 styled-button、countdown
+    - `miniprogram/pages/drum-room/index.wxml` - 使用 countdown
+- **开发规范**：
     - `../CLAUDE.md` - 项目开发规范
     - `../README.md` - 项目主文档
+- **产品文档**：
+    - `./README.md` - 文档索引
+    - 各页面文档中均有组件使用说明

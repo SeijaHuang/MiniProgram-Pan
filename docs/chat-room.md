@@ -2,10 +2,10 @@
 
 基于《Chat Room（对簿公堂）功能 PRD v1.0》梳理的实现文档，对应页面代码位于：
 
-- `miniprogram/pages/drum-room/index.json`
-- `miniprogram/pages/drum-room/index.wxml`
-- `miniprogram/pages/drum-room/index.wxss`
-- `miniprogram/pages/drum-room/index.ts`
+- `miniprogram/pages/chat-room/index.json`
+- `miniprogram/pages/chat-room/index.wxml`
+- `miniprogram/pages/chat-room/index.wxss`
+- `miniprogram/pages/chat-room/index.ts`
 
 本文档用于在产品、设计、前端之间对齐「Chat Room」的目标、布局和交互细节。
 
@@ -16,9 +16,9 @@
 | 项目     | 说明                           |
 | -------- | ------------------------------ |
 | 页面名称 | Chat Room（对簿公堂）          |
-| 页面路径 | `/pages/drum-room/index`       |
+| 页面路径 | `/pages/chat-room/index`       |
 | 页面类型 | 核心对簿与情绪释放页面         |
-| 进入方式 | 等待页倒计时结束后自动跳转     |
+| 进入方式 | Drum Room 结束后自动跳转       |
 | 退出方式 | 双方完成发言后跳转至 AI 分析页 |
 | 设计风格 | 强舞台感、娱乐化、视觉即状态   |
 | 优先级   | P0（主流程核心页面）           |
@@ -488,14 +488,15 @@ this.initSpeechRecognitionCallbacks();
 
 ## 15. 实现状态
 
-### 当前状态（2026-01-17）
+### 当前状态（2026-01-24）
 
 - ✅ **已完成** - 基础布局和倒计时实现
 - ✅ **已完成** - 麦克风按钮和录音功能
 - ✅ **已完成** - 表情互动系统
 - ✅ **已完成** - 微信同声传译插件集成（WechatSI）
-- ⏳ **待实现** - WebSocket 状态同步
-- ⏳ **待实现** - 异常处理和优化
+- ✅ **已完成** - 消息发送与接收（使用 chat-service）
+- ⏳ **待对接** - WebSocket 后端完整流程（状态同步、语音消息）
+- ⏳ **待完善** - 异常处理和优化
 
 ### 后续规划
 
@@ -503,8 +504,9 @@ this.initSpeechRecognitionCallbacks();
 2. ✅ **第二阶段**: 麦克风按钮和录音功能
 3. ✅ **第三阶段**: 表情互动系统
 4. ✅ **第四阶段**: 语音识别功能（WechatSI插件）
-5. ⏳ **第五阶段**: WebSocket 状态同步
-6. ⏳ **第六阶段**: 异常处理和优化
+5. ✅ **第五阶段**: 文本消息发送与接收（chat-service）
+6. ⏳ **第六阶段**: WebSocket 后端完整流程对接
+7. ⏳ **第七阶段**: 异常处理和优化
 
 ---
 
@@ -515,15 +517,22 @@ this.initSpeechRecognitionCallbacks();
     - 样式: `miniprogram/pages/chat-room/index.wxss`
     - 逻辑: `miniprogram/pages/chat-room/index.ts`
     - 配置: `miniprogram/pages/chat-room/index.json`
+- **服务层**:
+    - WebSocket 管理: `miniprogram/services/websocket-manager.ts`
+    - Chat 服务: `miniprogram/services/chat-service.ts`
+- **类型定义**:
+    - 消息模型: `miniprogram/models/message.ts`
+    - Chat WebSocket: `miniprogram/types/chat-websocket.ts`
+    - WebSocket 通用: `miniprogram/types/websocket-common.ts`
 - **插件配置**:
     - 全局配置: `miniprogram/app.json`（WechatSI 插件配置）
+- **录音与识别**:
+    - 录音管理器: 使用 `wx.getRecorderManager()`
+    - 语音识别: 使用微信同声传译插件（WechatSI）
 - **产品文档**:
     - 原始 PRD: `Chat_Room_PRD_v1.0.md`
     - 本实现文档: `docs/chat-room.md`
-- **相关服务**:
-    - WebSocket 管理: `miniprogram/services/websocket.ts`（待实现）
-    - 录音服务: 已集成在页面逻辑中（使用 `wx.getRecorderManager()`）
-    - 语音识别: 使用微信同声传译插件（WechatSI）
+    - 服务层说明: `docs/services.md`
 
 ---
 

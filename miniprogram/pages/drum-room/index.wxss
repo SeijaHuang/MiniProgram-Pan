@@ -20,7 +20,7 @@
     box-sizing: border-box;
     padding: 40rpx 30rpx;
     padding-top: 60rpx;
-    background: linear-gradient(135deg, #FF2E63 0%, #FF4D8D 35%, #FF8A5B 70%, #FFC75F 100%);
+    background: linear-gradient(135deg, #ff3b30 0%, #ff7a00 50%, #ffc400 100%);
     position: relative;
     overflow: hidden;
 }

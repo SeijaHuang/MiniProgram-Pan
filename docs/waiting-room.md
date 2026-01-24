@@ -66,27 +66,26 @@
 
 ## 4. 页面状态设计（核心）
 
-### 4.1 状态枚举
+### 4.1 视图模式枚举
 
 ```typescript
-type WaitingRoomState =
-    | 'created_waiting' // 已创建，等待对方
-    | 'joining' // 正在加入房间
-    | 'ready' // 双方已就位
-    | 'invalid'; // 房间失效
+type ViewMode =
+    | 'entry' // 入口模式，显示两个主按钮（发起申冤 / 加入房间）
+    | 'host_waiting' // 房主等待模式，显示房间号和等待文案
+    | 'guest_waiting'; // 访客等待模式，显示已加入提示
 ```
 
-### 4.2 状态流转
+### 4.2 视图模式流转
 
 ```
 创建者视角：
-创建房间成功 → created_waiting → (对方加入) → ready → 跳转准备页
+entry → (点击发起申冤) → 创建房间 → host_waiting → (对方加入) → 启动倒计时 → 跳转 Drum Room
 
 被邀请者视角：
-进入页面 → (点击加入) → joining → (加入成功) → ready → 跳转准备页
+entry → (点击加入房间) → 输入房间号 → 发送加入请求 → guest_waiting → 启动倒计时 → 跳转 Drum Room
 
 异常情况：
-任何状态 → invalid → Toast 提示 → 返回首页
+任何模式 → 房间无效/网络错误 → Toast 提示 → 返回 entry 模式
 ```
 
 ---
@@ -231,13 +230,23 @@ onClick() {
 
 ### 6.3 跳转目标
 
-双方就位后，自动跳转到：
+双方就位后，启动倒计时（使用 `countdown` 组件），倒计时结束后自动跳转到：
 
 ```
 /pages/drum-room/index
 ```
 
-（Drum Room - 震天鼓抢麦页面，包含 3 秒准备倒计时和 5 秒抢麦竞争）
+**倒计时说明**：
+
+- 使用全屏倒计时组件 `components/countdown`
+- 默认时长：3 秒
+- 副文案：「即将开庭」
+- 倒计时结束触发 `onCountdownComplete()` 事件，执行页面跳转
+
+**实现位置**：
+
+- 组件调用：`this.selectComponent('#countdown').start()`
+- 完成回调：`onCountdownComplete()` 方法
 
 ---
 
@@ -311,29 +320,69 @@ onClick() {
 
 ## 9. WebSocket 集成
 
-### 9.1 消息监听
+### 9.1 服务引用
 
-Waiting Room 需要监听以下 WebSocket 消息：
+Waiting Room 使用以下服务层：
+
+- **WebSocket 管理器**: `miniprogram/services/websocket-manager.ts`
+    - 职责：维护 WebSocket 连接、心跳、重连
+- **房间服务（HTTP）**: `miniprogram/services/room-service.ts`
+    - 职责：创建房间（POST /room/create）
+- **房间 WebSocket 服务**: `miniprogram/services/room-websocket-service.ts`
+    - 职责：发送 JOIN_ROOM、接收 JOIN_ACK
+
+### 9.2 消息监听
+
+Waiting Room 通过 `roomWebSocketService` 监听以下 WebSocket 消息：
 
 ```typescript
-// 对方加入房间
-onMessage('room:joined', data => {
-    // 更新状态为 ready
-    // 自动跳转准备页
-});
-
-// 房间失效
-onMessage('room:invalid', data => {
-    // 显示错误提示
-    // 返回首页
+// 加入房间确认（JOIN_ACK）
+roomWebSocketService.initialize((room: IRoom) => {
+    this.handleRoomJoined(room);
 });
 ```
 
-### 9.2 生命周期管理
+**JOIN_ACK 消息结构**：
 
-- `onLoad`: 初始化房间状态，注册 WebSocket 监听
-- `onShow`: 恢复页面状态，检查房间状态
-- `onUnload`: 取消 WebSocket 监听，清理定时器
+```typescript
+{
+    type: 'JOIN_ACK',
+    data: {
+        room: IRoom // 完整房间状态
+    },
+    timestamp: number
+}
+```
+
+### 9.3 房间加入流程
+
+**创建者流程**：
+
+1. 点击「发起申冤」按钮
+2. 调用 `roomService.createRoom()` 创建房间（HTTP）
+3. 创建成功后，调用 `roomWebSocketService.joinRoom(roomCode, user)` 加入房间（WebSocket）
+4. 收到 JOIN_ACK，更新 `viewMode` 为 `host_waiting`
+5. 等待对方加入
+
+**被邀请者流程**：
+
+1. 点击「加入房间」按钮，输入房间号
+2. 调用 `roomWebSocketService.joinRoom(roomCode, user)` 加入房间（WebSocket）
+3. 收到 JOIN_ACK，更新 `viewMode` 为 `guest_waiting`
+4. 检查房间是否满员（2人）且状态为 `Ready`
+
+**双方就位后**：
+
+- 房间状态：`room.status === ERoomStatus.Ready`
+- 房间人数：`room.participants.length >= 2`
+- 触发倒计时：`this.startCountdown()`
+
+### 9.4 生命周期管理
+
+- `onLoad`: 初始化 WebSocket 连接（`wsManager.connect()`），注册房间消息监听（`roomWebSocketService.initialize()`）
+- `onShow`: 页面恢复时无需特殊处理（连接由 wsManager 维护）
+- `onUnload`: 清理定时器（`clearAllTimers()`），WebSocket 断开由服务器处理用户离开
+- `onHide`: 清理定时器，停止倒计时组件
 
 ---
 
@@ -385,14 +434,26 @@ onMessage('room:invalid', data => {
 
 ## 13. 相关文件一览
 
-- 页面实现：
+- **页面实现**：
     - 结构：`miniprogram/pages/waiting-room/index.wxml`
     - 样式：`miniprogram/pages/waiting-room/index.wxss`
     - 逻辑：`miniprogram/pages/waiting-room/index.ts`
     - 配置：`miniprogram/pages/waiting-room/index.json`
-- 产品文档：
+- **组件**：
+    - 倒计时组件：`miniprogram/components/countdown/`
+    - 样式化按钮：`miniprogram/components/styled-button/`
+    - 样式化标题：`miniprogram/components/styled-title/`
+- **服务层**：
+    - WebSocket 管理：`miniprogram/services/websocket-manager.ts`
+    - 房间服务（HTTP）：`miniprogram/services/room-service.ts`
+    - 房间 WebSocket 服务：`miniprogram/services/room-websocket-service.ts`
+- **类型定义**：
+    - 房间相关：`miniprogram/models/room.ts`
+    - 用户相关：`miniprogram/models/user.ts`
+    - 房间 API：`miniprogram/types/room-api.ts`
+    - 房间 WebSocket：`miniprogram/types/room-websocket.ts`
+    - WebSocket 通用：`miniprogram/types/websocket-common.ts`
+- **产品文档**：
     - 原始 PRD：页面级 PRD｜房间创建 & 等待页（Waiting Room）
     - 本实现文档：`docs/waiting-room.md`
-- 相关服务：
-    - WebSocket 管理：`miniprogram/services/websocket.ts`（待实现）
-    - 房间服务：`miniprogram/services/room.ts`（待实现）
+    - 服务层说明：`docs/services.md`
