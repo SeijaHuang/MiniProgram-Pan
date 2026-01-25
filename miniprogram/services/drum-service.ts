@@ -38,7 +38,7 @@ class DrumService {
     private pendingDelta: number = 0;
     private tapFlushTimer: ReturnType<typeof setTimeout> | null = null;
     private currentRoomId: string = '';
-    private currentRole: TPlayerRole = 'A';
+    private currentRole: TPlayerRole = 'Organizer';
 
     /**
      * Initialize drum service with handlers

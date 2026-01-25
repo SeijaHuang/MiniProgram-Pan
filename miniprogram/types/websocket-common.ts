@@ -35,6 +35,13 @@ export enum EWSErrorCode {
 }
 
 /**
+ * Player Role in drum game
+ * - Organizer: The player who created the room
+ * - Joiner: The player who joined the room
+ */
+export type TPlayerRole = 'Organizer' | 'Joiner';
+
+/**
  * Base WebSocket Message
  * WebSocket 消息基础结构
  */

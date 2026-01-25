@@ -3,6 +3,11 @@
  * Message protocols for drum room real-time communication
  */
 
+import type { TPlayerRole } from './websocket-common';
+
+// Re-export TPlayerRole for convenience
+export type { TPlayerRole } from './websocket-common';
+
 /**
  * Drum Room Message Types
  */
@@ -24,14 +29,9 @@ export enum EDrumMessageType {
 }
 
 /**
- * Player Role
- */
-export type TPlayerRole = 'A' | 'B';
-
-/**
  * Base Drum Message
  */
-export interface IDrumMessage<T = unknown> {
+export interface IDrumMessage<T = object> {
     type: EDrumMessageType;
     data: T;
     timestamp: number;

@@ -7,6 +7,7 @@
  * - join-room.ts: Room join flow types
  * - chat.ts: Chat messaging types
  * - error.ts: Error handling types
+ * - drum.ts: Drum game types
  */
 
 // Base types
@@ -16,11 +17,13 @@ export * from './base';
 export * from './join-room';
 export * from './chat';
 export * from './error';
+export * from './drum';
 
 // Union types
 import type { IJoinRoomMessage, IJoinAckMessage } from './join-room';
 import type { IChatSendMessage, IChatReceiveMessage } from './chat';
 import type { IWSErrorMessage } from './error';
+import type { TDrumMessage } from './drum';
 
 /**
  * Union type of all WebSocket messages
@@ -30,4 +33,5 @@ export type WSMessage =
     | IChatSendMessage
     | IJoinAckMessage
     | IChatReceiveMessage
-    | IWSErrorMessage;
+    | IWSErrorMessage
+    | TDrumMessage;
