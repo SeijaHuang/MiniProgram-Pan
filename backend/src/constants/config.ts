@@ -17,3 +17,10 @@ export const ROOM_CONFIG = {
     MAX_PARTICIPANTS: 2,
     ROOM_CODE_LENGTH: 6,
 } as const;
+
+export const DRUM_CONFIG = {
+    /** Countdown duration before game starts (ms) */
+    COUNTDOWN_MS: 3000,
+    /** Game duration (ms) */
+    GAME_DURATION_MS: 10000,
+} as const;
