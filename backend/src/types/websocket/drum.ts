@@ -10,11 +10,11 @@
  * - DRUM_RESULT: Server → Client (Final result)
  */
 
-import type { IWSMessage, TPlayerRole } from './base';
-import { EWSMessageType } from './base';
+import type { IWSMessage } from './base';
+import { EWSMessageType, EPlayerRole } from './base';
 
-// Re-export TPlayerRole for convenience
-export type { TPlayerRole } from './base';
+// Re-export EPlayerRole for convenience
+export { EPlayerRole } from './base';
 
 // ==================== Server → Client ====================
 
@@ -28,7 +28,7 @@ export interface IDrumReadyMessage extends IWSMessage<IDrumReadyData> {
 export interface IDrumReadyData {
     roomId: string;
     serverTimeMs: number;
-    hostRole: TPlayerRole;
+    hostRole: EPlayerRole;
     playerAName: string;
     playerBName: string;
 }
@@ -68,7 +68,7 @@ export interface IDrumResultData {
     roomId: string;
     scoreA: number;
     scoreB: number;
-    winnerRole: TPlayerRole;
+    winnerRole: EPlayerRole;
 }
 
 // ==================== Bidirectional ====================
@@ -84,7 +84,7 @@ export interface IDrumTapMessage extends IWSMessage<IDrumTapData> {
 
 export interface IDrumTapData {
     roomId: string;
-    role: TPlayerRole;
+    role: EPlayerRole;
     delta: number; // Number of taps in this batch
     clientTimeMs: number;
 }

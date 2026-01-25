@@ -29,7 +29,10 @@ export enum EWSMessageType {
  * - Organizer: The player who created the room
  * - Joiner: The player who joined the room
  */
-export type TPlayerRole = 'Organizer' | 'Joiner';
+export enum EPlayerRole {
+    Organizer = 'Organizer',
+    Joiner = 'Joiner',
+}
 
 /**
  * Base WebSocket Message

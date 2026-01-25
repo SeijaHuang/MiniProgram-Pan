@@ -11,17 +11,17 @@
 import { wsManager } from './websocket-manager';
 import {
     EDrumMessageType,
+    EPlayerRole,
     parseDrumMessage,
     createTapMessage,
-    type TPlayerRole,
     type TDrumMessage,
 } from '../types/drum-websocket';
 
 /** Handler for opponent tap events */
-type DrumTapHandler = (role: TPlayerRole, delta: number) => void;
+type DrumTapHandler = (role: EPlayerRole, delta: number) => void;
 
 /** Handler for game result events */
-type DrumResultHandler = (winnerRole: TPlayerRole) => void;
+type DrumResultHandler = (winnerRole: EPlayerRole) => void;
 
 /** Handler for errors */
 type DrumErrorHandler = (message: string) => void;
@@ -38,14 +38,14 @@ class DrumService {
     private pendingDelta: number = 0;
     private tapFlushTimer: ReturnType<typeof setTimeout> | null = null;
     private currentRoomId: string = '';
-    private currentRole: TPlayerRole = 'Organizer';
+    private currentRole: EPlayerRole = EPlayerRole.Organizer;
 
     /**
      * Initialize drum service with handlers
      */
     initialize(
         roomId: string,
-        selfRole: TPlayerRole,
+        selfRole: EPlayerRole,
         onTap: DrumTapHandler,
         onResult: DrumResultHandler,
         onError: DrumErrorHandler
@@ -152,7 +152,7 @@ class DrumService {
     /**
      * Handle opponent tap event
      */
-    private handleTap(role: TPlayerRole, delta: number): void {
+    private handleTap(role: EPlayerRole, delta: number): void {
         if (this.tapHandler) {
             this.tapHandler(role, delta);
         }
@@ -161,7 +161,7 @@ class DrumService {
     /**
      * Handle game result
      */
-    private handleResult(winnerRole: TPlayerRole): void {
+    private handleResult(winnerRole: EPlayerRole): void {
         if (this.resultHandler) {
             this.resultHandler(winnerRole);
         }

@@ -3,10 +3,10 @@
  * Message protocols for drum room real-time communication
  */
 
-import type { TPlayerRole } from './websocket-common';
+import { EPlayerRole } from './websocket-common';
 
-// Re-export TPlayerRole for convenience
-export type { TPlayerRole } from './websocket-common';
+// Re-export EPlayerRole for convenience
+export { EPlayerRole } from './websocket-common';
 
 /**
  * Drum Room Message Types
@@ -44,7 +44,7 @@ export interface IDrumMessage<T = object> {
 export interface IDrumReadyData {
     roomId: string;
     serverTimeMs: number;
-    hostRole: TPlayerRole;
+    hostRole: EPlayerRole;
     playerAName: string;
     playerBName: string;
 }
@@ -72,7 +72,7 @@ export interface IDrumStartMessage extends IDrumMessage<IDrumStartData> {
  */
 export interface IDrumTapData {
     roomId: string;
-    role: TPlayerRole;
+    role: EPlayerRole;
     delta: number; // Number of taps in this batch
     clientTimeMs: number;
 }
@@ -102,7 +102,7 @@ export interface IDrumResultData {
     roomId: string;
     scoreA: number;
     scoreB: number;
-    winnerRole: TPlayerRole;
+    winnerRole: EPlayerRole;
 }
 
 export interface IDrumResultMessage extends IDrumMessage<IDrumResultData> {
@@ -151,7 +151,7 @@ export function parseDrumMessage(rawData: string): TDrumMessage | null {
  */
 export function createTapMessage(
     roomId: string,
-    role: TPlayerRole,
+    role: EPlayerRole,
     delta: number
 ): IDrumTapMessage {
     return {
