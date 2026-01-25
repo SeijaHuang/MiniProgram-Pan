@@ -302,8 +302,8 @@ Component({
     - `miniprogram/pages/waiting-room/index.wxml` - 使用 styled-button、countdown
     - `miniprogram/pages/drum-room/index.wxml` - 使用 countdown
 - **开发规范**：
-    - `../CLAUDE.md` - 项目开发规范
-    - `../README.md` - 项目主文档
+    - `../../CLAUDE.md` - 项目开发规范
+    - `../../README.md` - 项目主文档
 - **产品文档**：
     - `./README.md` - 文档索引
     - 各页面文档中均有组件使用说明

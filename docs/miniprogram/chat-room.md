@@ -531,8 +531,8 @@ this.initSpeechRecognitionCallbacks();
     - 语音识别: 使用微信同声传译插件（WechatSI）
 - **产品文档**:
     - 原始 PRD: `Chat_Room_PRD_v1.0.md`
-    - 本实现文档: `docs/chat-room.md`
-    - 服务层说明: `docs/services.md`
+    - 本实现文档: `docs/miniprogram/chat-room.md`
+    - 服务层说明: `docs/miniprogram/services.md`
 
 ---
 

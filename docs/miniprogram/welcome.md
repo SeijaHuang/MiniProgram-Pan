@@ -225,7 +225,7 @@ PRD 定义的 A/B/C/D 四大区域，在当前实现中的对应关系：
 #### 5.2 与 PRD 的对齐建议
 
 - 设计与开发在联调时，可以本文件为对照：
-    - 若 UI 细节与 PRD 更新，建议先更新本 `docs/welcome.md`，再同步到 `index.wxml` / `index.wxss`。
+    - 若 UI 细节与 PRD 更新，建议先更新本 `docs/miniprogram/welcome.md`，再同步到 `index.wxml` / `index.wxss`。
     - 新增交互或动画时，优先在「4. 动效与交互」中补充描述，确保后续维护人员能快速理解。
 
 ---
@@ -238,5 +238,5 @@ PRD 定义的 A/B/C/D 四大区域，在当前实现中的对应关系：
     - 逻辑：`miniprogram/pages/welcome/index.ts`
     - 配置：`miniprogram/pages/welcome/index.json`
 - 产品文档：
-    - 原始 PRD：`c:\Users\Shijia Huang\Downloads\欢迎界面_PRD_v1.0.md`
-    - 本实现文档：`docs/welcome.md`
+    - 原始 PRD：`欢迎界面_PRD_v1.0.md`
+    - 本实现文档：`docs/miniprogram/welcome.md`

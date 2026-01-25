@@ -4,52 +4,85 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WeChat Mini Program built with the **native framework** (not React/Vue/uni-app) using TypeScript. Supports real-time two-player interactive features via WebSocket.
+Two-player real-time interactive WeChat Mini Program ("申冤" app) with a Node.js backend. Users create/join rooms, compete in a drum-tapping game to decide speaking order, then take turns voicing grievances.
+
+**User Flow**: Welcome → Waiting Room → Drum Room (5s tap competition) → Chat Room (turn-based voice chat)
+
+**Tech Stack**:
+
+- **Frontend**: WeChat Mini Program native framework (TypeScript, WXML, WXSS)
+- **Backend**: Node.js + Express + WebSocket (ws library)
 
 ## Development Commands
+
+### Frontend (root directory)
 
 ```bash
 npm install            # Install dependencies
 npm run prepare        # Initialize Husky git hooks
-
 npm run lint           # Check code with ESLint
 npm run lint:fix       # Auto-fix ESLint issues
 npm run format         # Format code with Prettier
-npm run format:check   # Check Prettier formatting
+```
+
+### Backend (backend/ directory)
+
+```bash
+cd backend
+npm install            # Install dependencies
+npm run dev            # Start dev server (ts-node, hot reload)
+npm run build          # Compile TypeScript to dist/
+npm start              # Run production build
+npm run ws:test        # Test WebSocket connection
+npm run lint           # Check code with ESLint
 ```
 
 ## Development Environment
 
-- **Tool**: WeChat DevTools (微信开发者工具) - required to run/preview
+- **Frontend Tool**: WeChat DevTools (微信开发者工具) - required to run/preview
+- **Backend**: `http://localhost:8080`, WebSocket at `ws://localhost:8080/ws`
 - **Node.js**: >= 14.0.0
-- **Entry Point**: `miniprogram/` directory
+- **Frontend Entry**: `miniprogram/` directory
+- **Backend Entry**: `backend/src/index.ts`
 
 ## Architecture
 
-### Directory Structure
+### Frontend Structure (miniprogram/)
 
 ```
 miniprogram/
 ├── app.ts              # App entry with App<IAppOption>()
-├── app.json            # Global config, page routes
-├── app.wxss            # Global styles
-├── pages/              # Each page = directory with .ts/.wxml/.wxss/.json
-├── components/         # Reusable components (same 4-file structure)
+├── pages/              # welcome/, waiting-room/, drum/, chat-room/
+├── components/         # styled-button/, styled-title/
 ├── services/           # Business logic, API calls
-├── models/             # Domain object interfaces (IUser, IRoom, IMessage)
+├── models/             # Domain interfaces (IUser, IRoom, IMessage)
 ├── types/              # API/WebSocket contract types
-├── constants/          # Centralized configuration (config.ts)
-├── utils/              # Pure utility functions
-└── assets/             # Static assets (images, etc.)
+├── constants/          # Centralized config
+└── utils/              # Pure utility functions
+```
+
+### Backend Structure (backend/src/)
+
+```
+backend/src/
+├── routes/             # HTTP route definitions
+├── controllers/        # Request/response handling
+├── services/           # Business logic (core/, websocket/, handlers/)
+├── models/             # entities/, dto/, interfaces/, enums/
+├── repositories/       # Data access layer (future DB support)
+├── middlewares/        # validation/, error/, logging/
+├── types/              # TypeScript type definitions
+└── utils/              # Helper functions
 ```
 
 ### Separation of Concerns
 
-- **Pages**: UI logic only - delegate business logic to services
+- **Pages/Controllers**: UI/request handling only - delegate to services
 - **Services**: Business rules, API communication, data processing
 - **Utils**: Pure functions, no side effects, easily testable
+- **Repositories**: Data access abstraction (backend)
 
-### Key Patterns
+### Key Frontend Patterns
 
 - **App**: `App<IAppOption>()` in `app.ts` with `globalData` for shared state
 - **Page**: `Page()` with lifecycle (onLoad, onShow, onReady, onHide, onUnload)
@@ -133,37 +166,27 @@ Husky + lint-staged auto-runs on commit:
 
 ## WebSocket Pattern
 
-For real-time two-player features, implement singleton WebSocketManager:
-
-```typescript
-class WebSocketManager {
-    private static instance: WebSocketManager;
-    private socketTask: WechatMiniprogram.SocketTask | null = null;
-
-    static getInstance(): WebSocketManager {
-        /* ... */
-    }
-    connect(url: string): Promise<void> {
-        /* ... */
-    }
-    send(type: string, data: unknown): void {
-        /* ... */
-    }
-    on(messageType: string, handler: MessageHandler): void {
-        /* ... */
-    }
-}
-```
-
-Key requirements:
+### Frontend (singleton WebSocketManager)
 
 - Heartbeat mechanism to keep connection alive
 - Automatic reconnection with max attempts
 - Register handlers in `onLoad`, unregister in `onUnload`
 - Use WSS (secure WebSocket) protocol
 
+### Backend Message Protocol
+
+- **Client → Server**: `JOIN_ROOM`, `CHAT_SEND`
+- **Server → Client**: `JOIN_ACK`, `CHAT_RECEIVE`, `ERROR`
+- Room states: `WAITING` (1 person) → `READY` (2 people) → `CLOSED`
+
+### Room Flow
+
+1. Creator calls `POST /room/create` → gets `roomCode`
+2. Both users connect via WebSocket, send `JOIN_ROOM` with `roomCode`
+3. When 2 users join, room becomes `READY`, chat enabled
+
 ## Type Definitions
 
-- **Custom types**: `typings/` directory
-- **WeChat API types**: `miniprogram-api-typings` package
-- **Namespace**: `WechatMiniprogram` for all WeChat types
+- **Frontend custom types**: `typings/` directory
+- **WeChat API types**: `miniprogram-api-typings` package, use `WechatMiniprogram` namespace
+- **Backend types**: `backend/src/types/` (http.ts, ws-messages.ts, common.ts)
