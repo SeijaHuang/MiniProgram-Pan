@@ -291,8 +291,8 @@ export class WebSocketController {
             type: EWSMessageType.DrumResult,
             data: {
                 roomId,
-                scoreA: result.organizerScore,
-                scoreB: result.joinerScore,
+                organizerScore: result.organizerScore,
+                joinerScore: result.joinerScore,
                 winnerRole: result.winnerRole,
             },
             timestamp: Date.now(),

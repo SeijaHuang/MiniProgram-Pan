@@ -78,8 +78,8 @@ export interface IDrumResultMessage extends IWSMessage<IDrumResultData> {
 
 export interface IDrumResultData {
     roomId: string;
-    scoreA: number;
-    scoreB: number;
+    organizerScore: number;
+    joinerScore: number;
     winnerRole: EPlayerRole;
 }
 

@@ -19,7 +19,7 @@
                     <text class="drum-score__avatar-emoji">👤</text>
                 </view>
                 <text class="drum-score__name">{{ organizerName }}</text>
-                <text class="drum-score__value">{{ scoreA }}</text>
+                <text class="drum-score__value">{{ organizerScore }}</text>
                 <view class="drum-score__progress">
                     <view class="drum-score__progress-bar drum-score__progress-bar--a"
                           style="width: {{ progressA }}%;"></view>
@@ -37,7 +37,7 @@
                     <text class="drum-score__avatar-emoji">👤</text>
                 </view>
                 <text class="drum-score__name">{{ joinerName }}</text>
-                <text class="drum-score__value">{{ scoreB }}</text>
+                <text class="drum-score__value">{{ joinerScore }}</text>
                 <view class="drum-score__progress">
                     <view class="drum-score__progress-bar drum-score__progress-bar--b"
                           style="width: {{ progressB }}%;"></view>
@@ -95,9 +95,9 @@
                 <text class="drum-result__title">{{ resultTitle }}</text>
                 <text class="drum-result__subtitle">{{ resultSubtitle }}</text>
                 <view class="drum-result__scores">
-                    <text class="drum-result__score">{{ organizerName }}: {{ scoreA }}</text>
+                    <text class="drum-result__score">{{ organizerName }}: {{ organizerScore }}</text>
                     <text class="drum-result__score-divider">-</text>
-                    <text class="drum-result__score">{{ joinerName }}: {{ scoreB }}</text>
+                    <text class="drum-result__score">{{ joinerName }}: {{ joinerScore }}</text>
                 </view>
             </view>
         </view>

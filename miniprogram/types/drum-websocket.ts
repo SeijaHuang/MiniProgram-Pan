@@ -110,8 +110,8 @@ export interface IDrumFinishMessage extends IDrumMessage<IDrumFinishData> {
  */
 export interface IDrumResultData {
     roomId: string;
-    scoreA: number;
-    scoreB: number;
+    organizerScore: number;
+    joinerScore: number;
     winnerRole: EPlayerRole;
 }
 

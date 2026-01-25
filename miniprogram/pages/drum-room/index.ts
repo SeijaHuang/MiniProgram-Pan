@@ -56,8 +56,8 @@ interface IDrumPageData {
     runningLeftSec: number;
 
     // Scores
-    scoreA: number;
-    scoreB: number;
+    organizerScore: number;
+    joinerScore: number;
     progressA: number;
     progressB: number;
 
@@ -98,6 +98,11 @@ interface PrivateState {
     _lastShakeTime: number;
 }
 
+/** Get score key by player role */
+function getScoreKey(role: EPlayerRole): 'organizerScore' | 'joinerScore' {
+    return role === EPlayerRole.Organizer ? 'organizerScore' : 'joinerScore';
+}
+
 /** Game timing constants */
 const PREPARE_DURATION_MS: number = 3000;
 const RUNNING_DURATION_MS: number = 5000;
@@ -118,8 +123,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         runningLeftMs: RUNNING_DURATION_MS,
         runningLeftSec: 5,
 
-        scoreA: 0,
-        scoreB: 0,
+        organizerScore: 0,
+        joinerScore: 0,
         progressA: 0,
         progressB: 0,
 
@@ -293,12 +298,12 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Calculate result locally (fallback or mock mode)
      */
     _calculateLocalResult(): void {
-        const { scoreA, scoreB, hostRole } = this.data;
+        const { organizerScore, joinerScore, hostRole } = this.data;
 
         let winnerRole: EPlayerRole;
-        if (scoreA > scoreB) {
+        if (organizerScore > joinerScore) {
             winnerRole = EPlayerRole.Organizer;
-        } else if (scoreB > scoreA) {
+        } else if (joinerScore > organizerScore) {
             winnerRole = EPlayerRole.Joiner;
         } else {
             // Tie: host wins
@@ -335,8 +340,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Navigate to chat room after delay
         this._resultTimer = setTimeout(() => {
-            const { roomId, scoreA, scoreB } = this.data;
-            const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&scoreA=${scoreA}&scoreB=${scoreB}`;
+            const { roomId, organizerScore, joinerScore } = this.data;
+            const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&organizerScore=${organizerScore}&joinerScore=${joinerScore}`;
             wx.redirectTo({
                 url,
                 fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
@@ -355,8 +360,9 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         }
 
         // Increment local score immediately
-        const scoreKey: 'scoreA' | 'scoreB' =
-            this.data.selfRole === EPlayerRole.Organizer ? 'scoreA' : 'scoreB';
+        const scoreKey: 'organizerScore' | 'joinerScore' = getScoreKey(
+            this.data.selfRole
+        );
         const newScore: number = this.data[scoreKey] + 1;
 
         this._updateScore(this.data.selfRole, newScore);
@@ -372,8 +378,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Update score and progress bar
      */
     _updateScore(role: EPlayerRole, score: number): void {
-        const scoreKey: 'scoreA' | 'scoreB' =
-            role === EPlayerRole.Organizer ? 'scoreA' : 'scoreB';
+        const scoreKey: 'organizerScore' | 'joinerScore' = getScoreKey(role);
 
         const updateData: Partial<IDrumPageData> = {
             [scoreKey]: score,
@@ -387,16 +392,16 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Update progress bars based on scores
      */
     _updateProgress(): void {
-        const { scoreA, scoreB } = this.data;
-        const maxScore: number = Math.max(scoreA, scoreB, 1);
+        const { organizerScore, joinerScore } = this.data;
+        const maxScore: number = Math.max(organizerScore, joinerScore, 1);
         const scaledMax: number = Math.max(maxScore, MAX_SCORE_FOR_PROGRESS);
 
         const progressA: number = Math.min(
-            Math.round((scoreA / scaledMax) * 100),
+            Math.round((organizerScore / scaledMax) * 100),
             100
         );
         const progressB: number = Math.min(
-            Math.round((scoreB / scaledMax) * 100),
+            Math.round((joinerScore / scaledMax) * 100),
             100
         );
 
@@ -521,8 +526,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             return;
         }
 
-        const scoreKey: 'scoreA' | 'scoreB' =
-            role === EPlayerRole.Organizer ? 'scoreA' : 'scoreB';
+        const scoreKey: 'organizerScore' | 'joinerScore' = getScoreKey(role);
         const newScore: number = this.data[scoreKey] + delta;
 
         this._updateScore(role, newScore);

@@ -267,9 +267,9 @@ INIT（页面加载）
 ### 7.4 判定逻辑
 
 ```typescript
-if (scoreA > scoreB) {
+if (organizerScore > joinerScore) {
     winner = A;
-} else if (scoreB > scoreA) {
+} else if (joinerScore > organizerScore) {
     winner = B;
 } else {
     winner = hostRole; // 平局时房主胜
@@ -421,8 +421,8 @@ enum EDrumMessageType {
     type: 'DRUM_RESULT',
     data: {
         roomId: string,
-        scoreA: number,
-        scoreB: number,
+        organizerScore: number,
+        joinerScore: number,
         winnerRole: 'A' | 'B',
     },
     timestamp: number,

@@ -575,8 +575,8 @@ DRUM_RESULT (服务器 → 客户端, 含最终结果)
   "type": "DRUM_RESULT",
   "data": {
     "roomId": "room_abc123...",
-    "scoreA": 42,
-    "scoreB": 38,
+    "organizerScore": 42,
+    "joinerScore": 38,
     "winnerRole": "Organizer"
   },
   "timestamp": 1234567903000
@@ -586,8 +586,8 @@ DRUM_RESULT (服务器 → 客户端, 含最终结果)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `roomId` | string | 房间ID |
-| `scoreA` | number | Organizer 得分 |
-| `scoreB` | number | Joiner 得分 |
+| `organizerScore` | number | Organizer 得分 |
+| `joinerScore` | number | Joiner 得分 |
 | `winnerRole` | string | 胜者角色 |
 
 **胜负判定规则：**
