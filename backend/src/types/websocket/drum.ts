@@ -41,8 +41,8 @@ export interface IDrumReadyData {
     roomId: string;
     serverTimeMs: number;
     hostRole: EPlayerRole;
-    playerAName: string;
-    playerBName: string;
+    organizerName: string;
+    joinerName: string;
 }
 
 /**

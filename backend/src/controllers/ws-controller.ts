@@ -223,8 +223,8 @@ export class WebSocketController {
                 roomId,
                 serverTimeMs: Date.now(),
                 hostRole: game.hostRole,
-                playerAName: game.organizer.nickname,
-                playerBName: game.joiner.nickname,
+                organizerName: game.organizer.nickname,
+                joinerName: game.joiner.nickname,
             },
             timestamp: Date.now(),
         });

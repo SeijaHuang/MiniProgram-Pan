@@ -1,6 +1,6 @@
 # 聊天室后端服务
 
-基于HTTP + WebSocket的双人聊天室系统，支持房间创建、加入和实时聊天。
+基于HTTP + WebSocket的双人聊天室系统，支持房间创建、加入、实时聊天和击鼓游戏。
 
 ## 技术栈
 
@@ -14,6 +14,8 @@
 - ✅ 严格的双人房间系统（最多2人）
 - ✅ HTTP用于房间创建，WebSocket用于实时通信
 - ✅ 房间状态机：WAITING → READY → CLOSED
+- ✅ 击鼓游戏：双人实时对战，服务器计时计分
+- ✅ 游戏状态机：WAITING → COUNTDOWN → RUNNING → FINISHED
 - ✅ 完整的错误处理和验证
 - ✅ TypeScript类型安全
 - ✅ 三层架构设计，职责分离
@@ -391,9 +393,206 @@ docker-compose ps
 - `ROOM_FULL` - 房间已满
 - `ROOM_CLOSED` - 房间已关闭
 - `NOT_PARTICIPANT` - 不是房间参与者
-- `ROOM_NOT_READY` - 房间未就绪（需要2人才能聊天）
+- `ROOM_NOT_READY` - 房间未就绪（需要2人才能聊天/游戏未运行）
 - `ALREADY_JOINED` - 已加入该房间
 - `INTERNAL_ERROR` - 服务器内部错误
+
+---
+
+### 击鼓游戏协议 (Drum Game)
+
+房间就绪（2人加入）后自动启动击鼓游戏。
+
+#### 游戏流程
+
+```
+房间 READY (2人)
+    ↓ 自动启动
+DRUM_READY (服务器 → 客户端)
+    ↓
+DRUM_START (服务器 → 客户端, 含开始时间)
+    ↓ 3秒倒计时
+游戏开始 (RUNNING)
+    ↓ 10秒游戏时间
+    ↓ DRUM_TAP 双向传输
+DRUM_FINISH (服务器 → 客户端)
+    ↓
+DRUM_RESULT (服务器 → 客户端, 含最终结果)
+```
+
+#### 游戏配置
+
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| `COUNTDOWN_MS` | 3000ms | 倒计时时长 |
+| `GAME_DURATION_MS` | 10000ms | 游戏时长 |
+
+#### 玩家角色 (EPlayerRole)
+
+| 角色 | 值 | 说明 |
+|------|-----|------|
+| Organizer | `"Organizer"` | 房间创建者（房主） |
+| Joiner | `"Joiner"` | 加入者 |
+
+#### 游戏阶段 (EGamePhase)
+
+| 阶段 | 值 | 说明 |
+|------|-----|------|
+| Waiting | `"WAITING"` | 等待玩家 |
+| Countdown | `"COUNTDOWN"` | 倒计时中 |
+| Running | `"RUNNING"` | 游戏进行中 |
+| Finished | `"FINISHED"` | 游戏结束 |
+
+---
+
+#### 4. DRUM_READY - 游戏就绪
+
+房间满员后服务器自动发送，通知双方游戏即将开始。
+
+**服务器 → 客户端：**
+```json
+{
+  "type": "DRUM_READY",
+  "data": {
+    "roomId": "room_abc123...",
+    "serverTimeMs": 1234567890000,
+    "hostRole": "Organizer",
+    "organizerName": "Alice",
+    "joinerName": "Bob"
+  },
+  "timestamp": 1234567890000
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `roomId` | string | 房间ID |
+| `serverTimeMs` | number | 服务器当前时间戳 |
+| `hostRole` | string | 房主角色（固定为 "Organizer"） |
+| `organizerName` | string | Organizer 昵称 |
+| `joinerName` | string | Joiner 昵称 |
+
+---
+
+#### 5. DRUM_START - 游戏开始信号
+
+通知客户端游戏开始的精确时间。
+
+**服务器 → 客户端：**
+```json
+{
+  "type": "DRUM_START",
+  "data": {
+    "roomId": "room_abc123...",
+    "startAtMs": 1234567893000
+  },
+  "timestamp": 1234567890000
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `roomId` | string | 房间ID |
+| `startAtMs` | number | 游戏开始的绝对时间戳（倒计时结束后） |
+
+---
+
+#### 6. DRUM_TAP - 点击事件
+
+玩家点击时发送，服务器转发给对手。
+
+**客户端 → 服务器：**
+```json
+{
+  "type": "DRUM_TAP",
+  "data": {
+    "roomId": "room_abc123...",
+    "role": "Organizer",
+    "delta": 5,
+    "clientTimeMs": 1234567895000
+  },
+  "timestamp": 1234567895000
+}
+```
+
+**服务器 → 对手（转发）：**
+```json
+{
+  "type": "DRUM_TAP",
+  "data": {
+    "roomId": "room_abc123...",
+    "role": "Organizer",
+    "delta": 5,
+    "clientTimeMs": 1234567895000
+  },
+  "timestamp": 1234567895000
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `roomId` | string | 房间ID |
+| `role` | string | 发送者角色 |
+| `delta` | number | 本次批量点击数（正整数） |
+| `clientTimeMs` | number | 客户端时间戳 |
+
+**注意：**
+- 点击消息只转发给对手，不回发给自己
+- 服务器累计计分，客户端可用于显示对手进度
+
+---
+
+#### 7. DRUM_FINISH - 游戏结束信号
+
+游戏时间到，通知双方停止点击。
+
+**服务器 → 客户端：**
+```json
+{
+  "type": "DRUM_FINISH",
+  "data": {
+    "roomId": "room_abc123...",
+    "endAtMs": 1234567903000
+  },
+  "timestamp": 1234567903000
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `roomId` | string | 房间ID |
+| `endAtMs` | number | 游戏结束的绝对时间戳 |
+
+---
+
+#### 8. DRUM_RESULT - 游戏结果
+
+最终结果，包含双方得分和胜者。
+
+**服务器 → 客户端：**
+```json
+{
+  "type": "DRUM_RESULT",
+  "data": {
+    "roomId": "room_abc123...",
+    "scoreA": 42,
+    "scoreB": 38,
+    "winnerRole": "Organizer"
+  },
+  "timestamp": 1234567903000
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `roomId` | string | 房间ID |
+| `scoreA` | number | Organizer 得分 |
+| `scoreB` | number | Joiner 得分 |
+| `winnerRole` | string | 胜者角色 |
+
+**胜负判定规则：**
+- 得分高者获胜
+- 平局时房主（Organizer）获胜
 
 ---
 
@@ -691,9 +890,25 @@ CREATE (HTTP)
      ↓
   WAITING (1人)
      ↓ 第二人JOIN
-  READY (2人) ← 可以聊天
+  READY (2人) ← 可以聊天，自动启动游戏
      ↓ 有人离开
   CLOSED (删除)
+```
+
+## 游戏状态机
+
+```
+房间 READY
+     ↓ 自动初始化
+  WAITING (游戏初始化)
+     ↓ 发送 DRUM_READY, DRUM_START
+  COUNTDOWN (3秒倒计时)
+     ↓ 倒计时结束
+  RUNNING (10秒游戏) ← 接收 DRUM_TAP
+     ↓ 游戏时间到
+  FINISHED ← 发送 DRUM_FINISH, DRUM_RESULT
+     ↓
+  清理游戏状态
 ```
 
 ---
@@ -803,11 +1018,13 @@ backend/
 │   │   │       ├── room.service.ts       # 房间业务逻辑
 │   │   │       └── room-crud.service.ts  # 房间 CRUD (未来)
 │   │   ├── websocket/               # WebSocket 专用服务
-│   │   │   ├── connection-manager.ts
-│   │   │   └── room-manager.ts
+│   │   │   ├── connection-manager.ts    # 连接管理
+│   │   │   ├── room-manager.ts          # 房间管理
+│   │   │   └── drum-game-manager.ts     # 击鼓游戏状态管理
 │   │   └── handlers/                # 业务逻辑处理器
 │   │       ├── join-room-handler.ts
-│   │       └── chat-send-handler.ts
+│   │       ├── chat-send-handler.ts
+│   │       └── drum-tap-handler.ts      # 击鼓点击处理
 │   │
 │   ├── repositories/                # 🟣 数据访问层 (预留)
 │   │   └── base/
@@ -818,6 +1035,9 @@ backend/
 │   │   │   ├── room.ts
 │   │   │   ├── user.ts
 │   │   │   └── message.ts
+│   │   ├── schemas/                 # Zod 验证模式
+│   │   │   ├── ws-message.schema.ts     # WebSocket 消息验证
+│   │   │   └── drum-message.schema.ts   # 击鼓消息验证
 │   │   ├── dto/                     # 数据传输对象
 │   │   │   ├── request/
 │   │   │   └── response/
@@ -836,11 +1056,17 @@ backend/
 │   │
 │   ├── types/                       # 类型定义
 │   │   ├── http.ts                  # HTTP 相关类型
-│   │   ├── ws-messages.ts           # WebSocket 消息类型
+│   │   ├── websocket/               # WebSocket 消息类型
+│   │   │   ├── base.ts              # 基础类型 (EWSMessageType, EPlayerRole)
+│   │   │   ├── join-room.ts         # 加入房间消息
+│   │   │   ├── chat.ts              # 聊天消息
+│   │   │   ├── error.ts             # 错误消息
+│   │   │   ├── drum.ts              # 击鼓游戏消息 (EGamePhase)
+│   │   │   └── index.ts             # 统一导出
 │   │   └── common.ts                # 通用类型
 │   │
 │   ├── constants/                   # 常量
-│   │   └── config.ts
+│   │   └── config.ts                # APP_CONFIG, WS_CONFIG, ROOM_CONFIG, DRUM_CONFIG
 │   │
 │   ├── utils/                       # 工具函数
 │   │   ├── validators/              # 验证函数
@@ -905,6 +1131,30 @@ WebSocketController
     ↓ 格式化 JOIN_ACK
     ↓ 广播给所有参与者
 所有客户端 ← JOIN_ACK
+    ↓ 如果房间 READY
+WebSocketController.startDrumGame
+    ↓ 初始化游戏状态
+DrumGameManager.initGame
+    ↓ 广播 DRUM_READY, DRUM_START
+    ↓ 定时器调度游戏流程
+```
+
+#### WebSocket 消息：击鼓点击
+
+```
+客户端消息 DRUM_TAP
+    ↓
+WebSocketController.handleMessage (controllers/ws-controller.ts)
+    ↓ 路由到 Handler
+handleDrumTap (services/handlers/drum-tap-handler.ts)
+    ↓ Zod 验证消息
+    ↓ 检查游戏状态 (必须是 RUNNING)
+DrumGameManager.recordTap
+    ↓ 累计分数
+    ↓ 返回结果
+WebSocketController
+    ↓ 转发给对手 (broadcastToRoomExcept)
+对手客户端 ← DRUM_TAP
 ```
 
 ### 关键特性
