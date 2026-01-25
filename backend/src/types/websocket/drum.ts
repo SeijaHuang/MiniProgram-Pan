@@ -16,6 +16,18 @@ import { EWSMessageType, EPlayerRole } from './base';
 // Re-export EPlayerRole for convenience
 export { EPlayerRole } from './base';
 
+// ==================== Game Phase ====================
+
+/**
+ * Drum Game Phase
+ */
+export enum EGamePhase {
+    Waiting = 'WAITING',
+    Countdown = 'COUNTDOWN',
+    Running = 'RUNNING',
+    Finished = 'FINISHED',
+}
+
 // ==================== Server → Client ====================
 
 /**

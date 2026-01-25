@@ -29,6 +29,16 @@ export enum EDrumMessageType {
 }
 
 /**
+ * Drum Game Phase
+ */
+export enum EGamePhase {
+    Waiting = 'WAITING',
+    Countdown = 'COUNTDOWN',
+    Running = 'RUNNING',
+    Finished = 'FINISHED',
+}
+
+/**
  * Base Drum Message
  */
 export interface IDrumMessage<T = object> {
