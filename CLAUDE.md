@@ -114,6 +114,7 @@ In WXML: `<view animation="{{ animationData }}"></view>`
 - **Interface prefix**: `I` (e.g., `IUser`, `IPageData`)
 - **Unused code**: Prefix intentionally unused params with `_`
 - **WeChat types**: Use `WechatMiniprogram` namespace
+- **Object parameters for 3+ arguments** - Functions with 3 or more parameters must use a single options object instead of positional arguments for readability
 
 ```typescript
 // ✅ Correct

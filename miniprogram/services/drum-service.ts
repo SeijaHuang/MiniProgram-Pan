@@ -40,6 +40,18 @@ type DrumStartHandler = (startAtMs: number) => void;
 /** Handler for DRUM_FINISH events */
 type DrumFinishHandler = () => void;
 
+/** Options for initializing drum service */
+interface IDrumServiceOptions {
+    roomId: string;
+    selfRole: EPlayerRole;
+    onReady: DrumReadyHandler;
+    onStart: DrumStartHandler;
+    onTap: DrumTapHandler;
+    onFinish: DrumFinishHandler;
+    onResult: DrumResultHandler;
+    onError: DrumErrorHandler;
+}
+
 /** Tap batching configuration */
 const TAP_THROTTLE_MS: number = 150;
 
@@ -60,24 +72,15 @@ class DrumService {
     /**
      * Initialize drum service with handlers
      */
-    initialize(
-        roomId: string,
-        selfRole: EPlayerRole,
-        onReady: DrumReadyHandler,
-        onStart: DrumStartHandler,
-        onTap: DrumTapHandler,
-        onFinish: DrumFinishHandler,
-        onResult: DrumResultHandler,
-        onError: DrumErrorHandler
-    ): void {
-        this.currentRoomId = roomId;
-        this.currentRole = selfRole;
-        this.readyHandler = onReady;
-        this.startHandler = onStart;
-        this.tapHandler = onTap;
-        this.finishHandler = onFinish;
-        this.resultHandler = onResult;
-        this.errorHandler = onError;
+    initialize(options: IDrumServiceOptions): void {
+        this.currentRoomId = options.roomId;
+        this.currentRole = options.selfRole;
+        this.readyHandler = options.onReady;
+        this.startHandler = options.onStart;
+        this.tapHandler = options.onTap;
+        this.finishHandler = options.onFinish;
+        this.resultHandler = options.onResult;
+        this.errorHandler = options.onError;
 
         wsManager.updateCallbacks({
             onMessage: (data: string) => {
@@ -85,7 +88,7 @@ class DrumService {
             },
         });
 
-        console.log('[DrumService] Initialized for room:', roomId);
+        console.log('[DrumService] Initialized for room:', options.roomId);
     }
 
     /**
