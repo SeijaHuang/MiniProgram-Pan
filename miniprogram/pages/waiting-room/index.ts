@@ -8,6 +8,7 @@ import type { IUser } from '../../models/user';
 import type { IRoom } from '../../models/room';
 import { ERoomStatus } from '../../models/room';
 import { EPlayerRole } from '../../types/websocket-common';
+import { DEFAULT_USER_NAME } from '../../constants/defaultValue';
 
 /**
  * 视图模式类型
@@ -168,7 +169,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      */
     initUser(): void {
         const userId = wx.getStorageSync('userId') || this.generateUserId();
-        const nickname = wx.getStorageSync('nickname') || '匿名用户';
+        const nickname = wx.getStorageSync('nickname') || DEFAULT_USER_NAME;
 
         if (!wx.getStorageSync('userId')) {
             wx.setStorageSync('userId', userId);

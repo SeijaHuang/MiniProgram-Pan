@@ -5,9 +5,11 @@
         <!-- Header Section -->
         <view class="drum-header">
             <text class="drum-header__title">震天鼓抢麦</text>
-            <view class="drum-header__timer" wx:if="{{ phase === 'RUNNING' }}">
+            <view class="drum-header__timer {{ isLastThreeSeconds ? 'drum-header__timer--urgent' : '' }}" wx:if="{{ phase === 'RUNNING' }}">
                 <text class="drum-header__timer-label">剩余时间</text>
-                <text class="drum-header__timer-value">{{ runningLeftSec }}秒</text>
+                <view class="drum-header__timer-value-wrapper" animation="{{ timerAnimationData }}">
+                    <text class="drum-header__timer-value {{ isLastThreeSeconds ? 'drum-header__timer-value--urgent' : '' }}">{{ runningLeftSec }}秒</text>
+                </view>
             </view>
         </view>
 

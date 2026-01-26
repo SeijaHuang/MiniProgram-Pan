@@ -219,14 +219,26 @@ export class WebSocketController {
         const game = drumGameManager.initGame(room);
 
         // Broadcast DRUM_READY with player info
+        // 使用角色默认名称，当用户没有设置昵称或使用默认昵称时
+        const organizerNickname = game.organizer.nickname;
+        const joinerNickname = game.joiner.nickname;
+        const organizerName =
+            organizerNickname && organizerNickname !== '匿名用户'
+                ? organizerNickname
+                : '小冤家';
+        const joinerName =
+            joinerNickname && joinerNickname !== '匿名用户'
+                ? joinerNickname
+                : '家冤小';
+
         connectionManager.broadcastToRoom(roomId, {
             type: EWSMessageType.DrumReady,
             data: {
                 roomId,
                 serverTimeMs: Date.now(),
                 hostRole: game.hostRole,
-                organizerName: game.organizer.nickname,
-                joinerName: game.joiner.nickname,
+                organizerName,
+                joinerName,
             },
             timestamp: Date.now(),
         });

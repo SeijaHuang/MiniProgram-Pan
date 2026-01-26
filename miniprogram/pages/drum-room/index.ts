@@ -25,6 +25,11 @@ import { vibrateShort, vibrateLong } from '../../utils/haptic';
 import { playDrumSound, destroyAudioPool } from '../../utils/audio';
 import { EPlayerRole } from '../../types/websocket-common';
 import { drumService } from '../../services/drum-service';
+import {
+    DEFAULT_HOST_NAME,
+    DEFAULT_USER_NAME,
+    DEFAULT_JOINER_NAME,
+} from '../../constants/defaultValue';
 
 /** Game phase states */
 type TGamePhase = 'INIT' | 'PREPARE_COUNTDOWN' | 'RUNNING' | 'RESULT';
@@ -67,6 +72,8 @@ interface IDrumPageData {
     // Animations
     drumAnimationData: WechatMiniprogram.AnimationExportResult | null;
     containerAnimationData: WechatMiniprogram.AnimationExportResult | null;
+    timerAnimationData: WechatMiniprogram.AnimationExportResult | null;
+    isLastThreeSeconds: boolean;
 
     // Fly texts
     flyTexts: IFlyText[];
@@ -132,6 +139,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         drumAnimationData: null,
         containerAnimationData: null,
+        timerAnimationData: null,
+        isLastThreeSeconds: false,
 
         flyTexts: [],
 
@@ -162,12 +171,23 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         const roomId: string = options.roomId || 'room-001';
         const selfRole: EPlayerRole = options.selfRole || EPlayerRole.Organizer;
         const hostRole: EPlayerRole = options.hostRole || EPlayerRole.Organizer;
-        const organizerName: string = decodeURIComponent(
-            options.organizerName || '小冤家'
+
+        // Decode first, then check if it's the default user name
+        const rawOrganizerName: string = decodeURIComponent(
+            options.organizerName || ''
         );
-        const joinerName: string = decodeURIComponent(
-            options.joinerName || '家冤小'
+        const organizerName: string =
+            rawOrganizerName && rawOrganizerName !== DEFAULT_USER_NAME
+                ? rawOrganizerName
+                : DEFAULT_HOST_NAME;
+
+        const rawJoinerName: string = decodeURIComponent(
+            options.joinerName || ''
         );
+        const joinerName: string =
+            rawJoinerName && rawJoinerName !== DEFAULT_USER_NAME
+                ? rawJoinerName
+                : DEFAULT_JOINER_NAME;
 
         this.setData({
             roomId,
@@ -271,18 +291,33 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             runningLeftMs: RUNNING_DURATION_MS,
         });
 
+        // Track previous second to detect changes
+        let prevSec: number = Math.ceil(RUNNING_DURATION_MS / 1000);
+
         // Update countdown every 100ms for smooth display
         this._runningTimer = setInterval(() => {
             const remaining: number = getTimeRemainingMs(this._endAtMs);
             if (remaining <= 0) {
                 this._endRunningPhase();
             } else {
+                const currentSec: number = Math.ceil(remaining / 1000);
+                const isLastThree: boolean = currentSec <= 3;
+
+                // Trigger animation when second changes in last 3 seconds
+                if (isLastThree && currentSec !== prevSec) {
+                    this._animateTimer();
+                    vibrateLong();
+                }
+
+                prevSec = currentSec;
+
                 this.setData({
                     runningLeftMs: remaining,
-                    runningLeftSec: Math.ceil(remaining / 1000),
+                    runningLeftSec: currentSec,
+                    isLastThreeSeconds: isLastThree,
                 });
             }
-        }, 500);
+        }, 100);
     },
 
     /**
@@ -419,6 +454,24 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Add fly text
         this._addFlyText();
+    },
+
+    /**
+     * Animate timer scale for last 3 seconds
+     */
+    _animateTimer(): void {
+        const animation: WechatMiniprogram.Animation = wx.createAnimation({
+            duration: 400,
+            timingFunction: 'ease-out',
+        });
+
+        // Scale up then back to normal
+        animation.scale(1.8, 1.8).step({ duration: 150 });
+        animation.scale(1.0, 1.0).step({ duration: 250 });
+
+        this.setData({
+            timerAnimationData: animation.export(),
+        });
     },
 
     /**
