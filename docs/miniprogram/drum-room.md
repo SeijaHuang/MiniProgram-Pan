@@ -386,16 +386,46 @@ Drum Room 使用以下服务层：
 
 ```typescript
 enum EDrumMessageType {
-    DrumReady = 'DRUM_READY', // Server -> Client: 房间就绪，同步时间
-    DrumStart = 'DRUM_START', // Server -> Client: 游戏开始信号
+    DrumReady = 'DRUM_READY', // Server -> Client: 房间就绪，同步时间和角色
+    DrumStart = 'DRUM_START', // Server -> Client: 游戏开始信号（含 startAtMs）
     DrumTap = 'DRUM_TAP', // 双向: 点击事件
     DrumFinish = 'DRUM_FINISH', // Server -> Client: 游戏结束信号
     DrumResult = 'DRUM_RESULT', // Server -> Client: 最终结果
-    PeerLeft = 'PEER_LEFT', // Server -> Client: 对手离开
 }
 ```
 
 ### 11.3 消息结构
+
+**DRUM_READY（房间就绪）**:
+
+```typescript
+// Server -> Client
+{
+    type: 'DRUM_READY',
+    data: {
+        roomId: string,
+        serverTimeMs: number,   // 服务器时间戳（用于时间同步）
+        hostRole: 'ORGANIZER' | 'JOINER',
+        organizerName: string,
+        joinerName: string,
+    },
+    timestamp: number,
+}
+```
+
+**DRUM_START（游戏开始）**:
+
+```typescript
+// Server -> Client
+{
+    type: 'DRUM_START',
+    data: {
+        roomId: string,
+        startAtMs: number,      // 游戏开始的绝对时间戳
+    },
+    timestamp: number,
+}
+```
 
 **DRUM_TAP（点击事件）**:
 
@@ -405,9 +435,23 @@ enum EDrumMessageType {
     type: 'DRUM_TAP',
     data: {
         roomId: string,
-        role: 'A' | 'B',
-        delta: number,         // 批量点击次数
+        role: 'ORGANIZER' | 'JOINER',
+        delta: number,          // 批量点击次数
         clientTimeMs: number,
+    },
+    timestamp: number,
+}
+```
+
+**DRUM_FINISH（游戏结束）**:
+
+```typescript
+// Server -> Client
+{
+    type: 'DRUM_FINISH',
+    data: {
+        roomId: string,
+        endAtMs: number,        // 游戏结束时间戳
     },
     timestamp: number,
 }
@@ -423,21 +467,7 @@ enum EDrumMessageType {
         roomId: string,
         organizerScore: number,
         joinerScore: number,
-        winnerRole: 'A' | 'B',
-    },
-    timestamp: number,
-}
-```
-
-**PEER_LEFT（对手离开）**:
-
-```typescript
-// Server -> Client
-{
-    type: 'PEER_LEFT',
-    data: {
-        roomId: string,
-        leftRole: 'A' | 'B',
+        winnerRole: 'ORGANIZER' | 'JOINER',
     },
     timestamp: number,
 }
@@ -445,34 +475,56 @@ enum EDrumMessageType {
 
 ### 11.4 服务层使用
 
-**初始化**:
+**提前监听（在 waiting-room 页面）**:
 
 ```typescript
-drumService.initialize(
-    roomId,
-    selfRole,
-    (role, delta) => {
-        /* 处理对手点击 */
+// 房间满员后、跳转前调用，开始队列消息
+drumService.startListening();
+```
+
+**初始化（在 drum-room 页面）**:
+
+```typescript
+drumService.initialize({
+    roomId: string,
+    selfRole: EPlayerRole,
+    onReady: (
+        serverTimeMs,
+        hostRole,
+        organizerName,
+        joinerName,
+        receivedAtMs
+    ) => {
+        // 处理 DRUM_READY：同步服务器时间
+        setServerTimeOffset(serverTimeMs, receivedAtMs);
     },
-    winnerRole => {
-        /* 处理游戏结果 */
+    onStart: startAtMs => {
+        // 处理 DRUM_START：计算游戏开始/结束时间
+        this._startAtMs = startAtMs;
+        this._endAtMs = startAtMs + RUNNING_DURATION_MS;
     },
-    leftRole => {
-        /* 处理对手离开 */
+    onTap: (role, delta) => {
+        // 处理对手点击：更新对手分数
     },
-    message => {
-        /* 处理错误 */
-    }
-);
+    onFinish: () => {
+        // 处理 DRUM_FINISH：停止游戏
+    },
+    onResult: winnerRole => {
+        // 处理 DRUM_RESULT：显示结果
+    },
+    onError: message => {
+        // 处理错误
+    },
+});
 ```
 
 **发送点击**:
 
 ```typescript
-// 点击时调用（自动批量发送）
+// 点击时调用（自动批量发送，节流 150ms）
 drumService.queueTap();
 
-// 强制发送（倒计时结束时）
+// 强制发送（游戏结束时）
 drumService.flushPendingTaps();
 ```
 
@@ -483,17 +535,54 @@ drumService.flushPendingTaps();
 drumService.cleanup();
 ```
 
-### 11.5 生命周期管理
+### 11.5 消息队列机制
 
-- **onLoad**:
-    - 初始化音效池（预留）
+DrumService 实现了消息队列机制，解决页面跳转期间消息丢失问题：
+
+1. **提前监听**：在 waiting-room 页面调用 `drumService.startListening()`
+2. **消息入队**：`DRUM_READY` 和 `DRUM_START` 消息在 handlers 未就绪时入队
+3. **记录接收时间**：每条入队消息记录 `receivedAtMs`，用于精确时间同步
+4. **延迟处理**：在 drum-room 页面 `initialize()` 后处理队列消息
+
+```typescript
+// 消息队列结构
+private messageQueue: Array<{
+    message: TDrumMessage;
+    receivedAtMs: number;  // 原始接收时间，避免队列延迟影响时间同步
+}> = [];
+```
+
+### 11.6 时间同步机制
+
+使用 `miniprogram/utils/time.ts` 实现客户端与服务器时间同步：
+
+```typescript
+// 设置时间偏移（收到 DRUM_READY 时）
+setServerTimeOffset(serverTimeMs, receivedAtMs);
+// serverTimeOffsetMs = serverTimeMs - clientTimeMs
+
+// 获取服务器时间
+nowServerMs(); // Date.now() + serverTimeOffsetMs
+
+// 计算剩余时间
+getTimeRemainingMs(targetMs); // targetMs - nowServerMs()
+```
+
+**关键点**：使用消息的原始接收时间 `receivedAtMs` 而非处理时间，避免队列延迟影响偏移计算。
+
+### 11.7 生命周期管理
+
+- **waiting-room handleRoomJoined**:
+    - 房间满员后调用 `drumService.startListening()` 提前监听
+    - 启动前端倒计时，倒计时结束后跳转至 drum-room
+- **drum-room onLoad**:
     - 解析页面参数（roomId, selfRole, hostRole, playerNames）
-    - 通过 `wsManager.updateCallbacks` 注册 WebSocket 消息回调
-    - 启动游戏流程（`_startGame()`）
-- **onUnload**:
+    - 调用 `drumService.initialize(options)` 设置回调并处理队列消息
+    - 等待 DRUM_READY/DRUM_START 消息触发游戏流程
+- **drum-room onUnload**:
     - 清理所有定时器（`_clearAllTimers()`）
     - 销毁音效池（`destroyAudioPool()`）
-    - 清除 WebSocket 消息回调（`wsManager.updateCallbacks({ onMessage: undefined })`）
+    - 清理服务（`drumService.cleanup()`）
 
 ---
 
@@ -600,12 +689,12 @@ drumService.cleanup();
 
 ## 16. 实现状态
 
-### 当前状态（2026-01-24）
+### 当前状态（2026-01-26）
 
 - ✅ **已完成** - 基础布局和倒计时
     - 页面整体结构（标题、倒计时、进度条、震天鼓按钮）
     - 3秒准备倒计时（使用 countdown 组件）
-    - 10秒抢麦倒计时（实时更新，每 100ms 刷新）
+    - 10秒抢麦倒计时（实时更新，每 500ms 刷新）
 - ✅ **已完成** - 震天鼓按钮和点击反馈
     - 按钮缩放动画（`wx.createAnimation`）
     - 容器抖动动画（节流 50ms）
@@ -617,15 +706,22 @@ drumService.cleanup();
     - 进度条平滑更新（基于分数比例）
     - 批量发送点击（节流 150ms）
 - ✅ **已完成** - 结果展示和跳转
-    - 胜负判定逻辑（分数比较，平局房主胜）
+    - 胜负判定逻辑（服务端计算，分数比较，平局房主胜）
     - 结果遮罩层（胜者/败者文案）
-    - 2秒后自动跳转至 Chat Room（`wx.redirectTo`）
-- ⏳ **待对接** - WebSocket 后端集成
-    - 前端已实现消息发送和接收逻辑
-    - 后端 drum 消息类型处理待实现
+    - 2秒后自动跳转至 Chat Room
+- ✅ **已完成** - WebSocket 后端集成
+    - DrumService 完整实现消息发送和接收
+    - 消息队列机制处理页面跳转期间的消息
+    - 后端 DrumGameManager 管理游戏状态
+    - 完整消息流程：DRUM_READY → DRUM_START → DRUM_TAP → DRUM_FINISH → DRUM_RESULT
+- ✅ **已完成** - 时间同步机制
+    - 服务器时间偏移计算（`setServerTimeOffset`）
+    - 基于服务器时间的倒计时（`nowServerMs`、`getTimeRemainingMs`）
+    - 消息队列记录原始接收时间避免延迟影响
 - ⏳ **待完善** - 异常处理和优化
-    - 对手掉线处理（已有 PEER_LEFT 监听）
+    - 对手掉线处理
     - 网络延迟兜底策略
+    - 前端与后端倒计时同步优化
 
 ### 后续规划
 
@@ -633,7 +729,7 @@ drumService.cleanup();
 2. ✅ **第二阶段**: 震天鼓按钮和点击反馈
 3. ✅ **第三阶段**: 分数同步和进度条
 4. ✅ **第四阶段**: 结果展示和跳转
-5. ⏳ **第五阶段**: WebSocket 后端对接（后端需实现 drum 消息类型处理）
+5. ✅ **第五阶段**: WebSocket 后端对接
 6. ⏳ **第六阶段**: 异常处理和优化
 
 ---

@@ -631,7 +631,7 @@ WebSocket CHAT_SEND
 ### 鼓游戏流程
 
 ```
-房间 READY 状态
+房间 READY 状态（2人加入）
          │
          ▼
    DrumGameManager.initGame()
@@ -644,16 +644,19 @@ WebSocket CHAT_SEND
    └─────┬─────┘
          │
          ▼
-   广播 DRUM_START
+   广播 DRUM_READY（含 serverTimeMs）
          │
          ▼
-   phase = COUNTDOWN (3秒)
+   phase = COUNTDOWN
+   计算 startAtMs = now + 3000
+   计算 endAtMs = startAtMs + 10000
          │
          ▼
-   广播 DRUM_COUNTDOWN
+   广播 DRUM_START（含 startAtMs）
          │
          ▼
-   phase = RUNNING (10秒)
+   setTimeout(3秒后)
+   phase = RUNNING
          │
    ┌─────┴─────┐
    │ 玩家点击鼓 │
@@ -679,10 +682,13 @@ WebSocket CHAT_SEND
    └─────┬─────┘
          │
          ▼
-   广播 DRUM_TAP_ACK
+   广播 DRUM_TAP（转发给对手）
          │
          ▼
-   [10秒后] 游戏结束
+   setTimeout(13秒后) 游戏结束
+         │
+         ▼
+   广播 DRUM_FINISH（含 endAtMs）
          │
          ▼
    DrumGameManager.calculateResult()

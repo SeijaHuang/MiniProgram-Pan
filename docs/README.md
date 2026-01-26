@@ -259,9 +259,8 @@ docs/
 
 ## 相关资源
 
-- 项目主 README: `../README.md`
-- 开发规范: `../CLAUDE.md`
-- 项目配置: `../tsconfig.json`
-- 后端 README: `../backend/README.md`
-- 后端架构可视化: `../backend/ARCHITECTURE-VISUAL.md`
-- 后端架构指南: `../backend/ARCHITECTURE-GUIDE.md`
+- [项目主 README](../README.md) - 项目概述和快速开始
+- [前端 README](../miniprogram/README.md) - 小程序前端详细说明
+- [后端 README](../backend/README.md) - 后端服务详细说明
+- [开发规范](../CLAUDE.md) - Claude Code 开发指南
+- [项目配置](../tsconfig.json) - TypeScript 配置

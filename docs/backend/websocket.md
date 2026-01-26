@@ -377,7 +377,7 @@ interface IWSMessage<T> {
 
 ### DRUM_START
 
-鼓游戏开始信号（倒计时结束后发送）。
+鼓游戏开始信号（紧随 DRUM_READY 发送）。
 
 **响应**
 
@@ -386,7 +386,7 @@ interface IWSMessage<T> {
     type: "DRUM_START";
     data: {
         roomId: string;
-        startAtMs: number;  // 游戏开始的绝对时间戳（倒计时结束后）
+        startAtMs: number;  // 游戏开始的绝对时间戳（= 发送时间 + 3秒倒计时）
     };
     timestamp: number;
 }
@@ -401,14 +401,16 @@ interface IWSMessage<T> {
         "roomId": "room_a1b2c3d4e5f6",
         "startAtMs": 1706184003000
     },
-    "timestamp": 1706184003000
+    "timestamp": 1706184000000
 }
 ```
 
 **说明**
 
-- 在 `DRUM_READY` 发送后约 3 秒发送（倒计时结束）
-- 客户端应在此时刻开始游戏计时（10 秒）
+- 紧随 `DRUM_READY` 立即发送（同一时刻）
+- `startAtMs` = 当前时间 + 3000ms（倒计时时长）
+- 客户端根据 `startAtMs` 计算倒计时和游戏结束时间
+- 游戏持续 10 秒（`endAtMs` = `startAtMs` + 10000ms）
 
 ---
 

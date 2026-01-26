@@ -92,21 +92,50 @@
 
 **职责**:
 
-- 批量发送鼓点点击（节流）
+- 批量发送鼓点点击（节流 150ms）
 - 解析并分发鼓点消息与对抗结果
-- 处理对手离开事件
+- 消息队列机制处理页面跳转期间的消息
+- 时间同步支持（传递原始接收时间）
 
 **核心方法**:
 
-- `initialize(roomId, selfRole, onTap, onResult, onPeerLeft, onError)`
+- `startListening()`: 提前监听消息（在 waiting-room 调用）
+- `initialize(options: IDrumServiceOptions)`: 设置回调并处理队列
 - `queueTap()`: 点击入队（节流批量发送）
 - `flushPendingTaps()`: 立即发送积压点击
 - `cleanup()`: 清理计时器与回调
 
+**初始化选项** (`IDrumServiceOptions`):
+
+```typescript
+interface IDrumServiceOptions {
+    roomId: string;
+    selfRole: EPlayerRole;
+    onReady: (
+        serverTimeMs,
+        hostRole,
+        organizerName,
+        joinerName,
+        receivedAtMs
+    ) => void;
+    onStart: (startAtMs) => void;
+    onTap: (role, delta) => void;
+    onFinish: () => void;
+    onResult: (winnerRole) => void;
+    onError: (message) => void;
+}
+```
+
 **消息类型**:
 
 - 发送: `DRUM_TAP`
-- 接收: `DRUM_TAP / DRUM_RESULT / PEER_LEFT`
+- 接收: `DRUM_READY / DRUM_START / DRUM_TAP / DRUM_FINISH / DRUM_RESULT`
+
+**消息队列机制**:
+
+当 handlers 未就绪时（页面跳转期间），`DRUM_READY` 和 `DRUM_START` 消息会被队列，
+并记录原始接收时间 `receivedAtMs`。`initialize()` 调用后会处理队列消息，
+使用原始接收时间进行时间同步，避免队列延迟影响偏移计算。
 
 ## 使用约定与注意事项
 
