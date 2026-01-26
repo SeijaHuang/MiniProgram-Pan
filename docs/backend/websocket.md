@@ -32,6 +32,7 @@ interface IWSMessage<T> {
 |------|------|
 | `JOIN_ROOM` | 加入房间 |
 | `CHAT_SEND` | 发送聊天消息 |
+| `DRUM_TAP` | 鼓点击事件 |
 
 ### 服务器 → 客户端
 
@@ -39,6 +40,11 @@ interface IWSMessage<T> {
 |------|------|
 | `JOIN_ACK` | 加入房间确认 |
 | `CHAT_RECEIVE` | 接收聊天消息 |
+| `DRUM_READY` | 鼓游戏就绪，同步时间和角色 |
+| `DRUM_START` | 鼓游戏开始信号 |
+| `DRUM_TAP` | 对手鼓点击事件（广播） |
+| `DRUM_FINISH` | 鼓游戏结束信号 |
+| `DRUM_RESULT` | 鼓游戏结果 |
 | `ERROR` | 错误消息 |
 
 ---
@@ -150,6 +156,60 @@ interface IWSMessage<T> {
 **响应**
 
 - 成功: 广播 `CHAT_RECEIVE` 给所有参与者
+- 失败: 发送 `ERROR` 给请求者
+
+---
+
+### DRUM_TAP
+
+发送鼓点击事件。
+
+**请求**
+
+```typescript
+{
+    type: "DRUM_TAP";
+    data: {
+        roomId: string;
+        role: "ORGANIZER" | "JOINER";
+        delta: number;         // 本次批量点击数量
+        clientTimeMs: number;  // 客户端时间戳
+    };
+    timestamp: number;
+}
+```
+
+**示例**
+
+```json
+{
+    "type": "DRUM_TAP",
+    "data": {
+        "roomId": "room_a1b2c3d4e5f6",
+        "role": "ORGANIZER",
+        "delta": 5,
+        "clientTimeMs": 1706184001234
+    },
+    "timestamp": 1706184001234
+}
+```
+
+**验证规则**
+
+- `roomId`: 必填，非空字符串
+- `role`: 必填，必须为 `"ORGANIZER"` 或 `"JOINER"`
+- `delta`: 必填，必须为正整数
+- `clientTimeMs`: 必填，时间戳
+
+**业务验证**
+
+- 游戏必须存在
+- 游戏必须处于 `RUNNING` 阶段
+- 只有 `RUNNING` 阶段的点击才会被记录
+
+**响应**
+
+- 成功: 广播 `DRUM_TAP` 给房间内所有参与者（包括发送者）
 - 失败: 发送 `ERROR` 给请求者
 
 ---
@@ -277,6 +337,185 @@ interface IWSMessage<T> {
 
 ---
 
+### DRUM_READY
+
+鼓游戏就绪，同步服务器时间和角色信息。
+
+**响应**
+
+```typescript
+{
+    type: "DRUM_READY";
+    data: {
+        roomId: string;
+        serverTimeMs: number;          // 服务器时间戳（用于客户端时间同步）
+        hostRole: "ORGANIZER" | "JOINER"; // 房主角色（永远是 ORGANIZER）
+        organizerName: string;         // 组织者昵称
+        joinerName: string;            // 加入者昵称
+    };
+    timestamp: number;
+}
+```
+
+**示例**
+
+```json
+{
+    "type": "DRUM_READY",
+    "data": {
+        "roomId": "room_a1b2c3d4e5f6",
+        "serverTimeMs": 1706184000000,
+        "hostRole": "ORGANIZER",
+        "organizerName": "张三",
+        "joinerName": "李四"
+    },
+    "timestamp": 1706184000000
+}
+```
+
+---
+
+### DRUM_START
+
+鼓游戏开始信号（倒计时结束后发送）。
+
+**响应**
+
+```typescript
+{
+    type: "DRUM_START";
+    data: {
+        roomId: string;
+        startAtMs: number;  // 游戏开始的绝对时间戳（倒计时结束后）
+    };
+    timestamp: number;
+}
+```
+
+**示例**
+
+```json
+{
+    "type": "DRUM_START",
+    "data": {
+        "roomId": "room_a1b2c3d4e5f6",
+        "startAtMs": 1706184003000
+    },
+    "timestamp": 1706184003000
+}
+```
+
+**说明**
+
+- 在 `DRUM_READY` 发送后约 3 秒发送（倒计时结束）
+- 客户端应在此时刻开始游戏计时（5 秒）
+
+---
+
+### DRUM_TAP (Server → Client)
+
+对手的鼓点击事件（广播），与客户端发送的格式相同。
+
+**响应**
+
+```typescript
+{
+    type: "DRUM_TAP";
+    data: {
+        roomId: string;
+        role: "ORGANIZER" | "JOINER";
+        delta: number;
+        clientTimeMs: number;
+    };
+    timestamp: number;
+}
+```
+
+**说明**
+
+- 服务器会将玩家的点击事件广播给房间内所有参与者（包括发送者本身）
+- 客户端可以根据 `role` 判断是否为对手的点击
+
+---
+
+### DRUM_FINISH
+
+鼓游戏结束信号（5 秒游戏时间结束）。
+
+**响应**
+
+```typescript
+{
+    type: "DRUM_FINISH";
+    data: {
+        roomId: string;
+        endAtMs: number;  // 游戏结束时间戳
+    };
+    timestamp: number;
+}
+```
+
+**示例**
+
+```json
+{
+    "type": "DRUM_FINISH",
+    "data": {
+        "roomId": "room_a1b2c3d4e5f6",
+        "endAtMs": 1706184008000
+    },
+    "timestamp": 1706184008000
+}
+```
+
+**说明**
+
+- 在游戏开始后 5 秒发送
+- 客户端应停止接收点击输入
+
+---
+
+### DRUM_RESULT
+
+鼓游戏最终结果。
+
+**响应**
+
+```typescript
+{
+    type: "DRUM_RESULT";
+    data: {
+        roomId: string;
+        organizerScore: number;        // 组织者最终分数
+        joinerScore: number;           // 加入者最终分数
+        winnerRole: "ORGANIZER" | "JOINER"; // 获胜者角色
+    };
+    timestamp: number;
+}
+```
+
+**示例**
+
+```json
+{
+    "type": "DRUM_RESULT",
+    "data": {
+        "roomId": "room_a1b2c3d4e5f6",
+        "organizerScore": 42,
+        "joinerScore": 38,
+        "winnerRole": "ORGANIZER"
+    },
+    "timestamp": 1706184008500
+}
+```
+
+**胜负判定规则**
+
+1. 分数高者获胜
+2. 分数相等时，房主（Organizer）获胜
+
+---
+
 ### ERROR
 
 错误消息，发送给请求者。
@@ -360,7 +599,48 @@ interface IWSMessage<T> {
 客户端 ◀── CHAT_RECEIVE ── 广播给所有参与者
 ```
 
-### 4. 断开连接
+### 4. 鼓游戏流程
+
+```
+房间 READY 状态
+      │
+      ▼
+初始化游戏（DrumGameManager）
+      │
+      ▼
+客户端 ◀──── DRUM_READY ──── 服务器
+                                │
+                         同步时间和角色
+                         phase = COUNTDOWN
+                         等待 3 秒
+                                │
+客户端 ◀──── DRUM_START ──── 服务器
+                                │
+                         phase = RUNNING
+                         游戏开始，持续 5 秒
+                                │
+客户端 ──── DRUM_TAP ────▶ 服务器
+                                │
+                         验证游戏状态
+                         记录分数
+                                │
+客户端 ◀──── DRUM_TAP ──── 广播给所有参与者
+                                │
+                         [持续点击...]
+                                │
+                         [5 秒后]
+                                │
+客户端 ◀──── DRUM_FINISH ──── 服务器
+                                │
+                         phase = FINISHED
+                         计算结果
+                                │
+客户端 ◀──── DRUM_RESULT ──── 服务器
+                                │
+                         清理游戏状态
+```
+
+### 5. 断开连接
 
 ```
 客户端 ──── 断开连接 ────▶ 服务器
@@ -506,6 +786,9 @@ socketTask.onClose(() => {
 
 1. **消息顺序**: WebSocket 保证消息按发送顺序到达
 2. **连接唯一性**: 每个 WebSocket 连接有唯一的 `connectionId`
-3. **房间绑定**: 用户必须先发送 `JOIN_ROOM` 才能发送 `CHAT_SEND`
-4. **广播机制**: `JOIN_ACK` 和 `CHAT_RECEIVE` 会广播给房间内所有参与者
+3. **房间绑定**: 用户必须先发送 `JOIN_ROOM` 才能发送 `CHAT_SEND` 或 `DRUM_TAP`
+4. **广播机制**: `JOIN_ACK`、`CHAT_RECEIVE` 和鼓游戏相关消息会广播给房间内所有参与者
 5. **断线处理**: 当前版本不支持自动重连，断线后需重新加入房间
+6. **鼓游戏阶段**: 只有游戏处于 `RUNNING` 阶段时，`DRUM_TAP` 点击才会被记录
+7. **角色固定**: 房主永远是 `ORGANIZER`，加入者永远是 `JOINER`，角色不会改变
+8. **时间同步**: 客户端应使用 `DRUM_READY` 中的 `serverTimeMs` 进行时间同步，确保游戏计时准确

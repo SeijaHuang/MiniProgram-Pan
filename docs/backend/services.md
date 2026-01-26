@@ -12,10 +12,12 @@ services/
 │       └── room-crud.service.ts # 房间 CRUD 操作
 ├── handlers/                # 业务逻辑处理器
 │   ├── join-room-handler.ts     # 加入房间处理
-│   └── chat-send-handler.ts     # 发送消息处理
+│   ├── chat-send-handler.ts     # 发送消息处理
+│   └── drum-tap-handler.ts      # 鼓点击处理
 └── websocket/               # WebSocket 服务
     ├── room-manager.ts          # 房间管理器
-    └── connection-manager.ts    # 连接管理器
+    ├── connection-manager.ts    # 连接管理器
+    └── drum-game-manager.ts     # 鼓游戏管理器
 ```
 
 ---
@@ -184,6 +186,73 @@ function handleChatSend(
 
 ---
 
+### DrumTapHandler
+
+处理鼓点击的业务逻辑。
+
+**文件**: `backend/src/services/handlers/drum-tap-handler.ts`
+
+**职责**:
+
+- 验证点击请求
+- 检查游戏状态
+- 记录分数
+- 返回操作结果
+
+**处理流程**:
+
+```
+接收 DRUM_TAP 请求
+       │
+       ▼
+验证 payload 格式 (roomId, role, delta)
+       │
+       ▼
+检查游戏是否存在
+       │
+       ▼
+检查游戏是否处于 RUNNING 状态
+       │
+       ▼
+调用 DrumGameManager.recordTap()
+       │
+       ▼
+累加对应玩家分数
+       │
+       ▼
+返回结果
+```
+
+**接口**:
+
+```typescript
+interface IDrumTapResult {
+    success: true;
+    roomId: string;
+    role: EPlayerRole;
+    delta: number;
+}
+
+interface IDrumTapError {
+    success: false;
+    code: EWSErrorCode;
+    message: string;
+}
+
+type TDrumTapHandlerResult = IDrumTapResult | IDrumTapError;
+
+function handleDrumTap(message: IDrumTapMessage): TDrumTapHandlerResult;
+```
+
+**验证逻辑**:
+
+- 使用 Zod Schema 验证 payload 格式
+- 游戏不存在返回 `RoomNotFound`
+- 游戏未运行返回 `RoomNotReady`
+- 只有 `RUNNING` 阶段的点击会被记录
+
+---
+
 ## WebSocket 服务
 
 ### RoomManager
@@ -332,6 +401,150 @@ roomConnections: Map<string, Set<string>>; // roomId -> Set<connectionId>
 
 ---
 
+### DrumGameManager
+
+鼓游戏管理器，单例模式，管理所有鼓游戏的状态。
+
+**文件**: `backend/src/services/websocket/drum-game-manager.ts`
+
+**职责**:
+
+- 游戏初始化与角色分配
+- 游戏状态机管理
+- 分数累计与记录
+- 胜负判定
+- 游戏清理
+
+**单例获取**:
+
+```typescript
+const drumGameManager = DrumGameManager.getInstance();
+```
+
+**方法**:
+
+```typescript
+class DrumGameManager {
+    // 获取单例实例
+    static getInstance(): DrumGameManager;
+
+    // 初始化游戏
+    initGame(room: IRoom): IDrumGameState;
+
+    // 获取游戏状态
+    getGame(roomId: string): IDrumGameState | undefined;
+
+    // 设置游戏阶段
+    setPhase(roomId: string, phase: EGamePhase): IDrumGameState | undefined;
+
+    // 设置游戏计时
+    setTiming(
+        roomId: string,
+        startAtMs: number,
+        endAtMs: number
+    ): IDrumGameState | undefined;
+
+    // 记录点击并累加分数
+    recordTap(
+        roomId: string,
+        role: EPlayerRole,
+        delta: number
+    ): IDrumGameState | undefined;
+
+    // 计算游戏结果
+    calculateResult(roomId: string): IDrumGameResult | undefined;
+
+    // 清理游戏
+    cleanupGame(roomId: string): void;
+
+    // 获取所有游戏（调试用）
+    getAllGames(): IDrumGameState[];
+}
+```
+
+**游戏状态**:
+
+```typescript
+interface IDrumGameState {
+    roomId: string;
+    phase: EGamePhase; // WAITING, COUNTDOWN, RUNNING, FINISHED
+    hostRole: EPlayerRole; // 房主角色（总是 Organizer）
+    organizer: IUser; // 组织者（房主）
+    joiner: IUser; // 加入者
+    organizerScore: number; // 组织者分数
+    joinerScore: number; // 加入者分数
+    startAtMs: number; // 游戏开始时间戳
+    endAtMs: number; // 游戏结束时间戳
+}
+```
+
+**游戏结果**:
+
+```typescript
+interface IDrumGameResult {
+    organizerScore: number;
+    joinerScore: number;
+    winnerRole: EPlayerRole;
+}
+```
+
+**游戏状态机**:
+
+```
+┌─────────────────────────────────────────────┐
+│                  WAITING                     │
+│             (等待开始)                        │
+│                                             │
+│  游戏初始化时的默认状态                        │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────┐
+│                 COUNTDOWN                    │
+│             (倒计时阶段)                      │
+│                                             │
+│  准备开始，3秒倒计时                          │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────┐
+│                  RUNNING                     │
+│             (游戏进行中)                      │
+│                                             │
+│  玩家可以点击鼓，累计分数                      │
+│  持续 5 秒                                   │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────┐
+│                 FINISHED                     │
+│             (游戏结束)                        │
+│                                             │
+│  计算胜负，分数高者获胜                        │
+│  平局时房主（Organizer）获胜                  │
+└─────────────────────────────────────────────┘
+```
+
+**角色分配规则**:
+
+- **房主（Host）**: 永远是 `Organizer` 角色
+- **加入者（Joiner）**: 永远是 `Joiner` 角色
+- 角色在游戏初始化时确定，不会改变
+
+**胜负判定**:
+
+1. 分数高者获胜
+2. 分数相等时，房主（Organizer）获胜
+3. 游戏结束时自动设置阶段为 `FINISHED`
+
+**关键逻辑**:
+
+- **点击记录**: 只有 `RUNNING` 阶段的点击才会被记录
+- **分数累加**: 每次点击传入 `delta`，累加到对应玩家的分数
+- **游戏清理**: 游戏结束后应调用 `cleanupGame()` 释放内存
+
+---
+
 ## 服务交互流程
 
 ### 创建房间流程
@@ -413,6 +626,129 @@ WebSocket CHAT_SEND
          │
          ▼
    所有参与者收到 CHAT_RECEIVE
+```
+
+### 鼓游戏流程
+
+```
+房间 READY 状态
+         │
+         ▼
+   DrumGameManager.initGame()
+         │
+   ┌─────┴─────┐
+   │ 确定角色分配 │
+   │ Host → Organizer │
+   │ Joiner → Joiner │
+   │ phase = WAITING │
+   └─────┬─────┘
+         │
+         ▼
+   广播 DRUM_START
+         │
+         ▼
+   phase = COUNTDOWN (3秒)
+         │
+         ▼
+   广播 DRUM_COUNTDOWN
+         │
+         ▼
+   phase = RUNNING (5秒)
+         │
+   ┌─────┴─────┐
+   │ 玩家点击鼓 │
+   │ WebSocket DRUM_TAP │
+   └─────┬─────┘
+         │
+         ▼
+   handleDrumTap()
+         │
+   ┌─────┴─────┐
+   │ 验证请求格式 │
+   │ 检查游戏存在 │
+   │ 检查是否 RUNNING │
+   └─────┬─────┘
+         │
+         ▼
+   DrumGameManager.recordTap()
+         │
+   ┌─────┴─────┐
+   │ 累加分数   │
+   │ Organizer: +delta │
+   │ Joiner: +delta │
+   └─────┬─────┘
+         │
+         ▼
+   广播 DRUM_TAP_ACK
+         │
+         ▼
+   [5秒后] 游戏结束
+         │
+         ▼
+   DrumGameManager.calculateResult()
+         │
+   ┌─────┴─────┐
+   │ 比较分数   │
+   │ 确定胜者   │
+   │ phase = FINISHED │
+   └─────┬─────┘
+         │
+         ▼
+   广播 DRUM_RESULT
+         │
+         ▼
+   DrumGameManager.cleanupGame()
+```
+
+**WebSocket 消息类型**:
+
+| 消息类型 | 方向 | 说明 |
+|---------|------|------|
+| `DRUM_READY` | Server → Client | 房间就绪，同步服务器时间和角色信息 |
+| `DRUM_START` | Server → Client | 游戏开始信号（含倒计时结束时间戳） |
+| `DRUM_TAP` | Bidirectional | 玩家点击事件（客户端发送自己的点击，服务端广播对手的点击） |
+| `DRUM_FINISH` | Server → Client | 游戏结束信号 |
+| `DRUM_RESULT` | Server → Client | 最终结果（含分数和胜者） |
+
+**消息数据结构**:
+
+```typescript
+// DRUM_READY
+interface IDrumReadyData {
+    roomId: string;
+    serverTimeMs: number; // 服务器时间戳（用于客户端时间同步）
+    hostRole: EPlayerRole; // 房主角色（永远是 Organizer）
+    organizerName: string;
+    joinerName: string;
+}
+
+// DRUM_START
+interface IDrumStartData {
+    roomId: string;
+    startAtMs: number; // 游戏开始的绝对时间戳（倒计时结束后）
+}
+
+// DRUM_TAP
+interface IDrumTapData {
+    roomId: string;
+    role: EPlayerRole; // 点击者角色
+    delta: number; // 本次批量点击数量
+    clientTimeMs: number; // 客户端时间戳
+}
+
+// DRUM_FINISH
+interface IDrumFinishData {
+    roomId: string;
+    endAtMs: number; // 游戏结束时间戳
+}
+
+// DRUM_RESULT
+interface IDrumResultData {
+    roomId: string;
+    organizerScore: number;
+    joinerScore: number;
+    winnerRole: EPlayerRole;
+}
 ```
 
 ---

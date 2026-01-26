@@ -26,6 +26,20 @@ type DrumResultHandler = (winnerRole: EPlayerRole) => void;
 /** Handler for errors */
 type DrumErrorHandler = (message: string) => void;
 
+/** Handler for DRUM_READY events */
+type DrumReadyHandler = (
+    serverTimeMs: number,
+    hostRole: EPlayerRole,
+    organizerName: string,
+    joinerName: string
+) => void;
+
+/** Handler for DRUM_START events */
+type DrumStartHandler = (startAtMs: number) => void;
+
+/** Handler for DRUM_FINISH events */
+type DrumFinishHandler = () => void;
+
 /** Tap batching configuration */
 const TAP_THROTTLE_MS: number = 150;
 
@@ -33,6 +47,9 @@ class DrumService {
     private tapHandler: DrumTapHandler | null = null;
     private resultHandler: DrumResultHandler | null = null;
     private errorHandler: DrumErrorHandler | null = null;
+    private readyHandler: DrumReadyHandler | null = null;
+    private startHandler: DrumStartHandler | null = null;
+    private finishHandler: DrumFinishHandler | null = null;
 
     /** Batched tap state */
     private pendingDelta: number = 0;
@@ -46,13 +63,19 @@ class DrumService {
     initialize(
         roomId: string,
         selfRole: EPlayerRole,
+        onReady: DrumReadyHandler,
+        onStart: DrumStartHandler,
         onTap: DrumTapHandler,
+        onFinish: DrumFinishHandler,
         onResult: DrumResultHandler,
         onError: DrumErrorHandler
     ): void {
         this.currentRoomId = roomId;
         this.currentRole = selfRole;
+        this.readyHandler = onReady;
+        this.startHandler = onStart;
         this.tapHandler = onTap;
+        this.finishHandler = onFinish;
         this.resultHandler = onResult;
         this.errorHandler = onError;
 
@@ -76,6 +99,9 @@ class DrumService {
         this.tapHandler = null;
         this.resultHandler = null;
         this.errorHandler = null;
+        this.readyHandler = null;
+        this.startHandler = null;
+        this.finishHandler = null;
 
         wsManager.updateCallbacks({
             onMessage: undefined,
@@ -136,8 +162,25 @@ class DrumService {
         console.log('[DrumService] Message received:', message.type);
 
         switch (message.type) {
+            case EDrumMessageType.DrumReady:
+                this.handleReady(
+                    message.data.serverTimeMs,
+                    message.data.hostRole,
+                    message.data.organizerName,
+                    message.data.joinerName
+                );
+                break;
+
+            case EDrumMessageType.DrumStart:
+                this.handleStart(message.data.startAtMs);
+                break;
+
             case EDrumMessageType.DrumTap:
                 this.handleTap(message.data.role, message.data.delta);
+                break;
+
+            case EDrumMessageType.DrumFinish:
+                this.handleFinish();
                 break;
 
             case EDrumMessageType.DrumResult:
@@ -150,11 +193,48 @@ class DrumService {
     }
 
     /**
+     * Handle DRUM_READY event
+     */
+    private handleReady(
+        serverTimeMs: number,
+        hostRole: EPlayerRole,
+        organizerName: string,
+        joinerName: string
+    ): void {
+        if (this.readyHandler) {
+            this.readyHandler(
+                serverTimeMs,
+                hostRole,
+                organizerName,
+                joinerName
+            );
+        }
+    }
+
+    /**
+     * Handle DRUM_START event
+     */
+    private handleStart(startAtMs: number): void {
+        if (this.startHandler) {
+            this.startHandler(startAtMs);
+        }
+    }
+
+    /**
      * Handle opponent tap event
      */
     private handleTap(role: EPlayerRole, delta: number): void {
         if (this.tapHandler) {
             this.tapHandler(role, delta);
+        }
+    }
+
+    /**
+     * Handle DRUM_FINISH event
+     */
+    private handleFinish(): void {
+        if (this.finishHandler) {
+            this.finishHandler();
         }
     }
 
