@@ -162,7 +162,7 @@ npm run format:check
 
 - **欢迎页（Welcome）**: `docs/welcome.md` - 首页入口，包含角色展示和主 CTA 按钮
 - **等待页（Waiting Room）**: `docs/waiting-room.md` - 房间创建和等待对方加入的页面，双方就位后自动跳转至 Drum Room
-- **Drum Room（震天鼓抢麦）**: `docs/drum-room.md` - 抢先发言权对抗模块，通过 5 秒快速点击竞争决定谁先申冤
+- **Drum Room（震天鼓抢麦）**: `docs/drum-room.md` - 抢先发言权对抗模块，通过 10 秒快速点击竞争决定谁先申冤
 - **Chat Room（对簿公堂）**: `docs/chat-room.md` - 核心对簿与情绪释放页面，支持双方轮流语音申冤、表情互动和倒计时控制
 
 每个页面文档包含：
@@ -194,7 +194,7 @@ npm run format:check
 
 1. **Welcome（欢迎页）** → 用户进入小程序，点击「我要申冤！」
 2. **Waiting Room（等待页）** → 创建房间或加入房间，等待对方加入
-3. **Drum Room（震天鼓抢麦）** → 3秒准备倒计时 + 5秒快速点击竞争，决定谁先发言
+3. **Drum Room（震天鼓抢麦）** → 3秒准备倒计时 + 10秒快速点击竞争，决定谁先发言
 4. **Chat Room（对簿公堂）** → 双方轮流语音申冤，表情互动，完成对簿流程
 
 ## 开发注意事项

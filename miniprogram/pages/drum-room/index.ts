@@ -121,7 +121,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         joinerName: '',
 
         runningLeftMs: RUNNING_DURATION_MS,
-        runningLeftSec: 5,
+        runningLeftSec: 10,
 
         organizerScore: 0,
         joinerScore: 0,
@@ -240,7 +240,11 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Handle countdown complete event
      */
     onCountdownComplete(): void {
-        console.log('[DrumRoom] Countdown complete');
+        console.log('[DrumRoom] Countdown complete at:', {
+            nowServerMs: nowServerMs(),
+            timeSinceStart: nowServerMs() - this._startAtMs,
+            remainingToEnd: getTimeRemainingMs(this._endAtMs),
+        });
         this._startRunningPhase();
     },
 
@@ -248,7 +252,12 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Start 5-second running (tapping) phase
      */
     _startRunningPhase(): void {
-        console.log('[DrumRoom] Starting running phase');
+        console.log('[DrumRoom] Running phase start:', {
+            nowServerMs: nowServerMs(),
+            endAtMs: this._endAtMs,
+            remaining: getTimeRemainingMs(this._endAtMs),
+            expectedRemaining: RUNNING_DURATION_MS,
+        });
 
         vibrateLong();
 
@@ -535,7 +544,12 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Starts countdown and game timer based on server timing
      */
     _handleDrumStart(startAtMs: number): void {
-        console.log('[DrumRoom] DRUM_START received, startAtMs:', startAtMs);
+        console.log('[DrumRoom] Time values:', {
+            startAtMs,
+            endAtMs: this._endAtMs,
+            nowServerMs: nowServerMs(),
+            expectedRemaining: this._endAtMs - nowServerMs(),
+        });
 
         // Calculate end time
         this._startAtMs = startAtMs;

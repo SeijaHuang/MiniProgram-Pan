@@ -512,7 +512,7 @@ interface IDrumGameResult {
 │             (游戏进行中)                      │
 │                                             │
 │  玩家可以点击鼓，累计分数                      │
-│  持续 5 秒                                   │
+│  持续 10 秒                                  │
 └─────────────────────────────────────────────┘
                     │
                     ▼
@@ -653,7 +653,7 @@ WebSocket CHAT_SEND
    广播 DRUM_COUNTDOWN
          │
          ▼
-   phase = RUNNING (5秒)
+   phase = RUNNING (10秒)
          │
    ┌─────┴─────┐
    │ 玩家点击鼓 │
@@ -682,7 +682,7 @@ WebSocket CHAT_SEND
    广播 DRUM_TAP_ACK
          │
          ▼
-   [5秒后] 游戏结束
+   [10秒后] 游戏结束
          │
          ▼
    DrumGameManager.calculateResult()

@@ -408,7 +408,7 @@ interface IWSMessage<T> {
 **说明**
 
 - 在 `DRUM_READY` 发送后约 3 秒发送（倒计时结束）
-- 客户端应在此时刻开始游戏计时（5 秒）
+- 客户端应在此时刻开始游戏计时（10 秒）
 
 ---
 
@@ -440,7 +440,7 @@ interface IWSMessage<T> {
 
 ### DRUM_FINISH
 
-鼓游戏结束信号（5 秒游戏时间结束）。
+鼓游戏结束信号（10 秒游戏时间结束）。
 
 **响应**
 
@@ -470,7 +470,7 @@ interface IWSMessage<T> {
 
 **说明**
 
-- 在游戏开始后 5 秒发送
+- 在游戏开始后 10 秒发送
 - 客户端应停止接收点击输入
 
 ---
@@ -617,7 +617,7 @@ interface IWSMessage<T> {
 客户端 ◀──── DRUM_START ──── 服务器
                                 │
                          phase = RUNNING
-                         游戏开始，持续 5 秒
+                         游戏开始，持续 10 秒
                                 │
 客户端 ──── DRUM_TAP ────▶ 服务器
                                 │
@@ -628,7 +628,7 @@ interface IWSMessage<T> {
                                 │
                          [持续点击...]
                                 │
-                         [5 秒后]
+                         [10 秒后]
                                 │
 客户端 ◀──── DRUM_FINISH ──── 服务器
                                 │

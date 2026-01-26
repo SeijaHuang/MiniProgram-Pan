@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "main": "index.js",
     "scripts": {
-        "dev": "ts-node src/index.ts",
+        "dev": "ts-node src/index.ts --watch",
         "build": "tsc",
         "start": "node dist/index.js",
         "ws:test": "ts-node scripts/ws-test.ts",
