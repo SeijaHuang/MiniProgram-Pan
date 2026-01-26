@@ -32,7 +32,8 @@ type DrumReadyHandler = (
     serverTimeMs: number,
     hostRole: EPlayerRole,
     organizerName: string,
-    joinerName: string
+    joinerName: string,
+    receivedAtMs: number
 ) => void;
 
 /** Handler for DRUM_START events */
@@ -70,8 +71,11 @@ class DrumService {
     private currentRoomId: string = '';
     private currentRole: EPlayerRole = EPlayerRole.Organizer;
 
-    /** Message queue for early messages (before drum-room is ready) */
-    private messageQueue: TDrumMessage[] = [];
+    /** Queued message with receive timestamp */
+    private messageQueue: Array<{
+        message: TDrumMessage;
+        receivedAtMs: number;
+    }> = [];
     private isListening: boolean = false;
 
     /**
@@ -153,6 +157,7 @@ class DrumService {
     /**
      * Process queued messages
      * Called after handlers are set up in initialize()
+     * Uses original receive time for accurate time sync
      */
     private processQueuedMessages(): void {
         if (this.messageQueue.length === 0) {
@@ -164,11 +169,14 @@ class DrumService {
             this.messageQueue.length
         );
 
-        const messages: TDrumMessage[] = [...this.messageQueue];
+        const queuedItems = [...this.messageQueue];
         this.messageQueue = [];
 
-        for (const message of messages) {
-            this.dispatchMessage(message);
+        for (const item of queuedItems) {
+            this.dispatchMessageWithReceiveTime(
+                item.message,
+                item.receivedAtMs
+            );
         }
     }
 
@@ -225,13 +233,22 @@ class DrumService {
         console.log('[DrumService] Message received:', message.type);
 
         // If handlers aren't ready, queue DRUM_READY and DRUM_START messages
+        // Record receive time for accurate time sync
         if (!this.readyHandler || !this.startHandler) {
             if (
                 message.type === EDrumMessageType.DrumReady ||
                 message.type === EDrumMessageType.DrumStart
             ) {
-                console.log('[DrumService] Queuing message:', message.type);
-                this.messageQueue.push(message);
+                console.log(
+                    '[DrumService] Queuing message:',
+                    message.type,
+                    'receivedAtMs:',
+                    Date.now()
+                );
+                this.messageQueue.push({
+                    message,
+                    receivedAtMs: Date.now(),
+                });
                 return;
             }
         }
@@ -241,15 +258,28 @@ class DrumService {
 
     /**
      * Dispatch message to appropriate handler
+     * Uses current time for immediate messages
      */
     private dispatchMessage(message: TDrumMessage): void {
+        this.dispatchMessageWithReceiveTime(message, Date.now());
+    }
+
+    /**
+     * Dispatch message with specific receive time
+     * Used for queued messages to maintain accurate timing
+     */
+    private dispatchMessageWithReceiveTime(
+        message: TDrumMessage,
+        receivedAtMs: number
+    ): void {
         switch (message.type) {
             case EDrumMessageType.DrumReady:
                 this.handleReady(
                     message.data.serverTimeMs,
                     message.data.hostRole,
                     message.data.organizerName,
-                    message.data.joinerName
+                    message.data.joinerName,
+                    receivedAtMs
                 );
                 break;
 
@@ -281,14 +311,16 @@ class DrumService {
         serverTimeMs: number,
         hostRole: EPlayerRole,
         organizerName: string,
-        joinerName: string
+        joinerName: string,
+        receivedAtMs: number
     ): void {
         if (this.readyHandler) {
             this.readyHandler(
                 serverTimeMs,
                 hostRole,
                 organizerName,
-                joinerName
+                joinerName,
+                receivedAtMs
             );
         }
     }

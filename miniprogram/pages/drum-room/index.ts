@@ -185,13 +185,15 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
                 serverTimeMs: number,
                 hostRole: EPlayerRole,
                 organizerName: string,
-                joinerName: string
+                joinerName: string,
+                receivedAtMs: number
             ) => {
                 this._handleDrumReady(
                     serverTimeMs,
                     hostRole,
                     organizerName,
-                    joinerName
+                    joinerName,
+                    receivedAtMs
                 );
             },
             onStart: (startAtMs: number) => {
@@ -249,9 +251,10 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     },
 
     /**
-     * Start 5-second running (tapping) phase
+     * Start 10-second running (tapping) phase
      */
     _startRunningPhase(): void {
+        this._clearAllTimers();
         console.log('[DrumRoom] Running phase start:', {
             nowServerMs: nowServerMs(),
             endAtMs: this._endAtMs,
@@ -271,7 +274,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         // Update countdown every 100ms for smooth display
         this._runningTimer = setInterval(() => {
             const remaining: number = getTimeRemainingMs(this._endAtMs);
-
             if (remaining <= 0) {
                 this._endRunningPhase();
             } else {
@@ -280,7 +282,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
                     runningLeftSec: Math.ceil(remaining / 1000),
                 });
             }
-        }, 100);
+        }, 500);
     },
 
     /**
@@ -331,14 +333,14 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Navigate to chat room after delay
         this._resultTimer = setTimeout(() => {
-            const { roomId, organizerScore, joinerScore } = this.data;
-            const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&organizerScore=${organizerScore}&joinerScore=${joinerScore}`;
-            wx.redirectTo({
-                url,
-                fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
-                    console.error('[DrumRoom] Navigate failed:', err);
-                },
-            });
+            // const { roomId, organizerScore, joinerScore } = this.data;
+            // const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&organizerScore=${organizerScore}&joinerScore=${joinerScore}`;
+            // wx.redirectTo({
+            //     url,
+            //     fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
+            //         console.error('[DrumRoom] Navigate failed:', err);
+            //     },
+            // });
         }, RESULT_DISPLAY_MS);
     },
 
@@ -516,17 +518,20 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         serverTimeMs: number,
         hostRole: EPlayerRole,
         organizerName: string,
-        joinerName: string
+        joinerName: string,
+        receivedAtMs: number
     ): void {
         console.log('[DrumRoom] DRUM_READY received', {
             serverTimeMs,
             hostRole,
             organizerName,
             joinerName,
+            receivedAtMs,
         });
 
-        // Sync server time
-        setServerTimeOffset(serverTimeMs);
+        // Sync server time using original receive time (not current time)
+        // This avoids queue delay affecting the offset calculation
+        setServerTimeOffset(serverTimeMs, receivedAtMs);
 
         // Update player info from server
         this.setData({
@@ -574,7 +579,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Stops game and waits for result
      */
     _handleDrumFinish(): void {
-        console.log('[DrumRoom] DRUM_FINISH received');
+        console.log('[DrumRoom] DRUM_FINISH received', Date.now());
 
         // Clear timers
         this._clearAllTimers();
