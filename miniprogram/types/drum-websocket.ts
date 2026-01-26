@@ -3,6 +3,11 @@
  * Message protocols for drum room real-time communication
  */
 
+import { EPlayerRole } from './websocket-common';
+
+// Re-export EPlayerRole for convenience
+export { EPlayerRole } from './websocket-common';
+
 /**
  * Drum Room Message Types
  */
@@ -21,20 +26,22 @@ export enum EDrumMessageType {
 
     // Server -> Client: Final result
     DrumResult = 'DRUM_RESULT',
-
-    // Server -> Client: Peer disconnected
-    PeerLeft = 'PEER_LEFT',
 }
 
 /**
- * Player Role
+ * Drum Game Phase
  */
-export type TPlayerRole = 'A' | 'B';
+export enum EGamePhase {
+    Waiting = 'WAITING',
+    Countdown = 'COUNTDOWN',
+    Running = 'RUNNING',
+    Finished = 'FINISHED',
+}
 
 /**
  * Base Drum Message
  */
-export interface IDrumMessage<T = unknown> {
+export interface IDrumMessage<T = object> {
     type: EDrumMessageType;
     data: T;
     timestamp: number;
@@ -47,9 +54,9 @@ export interface IDrumMessage<T = unknown> {
 export interface IDrumReadyData {
     roomId: string;
     serverTimeMs: number;
-    hostRole: TPlayerRole;
-    playerAName: string;
-    playerBName: string;
+    hostRole: EPlayerRole;
+    organizerName: string;
+    joinerName: string;
 }
 
 export interface IDrumReadyMessage extends IDrumMessage<IDrumReadyData> {
@@ -75,7 +82,7 @@ export interface IDrumStartMessage extends IDrumMessage<IDrumStartData> {
  */
 export interface IDrumTapData {
     roomId: string;
-    role: TPlayerRole;
+    role: EPlayerRole;
     delta: number; // Number of taps in this batch
     clientTimeMs: number;
 }
@@ -103,26 +110,13 @@ export interface IDrumFinishMessage extends IDrumMessage<IDrumFinishData> {
  */
 export interface IDrumResultData {
     roomId: string;
-    scoreA: number;
-    scoreB: number;
-    winnerRole: TPlayerRole;
+    organizerScore: number;
+    joinerScore: number;
+    winnerRole: EPlayerRole;
 }
 
 export interface IDrumResultMessage extends IDrumMessage<IDrumResultData> {
     type: EDrumMessageType.DrumResult;
-}
-
-/**
- * PEER_LEFT: Opponent disconnected
- * Server -> Client
- */
-export interface IPeerLeftData {
-    roomId: string;
-    leftRole: TPlayerRole;
-}
-
-export interface IPeerLeftMessage extends IDrumMessage<IPeerLeftData> {
-    type: EDrumMessageType.PeerLeft;
 }
 
 /**
@@ -133,8 +127,7 @@ export type TDrumMessage =
     | IDrumStartMessage
     | IDrumTapMessage
     | IDrumFinishMessage
-    | IDrumResultMessage
-    | IPeerLeftMessage;
+    | IDrumResultMessage;
 
 /**
  * Parse incoming WebSocket message as drum message
@@ -168,7 +161,7 @@ export function parseDrumMessage(rawData: string): TDrumMessage | null {
  */
 export function createTapMessage(
     roomId: string,
-    role: TPlayerRole,
+    role: EPlayerRole,
     delta: number
 ): IDrumTapMessage {
     return {

@@ -455,5 +455,5 @@ roomWebSocketService.initialize((room: IRoom) => {
     - WebSocket 通用：`miniprogram/types/websocket-common.ts`
 - **产品文档**：
     - 原始 PRD：页面级 PRD｜房间创建 & 等待页（Waiting Room）
-    - 本实现文档：`docs/waiting-room.md`
-    - 服务层说明：`docs/services.md`
+    - 本实现文档：`docs/miniprogram/waiting-room.md`
+    - 服务层说明：`docs/miniprogram/services.md`

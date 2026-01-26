@@ -5,9 +5,11 @@
         <!-- Header Section -->
         <view class="drum-header">
             <text class="drum-header__title">震天鼓抢麦</text>
-            <view class="drum-header__timer" wx:if="{{ phase === 'RUNNING' }}">
+            <view class="drum-header__timer {{ isLastThreeSeconds ? 'drum-header__timer--urgent' : '' }}" wx:if="{{ phase === 'RUNNING' }}">
                 <text class="drum-header__timer-label">剩余时间</text>
-                <text class="drum-header__timer-value">{{ runningLeftSec }}秒</text>
+                <view class="drum-header__timer-value-wrapper" animation="{{ timerAnimationData }}">
+                    <text class="drum-header__timer-value {{ isLastThreeSeconds ? 'drum-header__timer-value--urgent' : '' }}">{{ runningLeftSec }}秒</text>
+                </view>
             </view>
         </view>
 
@@ -18,8 +20,8 @@
                 <view class="drum-score__avatar">
                     <text class="drum-score__avatar-emoji">👤</text>
                 </view>
-                <text class="drum-score__name">{{ playerAName }}</text>
-                <text class="drum-score__value">{{ scoreA }}</text>
+                <text class="drum-score__name">{{ organizerName }}</text>
+                <text class="drum-score__value">{{ organizerScore }}</text>
                 <view class="drum-score__progress">
                     <view class="drum-score__progress-bar drum-score__progress-bar--a"
                           style="width: {{ progressA }}%;"></view>
@@ -36,8 +38,8 @@
                 <view class="drum-score__avatar">
                     <text class="drum-score__avatar-emoji">👤</text>
                 </view>
-                <text class="drum-score__name">{{ playerBName }}</text>
-                <text class="drum-score__value">{{ scoreB }}</text>
+                <text class="drum-score__name">{{ joinerName }}</text>
+                <text class="drum-score__value">{{ joinerScore }}</text>
                 <view class="drum-score__progress">
                     <view class="drum-score__progress-bar drum-score__progress-bar--b"
                           style="width: {{ progressB }}%;"></view>
@@ -73,7 +75,7 @@
         <!-- Hint Text -->
         <view class="drum-hint">
             <text class="drum-hint__text" wx:if="{{ phase === 'RUNNING' }}">
-                5秒内疯狂点击！谁点得多谁先冤！
+                10秒内疯狂点击！谁点得多谁先冤！
             </text>
             <text class="drum-hint__text" wx:elif="{{ phase === 'INIT' }}">
                 等待开始...
@@ -95,9 +97,9 @@
                 <text class="drum-result__title">{{ resultTitle }}</text>
                 <text class="drum-result__subtitle">{{ resultSubtitle }}</text>
                 <view class="drum-result__scores">
-                    <text class="drum-result__score">{{ playerAName }}: {{ scoreA }}</text>
+                    <text class="drum-result__score">{{ organizerName }}: {{ organizerScore }}</text>
                     <text class="drum-result__score-divider">-</text>
-                    <text class="drum-result__score">{{ playerBName }}: {{ scoreB }}</text>
+                    <text class="drum-result__score">{{ joinerName }}: {{ joinerScore }}</text>
                 </view>
             </view>
         </view>

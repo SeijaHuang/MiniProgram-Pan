@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "main": "index.js",
     "scripts": {
-        "dev": "ts-node src/index.ts",
+        "dev": "ts-node src/index.ts --watch",
         "build": "tsc",
         "start": "node dist/index.js",
         "ws:test": "ts-node scripts/ws-test.ts",
@@ -20,7 +20,7 @@
         "dotenv": "^17.2.3",
         "express": "^5.2.1",
         "ws": "^8.19.0",
-        "zod": "^4.3.5"
+        "zod": "^4.3.6"
     },
     "devDependencies": {
         "@types/express": "^5.0.6",

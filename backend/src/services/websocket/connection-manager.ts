@@ -121,6 +121,38 @@ export class ConnectionManager {
     }
 
     /**
+     * Broadcast message to all participants in a room except the sender
+     * Used for forwarding messages to opponents
+     */
+    broadcastToRoomExcept(
+        roomId: string,
+        message: unknown,
+        excludeConnectionId: string
+    ): void {
+        const room = roomManager.getRoomById(roomId);
+        if (!room) {
+            console.warn(
+                `[ConnectionManager] Room ${roomId} not found, cannot broadcast`
+            );
+            return;
+        }
+
+        // Send to all participants except the excluded one
+        for (const participant of room.participants) {
+            const connectionId = this.userToConnection.get(
+                participant.user.userId
+            );
+            if (connectionId && connectionId !== excludeConnectionId) {
+                this.sendToConnection(connectionId, message);
+            }
+        }
+
+        console.log(
+            `[ConnectionManager] Broadcast to room ${roomId} (excluding ${excludeConnectionId})`
+        );
+    }
+
+    /**
      * Handle connection disconnect
      * CRITICAL: Cleans up user from room
      */

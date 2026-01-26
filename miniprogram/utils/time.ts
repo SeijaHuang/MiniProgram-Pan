@@ -10,10 +10,18 @@ let serverTimeOffsetMs: number = 0;
  * Set server time offset
  * Call this when receiving server timestamp to calibrate local time
  * @param serverTimeMs - Server timestamp in milliseconds
+ * @param receivedAtMs - Optional: client time when message was received
+ *                       Use this for queued messages to avoid queue delay
  */
-export function setServerTimeOffset(serverTimeMs: number): void {
-    serverTimeOffsetMs = serverTimeMs - Date.now();
-    console.log(`[Time] Server offset set to ${serverTimeOffsetMs}ms`);
+export function setServerTimeOffset(
+    serverTimeMs: number,
+    receivedAtMs?: number
+): void {
+    const clientTimeMs: number = receivedAtMs ?? Date.now();
+    serverTimeOffsetMs = serverTimeMs - clientTimeMs;
+    console.log(
+        `[Time] Server offset set to ${serverTimeOffsetMs}ms (serverTime: ${serverTimeMs}, clientTime: ${clientTimeMs})`
+    );
 }
 
 /**

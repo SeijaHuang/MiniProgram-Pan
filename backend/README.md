@@ -11,7 +11,7 @@
 - **Validation**: Zod
 - **Architecture**: Controller → Service → Repository
 
-## 项目特点
+## 特性
 
 - ✅ 严格的双人房间系统（最多2人）
 - ✅ HTTP用于房间创建，WebSocket用于实时通信
@@ -59,7 +59,7 @@ npm install
 
 ### 2. 配置环境变量
 
-创建`.env`文件（或使用`.env.example`）：
+创建 `.env` 文件:
 
 ```env
 PORT=8080
@@ -69,37 +69,16 @@ NODE_ENV=development
 
 ### 3. 启动服务器
 
-#### 开发模式（推荐用于开发调试）
-
 ```bash
+# 开发模式 (推荐)
 npm run dev
+
+# 生产模式
+npm run build && npm start
 ```
 
-使用 `ts-node` 直接运行 TypeScript 代码，支持热重载。
-
-#### 生产模式
-
-**第一步：编译 TypeScript**
-
-```bash
-npm run build
-```
-
-这将编译 TypeScript 代码到 `dist/` 目录。
-
-**第二步：运行编译后的代码**
-
-```bash
-npm start
-```
-
-或者直接运行：
-
-```bash
-node dist/index.js
-```
-
-服务器将在 `http://localhost:8080` 启动，WebSocket路径为 `ws://localhost:8080/ws`
+服务器: `http://localhost:8080`
+WebSocket: `ws://localhost:8080/ws`
 
 ### 4. 验证服务器运行
 
@@ -270,8 +249,70 @@ docker-compose up --build
 # 测试 HTTP API
 curl -X POST http://localhost:8080/room/create \
   -H "Content-Type: application/json" \
-  -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
+  -d '{"creator":{"userId":"test","nickname":"Test"}}'
 
+# 测试 WebSocket
+npm run ws:test
+```
+
+## 项目结构
+
+```
+backend/src/
+├── routes/                 # HTTP 路由
+├── controllers/            # 控制器 (HTTP/WebSocket)
+├── services/
+│   ├── core/               # 核心业务 (RoomService)
+│   ├── websocket/          # WebSocket 管理
+│   │   ├── connection-manager.ts
+│   │   ├── room-manager.ts
+│   │   └── drum-game-manager.ts
+│   └── handlers/           # 消息处理器
+│       ├── join-room-handler.ts
+│       ├── chat-send-handler.ts
+│       └── drum-tap-handler.ts
+├── models/
+│   ├── entities/           # 领域实体 (Room, User, Message)
+│   ├── schemas/            # Zod 验证
+│   ├── dto/                # 数据传输对象
+│   └── enums/              # 枚举类型
+├── middlewares/            # 中间件
+├── types/                  # TypeScript 类型
+├── constants/              # 常量配置
+└── utils/                  # 工具函数
+```
+
+## API 文档
+
+### HTTP API
+
+#### POST /room/create
+
+创建新房间。
+
+**请求**:
+```json
+{
+  "creator": {
+    "userId": "user_alice",
+    "nickname": "Alice"
+  }
+}
+```
+
+**响应** (201):
+```json
+{
+  "success": true,
+  "data": {
+    "room": {
+      "roomId": "room_abc123",
+      "roomCode": "123456",
+      "status": "WAITING",
+      "participants": [...]
+    }
+  }
+}
 # 健康检查
 curl http://localhost:8080/health
 # 预期: {"ok":true}

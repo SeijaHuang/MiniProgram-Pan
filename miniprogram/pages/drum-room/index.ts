@@ -7,13 +7,13 @@
  *
  * WebSocket Messages:
  * - Send: DRUM_TAP (batched taps)
- * - Receive: DRUM_TAP (opponent), DRUM_RESULT (final result), PEER_LEFT
+ * - Receive: DRUM_TAP (opponent), DRUM_RESULT (final result)
  */
 
 import {
     nowServerMs,
     getTimeRemainingMs,
-    resetServerTimeOffset,
+    setServerTimeOffset,
 } from '../../utils/time';
 import {
     getRandomFlyText,
@@ -23,8 +23,13 @@ import {
 } from '../../utils/random';
 import { vibrateShort, vibrateLong } from '../../utils/haptic';
 import { playDrumSound, destroyAudioPool } from '../../utils/audio';
-import { TPlayerRole } from '../../types/drum-websocket';
+import { EPlayerRole } from '../../types/websocket-common';
 import { drumService } from '../../services/drum-service';
+import {
+    DEFAULT_HOST_NAME,
+    DEFAULT_USER_NAME,
+    DEFAULT_JOINER_NAME,
+} from '../../constants/defaultValue';
 
 /** Game phase states */
 type TGamePhase = 'INIT' | 'PREPARE_COUNTDOWN' | 'RUNNING' | 'RESULT';
@@ -46,18 +51,18 @@ interface IDrumPageData {
     roomId: string;
 
     // Player info
-    selfRole: TPlayerRole;
-    hostRole: TPlayerRole;
-    playerAName: string;
-    playerBName: string;
+    selfRole: EPlayerRole;
+    hostRole: EPlayerRole;
+    organizerName: string;
+    joinerName: string;
 
     // Countdown
     runningLeftMs: number;
     runningLeftSec: number;
 
     // Scores
-    scoreA: number;
-    scoreB: number;
+    organizerScore: number;
+    joinerScore: number;
     progressA: number;
     progressB: number;
 
@@ -67,12 +72,14 @@ interface IDrumPageData {
     // Animations
     drumAnimationData: WechatMiniprogram.AnimationExportResult | null;
     containerAnimationData: WechatMiniprogram.AnimationExportResult | null;
+    timerAnimationData: WechatMiniprogram.AnimationExportResult | null;
+    isLastThreeSeconds: boolean;
 
     // Fly texts
     flyTexts: IFlyText[];
 
     // Result
-    winnerRole: TPlayerRole | null;
+    winnerRole: EPlayerRole | null;
     resultTitle: string;
     resultSubtitle: string;
     resultVisible: boolean;
@@ -81,10 +88,10 @@ interface IDrumPageData {
 /** Page options interface (from waiting-room navigation) */
 interface IDrumPageOptions {
     roomId?: string;
-    selfRole?: TPlayerRole;
-    hostRole?: TPlayerRole;
-    playerAName?: string;
-    playerBName?: string;
+    selfRole?: EPlayerRole;
+    hostRole?: EPlayerRole;
+    organizerName?: string;
+    joinerName?: string;
 }
 
 interface PrivateState {
@@ -98,9 +105,14 @@ interface PrivateState {
     _lastShakeTime: number;
 }
 
+/** Get score key by player role */
+function getScoreKey(role: EPlayerRole): 'organizerScore' | 'joinerScore' {
+    return role === EPlayerRole.Organizer ? 'organizerScore' : 'joinerScore';
+}
+
 /** Game timing constants */
-const PREPARE_DURATION_MS: number = 3000;
-const RUNNING_DURATION_MS: number = 5000;
+// const PREPARE_DURATION_MS: number = 3000;
+const RUNNING_DURATION_MS: number = 10000;
 const RESULT_DISPLAY_MS: number = 2000;
 const FLY_TEXT_DURATION_MS: number = 800;
 const MAX_SCORE_FOR_PROGRESS: number = 100;
@@ -110,16 +122,16 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         phase: 'INIT',
         roomId: '',
 
-        selfRole: 'A',
-        hostRole: 'A',
-        playerAName: '',
-        playerBName: '',
+        selfRole: EPlayerRole.Organizer,
+        hostRole: EPlayerRole.Organizer,
+        organizerName: '',
+        joinerName: '',
 
         runningLeftMs: RUNNING_DURATION_MS,
-        runningLeftSec: 5,
+        runningLeftSec: 10,
 
-        scoreA: 0,
-        scoreB: 0,
+        organizerScore: 0,
+        joinerScore: 0,
         progressA: 0,
         progressB: 0,
 
@@ -127,6 +139,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         drumAnimationData: null,
         containerAnimationData: null,
+        timerAnimationData: null,
+        isLastThreeSeconds: false,
 
         flyTexts: [],
 
@@ -155,41 +169,69 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Parse options from previous page (waiting-room)
         const roomId: string = options.roomId || 'room-001';
-        const selfRole: TPlayerRole = (options.selfRole as TPlayerRole) || 'A';
-        const hostRole: TPlayerRole = (options.hostRole as TPlayerRole) || 'A';
-        const playerAName: string =
-            decodeURIComponent(options.playerAName || '') || '小冤家';
-        const playerBName: string =
-            decodeURIComponent(options.playerBName || '') || '家冤小';
+        const selfRole: EPlayerRole = options.selfRole || EPlayerRole.Organizer;
+        const hostRole: EPlayerRole = options.hostRole || EPlayerRole.Organizer;
+
+        // Decode first, then check if it's the default user name
+        const rawOrganizerName: string = decodeURIComponent(
+            options.organizerName || ''
+        );
+        const organizerName: string =
+            rawOrganizerName && rawOrganizerName !== DEFAULT_USER_NAME
+                ? rawOrganizerName
+                : DEFAULT_HOST_NAME;
+
+        const rawJoinerName: string = decodeURIComponent(
+            options.joinerName || ''
+        );
+        const joinerName: string =
+            rawJoinerName && rawJoinerName !== DEFAULT_USER_NAME
+                ? rawJoinerName
+                : DEFAULT_JOINER_NAME;
 
         this.setData({
             roomId,
             selfRole,
             hostRole,
-            playerAName,
-            playerBName,
+            organizerName,
+            joinerName,
         });
 
         // Initialize drum service with handlers
-        drumService.initialize(
+        drumService.initialize({
             roomId,
             selfRole,
-            (role: TPlayerRole, delta: number) => {
+            onReady: (
+                serverTimeMs: number,
+                hostRole: EPlayerRole,
+                organizerName: string,
+                joinerName: string,
+                receivedAtMs: number
+            ) => {
+                this._handleDrumReady(
+                    serverTimeMs,
+                    hostRole,
+                    organizerName,
+                    joinerName,
+                    receivedAtMs
+                );
+            },
+            onStart: (startAtMs: number) => {
+                this._handleDrumStart(startAtMs);
+            },
+            onTap: (role: EPlayerRole, delta: number) => {
                 this._handleOpponentTap(role, delta);
             },
-            (winnerRole: TPlayerRole) => {
+            onFinish: () => {
+                this._handleDrumFinish();
+            },
+            onResult: (winnerRole: EPlayerRole) => {
                 this._handleServerResult(winnerRole);
             },
-            (leftRole: TPlayerRole) => {
-                this._handlePeerLeft(leftRole);
-            },
-            (message: string) => {
+            onError: (message: string) => {
                 console.error('[DrumRoom] Service error:', message);
-            }
-        );
-
-        // Start game flow
-        this._startGame();
+            },
+        });
     },
 
     /**
@@ -205,76 +247,85 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     },
 
     /**
-     * Start game flow
-     * 进入页面后直接开始游戏流程
+     * Start game flow - Wait for server messages
      */
     _startGame(): void {
-        console.log('[DrumRoom] Starting game');
+        console.log('[DrumRoom] Waiting for DRUM_READY from server...');
 
-        // Reset time offset (use local time)
-        resetServerTimeOffset();
-
-        // Calculate timing
-        const startAtMs: number = nowServerMs() + PREPARE_DURATION_MS;
-        this._startAtMs = startAtMs;
-        this._endAtMs = startAtMs + RUNNING_DURATION_MS;
-
-        // Enter prepare countdown phase
+        // Set initial phase
         this.setData({
-            phase: 'PREPARE_COUNTDOWN',
+            phase: 'INIT',
         });
-
-        // Start countdown component
-        const countdown: WechatMiniprogram.Component.TrivialInstance | null =
-            this.selectComponent('#countdown');
-        if (countdown) {
-            countdown.start();
-        }
     },
 
     /**
      * Handle countdown complete event
      */
     onCountdownComplete(): void {
-        console.log('[DrumRoom] Countdown complete');
+        console.log('[DrumRoom] Countdown complete at:', {
+            nowServerMs: nowServerMs(),
+            timeSinceStart: nowServerMs() - this._startAtMs,
+            remainingToEnd: getTimeRemainingMs(this._endAtMs),
+        });
         this._startRunningPhase();
     },
 
     /**
-     * Start 5-second running (tapping) phase
+     * Start 10-second running (tapping) phase
      */
     _startRunningPhase(): void {
-        console.log('[DrumRoom] Starting running phase');
+        this._clearAllTimers();
+        console.log('[DrumRoom] Running phase start:', {
+            nowServerMs: nowServerMs(),
+            endAtMs: this._endAtMs,
+            remaining: getTimeRemainingMs(this._endAtMs),
+            expectedRemaining: RUNNING_DURATION_MS,
+        });
 
         vibrateLong();
 
         this.setData({
             phase: 'RUNNING',
             tapEnabled: true,
-            runningLeftSec: 500,
+            runningLeftSec: Math.ceil(RUNNING_DURATION_MS / 1000),
             runningLeftMs: RUNNING_DURATION_MS,
         });
+
+        // Track previous second to detect changes
+        let prevSec: number = Math.ceil(RUNNING_DURATION_MS / 1000);
 
         // Update countdown every 100ms for smooth display
         this._runningTimer = setInterval(() => {
             const remaining: number = getTimeRemainingMs(this._endAtMs);
-
             if (remaining <= 0) {
                 this._endRunningPhase();
             } else {
+                const currentSec: number = Math.ceil(remaining / 1000);
+                const isLastThree: boolean = currentSec <= 3;
+
+                // Trigger animation when second changes in last 3 seconds
+                if (isLastThree && currentSec !== prevSec) {
+                    this._animateTimer();
+                    vibrateLong();
+                }
+
+                prevSec = currentSec;
+
                 this.setData({
                     runningLeftMs: remaining,
-                    runningLeftSec: Math.ceil(remaining / 1000),
+                    runningLeftSec: currentSec,
+                    isLastThreeSeconds: isLastThree,
                 });
             }
         }, 100);
     },
 
     /**
-     * End running phase and show result
+     * End running phase (local timer backup)
+     * Server should send DRUM_FINISH, this is fallback
      */
     _endRunningPhase(): void {
-        console.log('[DrumRoom] Ending running phase');
+        console.log('[DrumRoom] Local timer ended (fallback)');
 
         this._clearAllTimers();
 
@@ -286,33 +337,14 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         // Flush any pending taps
         drumService.flushPendingTaps();
 
-        // 直接计算结果（暂不等待服务器）
-        this._calculateLocalResult();
-    },
-
-    /**
-     * Calculate result locally (fallback or mock mode)
-     */
-    _calculateLocalResult(): void {
-        const { scoreA, scoreB, hostRole } = this.data;
-
-        let winnerRole: TPlayerRole;
-        if (scoreA > scoreB) {
-            winnerRole = 'A';
-        } else if (scoreB > scoreA) {
-            winnerRole = 'B';
-        } else {
-            // Tie: host wins
-            winnerRole = hostRole;
-        }
-
-        this._showResult(winnerRole);
+        // Wait for server DRUM_RESULT (don't calculate locally)
+        console.log('[DrumRoom] Waiting for server result...');
     },
 
     /**
      * Show result overlay and navigate to chat room
      */
-    _showResult(winnerRole: TPlayerRole): void {
+    _showResult(winnerRole: EPlayerRole): void {
         console.log('[DrumRoom] Showing result, winner:', winnerRole);
 
         const isSelfWinner: boolean = winnerRole === this.data.selfRole;
@@ -336,14 +368,14 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Navigate to chat room after delay
         this._resultTimer = setTimeout(() => {
-            const { roomId, scoreA, scoreB } = this.data;
-            const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&scoreA=${scoreA}&scoreB=${scoreB}`;
-            wx.redirectTo({
-                url,
-                fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
-                    console.error('[DrumRoom] Navigate failed:', err);
-                },
-            });
+            // const { roomId, organizerScore, joinerScore } = this.data;
+            // const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&organizerScore=${organizerScore}&joinerScore=${joinerScore}`;
+            // wx.redirectTo({
+            //     url,
+            //     fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
+            //         console.error('[DrumRoom] Navigate failed:', err);
+            //     },
+            // });
         }, RESULT_DISPLAY_MS);
     },
 
@@ -356,8 +388,9 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         }
 
         // Increment local score immediately
-        const scoreKey: 'scoreA' | 'scoreB' =
-            this.data.selfRole === 'A' ? 'scoreA' : 'scoreB';
+        const scoreKey: 'organizerScore' | 'joinerScore' = getScoreKey(
+            this.data.selfRole
+        );
         const newScore: number = this.data[scoreKey] + 1;
 
         this._updateScore(this.data.selfRole, newScore);
@@ -372,9 +405,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     /**
      * Update score and progress bar
      */
-    _updateScore(role: TPlayerRole, score: number): void {
-        const scoreKey: 'scoreA' | 'scoreB' =
-            role === 'A' ? 'scoreA' : 'scoreB';
+    _updateScore(role: EPlayerRole, score: number): void {
+        const scoreKey: 'organizerScore' | 'joinerScore' = getScoreKey(role);
 
         const updateData: Partial<IDrumPageData> = {
             [scoreKey]: score,
@@ -388,16 +420,16 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Update progress bars based on scores
      */
     _updateProgress(): void {
-        const { scoreA, scoreB } = this.data;
-        const maxScore: number = Math.max(scoreA, scoreB, 1);
+        const { organizerScore, joinerScore } = this.data;
+        const maxScore: number = Math.max(organizerScore, joinerScore, 1);
         const scaledMax: number = Math.max(maxScore, MAX_SCORE_FOR_PROGRESS);
 
         const progressA: number = Math.min(
-            Math.round((scoreA / scaledMax) * 100),
+            Math.round((organizerScore / scaledMax) * 100),
             100
         );
         const progressB: number = Math.min(
-            Math.round((scoreB / scaledMax) * 100),
+            Math.round((joinerScore / scaledMax) * 100),
             100
         );
 
@@ -422,6 +454,24 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Add fly text
         this._addFlyText();
+    },
+
+    /**
+     * Animate timer scale for last 3 seconds
+     */
+    _animateTimer(): void {
+        const animation: WechatMiniprogram.Animation = wx.createAnimation({
+            duration: 400,
+            timingFunction: 'ease-out',
+        });
+
+        // Scale up then back to normal
+        animation.scale(1.8, 1.8).step({ duration: 150 });
+        animation.scale(1.0, 1.0).step({ duration: 250 });
+
+        this.setData({
+            timerAnimationData: animation.export(),
+        });
     },
 
     /**
@@ -514,43 +564,122 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     },
 
     /**
-     * Handle peer left event
+     * Handle DRUM_READY message from server
+     * Syncs server time and updates player info
      */
-    _handlePeerLeft(_leftRole: TPlayerRole): void {
-        void wx.showToast({
-            title: '对方已离开',
-            icon: 'none',
+    _handleDrumReady(
+        serverTimeMs: number,
+        hostRole: EPlayerRole,
+        organizerName: string,
+        joinerName: string,
+        receivedAtMs: number
+    ): void {
+        console.log('[DrumRoom] DRUM_READY received', {
+            serverTimeMs,
+            hostRole,
+            organizerName,
+            joinerName,
+            receivedAtMs,
         });
+
+        // Sync server time using original receive time (not current time)
+        // This avoids queue delay affecting the offset calculation
+        setServerTimeOffset(serverTimeMs, receivedAtMs);
+
+        // Update player info from server
+        this.setData({
+            hostRole,
+            organizerName,
+            joinerName,
+            phase: 'PREPARE_COUNTDOWN',
+        });
+
+        console.log('[DrumRoom] Server time synced, waiting for DRUM_START...');
+    },
+
+    /**
+     * Handle DRUM_START message from server
+     * Starts countdown and game timer based on server timing
+     */
+    _handleDrumStart(startAtMs: number): void {
+        console.log('[DrumRoom] Time values:', {
+            startAtMs,
+            endAtMs: this._endAtMs,
+            nowServerMs: nowServerMs(),
+            expectedRemaining: this._endAtMs - nowServerMs(),
+        });
+
+        // Calculate end time
+        this._startAtMs = startAtMs;
+        this._endAtMs = startAtMs + RUNNING_DURATION_MS;
+
+        // Start countdown component
+        const countdown: WechatMiniprogram.Component.TrivialInstance | null =
+            this.selectComponent('#countdown');
+        if (countdown) {
+            countdown.start();
+        }
+
+        console.log('[DrumRoom] Game scheduled:', {
+            startAtMs,
+            endAtMs: this._endAtMs,
+            nowServerMs: nowServerMs(),
+        });
+    },
+
+    /**
+     * Handle DRUM_FINISH message from server
+     * Stops game and waits for result
+     */
+    _handleDrumFinish(): void {
+        console.log('[DrumRoom] DRUM_FINISH received', Date.now());
+
+        // Clear timers
+        this._clearAllTimers();
+
+        // Disable tapping
+        this.setData({
+            tapEnabled: false,
+            runningLeftSec: 0,
+        });
+
+        // Flush any pending taps
+        drumService.flushPendingTaps();
+
+        console.log('[DrumRoom] Game finished, waiting for DRUM_RESULT...');
     },
 
     /**
      * Handle opponent tap event from server
      */
-    _handleOpponentTap(role: TPlayerRole, delta: number): void {
+    _handleOpponentTap(role: EPlayerRole, delta: number): void {
         // Only update if it's the opponent's tap
         if (role === this.data.selfRole) {
             return;
         }
 
-        const scoreKey: 'scoreA' | 'scoreB' =
-            role === 'A' ? 'scoreA' : 'scoreB';
+        const scoreKey: 'organizerScore' | 'joinerScore' = getScoreKey(role);
         const newScore: number = this.data[scoreKey] + delta;
 
         this._updateScore(role, newScore);
     },
 
     /**
-     * Handle server result message
+     * Handle DRUM_RESULT message from server
      */
-    _handleServerResult(winnerRole: TPlayerRole): void {
-        // Clear timers and show result from server
+    _handleServerResult(winnerRole: EPlayerRole): void {
+        console.log('[DrumRoom] DRUM_RESULT received, winner:', winnerRole);
+
+        // Clear timers
         this._clearAllTimers();
 
+        // Disable tapping
         this.setData({
             tapEnabled: false,
             runningLeftSec: 0,
         });
 
+        // Show result from server
         this._showResult(winnerRole);
     },
 });

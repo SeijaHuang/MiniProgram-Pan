@@ -15,6 +15,23 @@ export enum EWSMessageType {
     JoinAck = 'JOIN_ACK',
     ChatReceive = 'CHAT_RECEIVE',
     Error = 'ERROR',
+
+    // Drum Game (Bidirectional)
+    DrumReady = 'DRUM_READY',
+    DrumStart = 'DRUM_START',
+    DrumTap = 'DRUM_TAP',
+    DrumFinish = 'DRUM_FINISH',
+    DrumResult = 'DRUM_RESULT',
+}
+
+/**
+ * Player Role in drum game
+ * - Organizer: The player who created the room
+ * - Joiner: The player who joined the room
+ */
+export enum EPlayerRole {
+    Organizer = 'Organizer',
+    Joiner = 'Joiner',
 }
 
 /**
