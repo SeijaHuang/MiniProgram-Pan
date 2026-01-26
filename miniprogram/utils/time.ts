@@ -38,7 +38,6 @@ export function nowServerMs(): number {
  * @returns Remaining milliseconds (0 if already passed)
  */
 export function getTimeRemainingMs(targetMs: number): number {
-    console.log('now service time:', nowServerMs());
     const remaining: number = targetMs - nowServerMs();
     return remaining > 0 ? remaining : 0;
 }

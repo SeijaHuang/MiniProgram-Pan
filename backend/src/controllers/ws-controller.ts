@@ -34,7 +34,7 @@ import type {
 import { EWSMessageType, EWSErrorCode } from '../types/websocket';
 import { EGamePhase } from '../types/websocket/drum';
 import { ERoomStatus } from '../models/entities/room';
-import { DRUM_CONFIG } from '../constants/config';
+import { DRUM_CONFIG, WAITING_ROOM_CONFIG } from '../constants/config';
 
 export class WebSocketController {
     /**
@@ -128,7 +128,9 @@ export class WebSocketController {
 
         // If room is ready (2 players), start drum game
         if (result.room.status === ERoomStatus.Ready) {
-            WebSocketController.startDrumGame(result.room.roomId);
+            setTimeout(() => {            
+                WebSocketController.startDrumGame(result.room.roomId);
+            },WAITING_ROOM_CONFIG.COUNTDOWN_MS);
         }
     }
 

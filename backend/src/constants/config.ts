@@ -18,6 +18,12 @@ export const ROOM_CONFIG = {
     ROOM_CODE_LENGTH: 6,
 } as const;
 
+export const WAITING_ROOM_CONFIG = {
+    /** Countdown duration before starting waiting room (ms) */
+    COUNTDOWN_MS: 3000,
+} as const;
+
+
 export const DRUM_CONFIG = {
     /** Countdown duration before game starts (ms) */
     COUNTDOWN_MS: 3000,
