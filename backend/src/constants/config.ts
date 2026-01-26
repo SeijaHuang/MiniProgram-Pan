@@ -23,7 +23,6 @@ export const WAITING_ROOM_CONFIG = {
     COUNTDOWN_MS: 3000,
 } as const;
 
-
 export const DRUM_CONFIG = {
     /** Countdown duration before game starts (ms) */
     COUNTDOWN_MS: 3000,
