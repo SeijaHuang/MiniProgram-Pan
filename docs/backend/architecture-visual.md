@@ -323,7 +323,4 @@ async create(room) {
 - 为数据库集成做好准备
 - 易于测试和维护
 
-📚 **相关文档**:
-- [README.md](README.md) - 项目使用指南
-- [ARCHITECTURE-UPDATE.md](ARCHITECTURE-UPDATE.md) - 架构更新日志
-- [MODULAR-ARCHITECTURE.md](MODULAR-ARCHITECTURE.md) - 详细架构说明
+

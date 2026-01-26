@@ -1,24 +1,52 @@
-# 申冤后端服务
+# 后端文档中心
 
-基于 HTTP + WebSocket 的双人聊天室系统，支持房间创建、加入、实时聊天和击鼓游戏。
+双人聊天室后端服务完整文档与使用指南。
 
 ## 技术栈
 
-- **Node.js** + **TypeScript**
-- **Express** - HTTP 服务器
-- **WebSocket (ws)** - 实时通信
-- **Zod** - 消息验证
-- **dotenv** - 环境变量
+- **Runtime**: Node.js 18+
+- **Language**: TypeScript 5+
+- **HTTP Framework**: Express
+- **WebSocket**: ws library
+- **Validation**: Zod
+- **Architecture**: Controller → Service → Repository
 
 ## 特性
 
-- 严格的双人房间系统 (最多 2 人)
-- HTTP 用于房间创建，WebSocket 用于实时通信
-- 房间状态机: WAITING → READY → CLOSED
-- 击鼓游戏: 双人实时对战，服务器计时计分
-- 游戏状态机: WAITING → COUNTDOWN → RUNNING → FINISHED
-- 三层架构设计，职责分离
-- TypeScript 类型安全
+- ✅ 严格的双人房间系统（最多2人）
+- ✅ HTTP用于房间创建，WebSocket用于实时通信
+- ✅ 房间状态机：WAITING → READY → CLOSED
+- ✅ 完整的错误处理和验证
+- ✅ TypeScript类型安全
+- ✅ 三层架构设计，职责分离
+- ✅ Repository模式，支持未来数据库集成
+
+---
+
+## 📚 完整文档导航
+
+### 功能特性文档
+
+按功能模块划分的详细实现文档：
+
+| 文档 | 描述 | 路径 |
+|------|------|------|
+| 🏠 [创建房间](docs/features/01-room-creation.md) | HTTP API 创建房间流程 | `POST /room/create` |
+| 🔌 [加入房间](docs/features/02-join-room.md) | WebSocket 加入房间协议 | `JOIN_ROOM` 消息 |
+| 💬 [聊天消息](docs/features/03-chat-messaging.md) | 实时聊天消息收发 | `CHAT_SEND/RECEIVE` |
+| 🔗 [连接管理](docs/features/04-connection-lifecycle.md) | WebSocket 连接生命周期 | 连接/断开处理 |
+| ⚠️ [错误处理](docs/features/05-error-handling.md) | 统一错误码和处理机制 | 错误响应规范 |
+
+### 核心概念文档
+
+| 文档 | 描述 |
+|------|------|
+| 📊 [数据模型](docs/data-models.md) | Room, User, Message 等实体定义 |
+| 🏗️ [架构可视化](docs/architecture-visual.md) | 三层架构可视化和文件结构 |
+| 📋 [产品需求](docs/product-requirements.md) | 完整的功能需求和验收标准 |
+| 📡 [API 完整规格](docs/api-specification.md) | 所有 API 的详细规格说明 |
+
+---
 
 ## 快速开始
 
@@ -52,7 +80,170 @@ npm run build && npm start
 服务器: `http://localhost:8080`
 WebSocket: `ws://localhost:8080/ws`
 
-### 4. 验证运行
+### 4. 验证服务器运行
+
+**测试 HTTP API：**
+
+```bash
+curl -X POST http://localhost:8080/room/create \
+  -H "Content-Type: application/json" \
+  -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
+```
+
+**测试 WebSocket：**
+
+使用提供的测试脚本：
+
+```bash
+npm run ws:test
+```
+
+---
+
+## 🐳 Docker 部署
+
+### 前置要求
+
+- 安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- 确保 Docker Desktop 正在运行
+
+### Docker 镜像说明
+
+**Dockerfile.dev - 开发环境**
+- 包含所有依赖（含devDependencies）
+- 支持热重载
+- 挂载源代码目录
+- 使用`ts-node`直接运行TypeScript
+
+**Dockerfile - 生产环境**
+- 多阶段构建，优化镜像大小
+- 只包含生产依赖
+- TypeScript编译为JavaScript
+- 使用编译后的`dist`目录运行
+
+### 快速启动
+
+#### Windows 用户
+
+双击运行 `start-docker.bat` 或在 PowerShell 中执行：
+
+```powershell
+.\start-docker.bat
+```
+
+#### Mac/Linux 用户
+
+```bash
+chmod +x start-docker.sh
+./start-docker.sh
+```
+
+#### 使用 docker-compose 命令
+
+```bash
+# 构建并启动（开发模式，支持热重载）
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
+
+# 重新构建
+docker-compose up --build -d
+```
+
+### Docker 常用命令
+
+| 操作 | 命令 |
+|------|------|
+| 启动服务 | `docker-compose up -d` |
+| 停止服务 | `docker-compose down` |
+| 查看日志 | `docker-compose logs -f` |
+| 实时日志 | `docker-compose logs -f backend` |
+| 重启服务 | `docker-compose restart` |
+| 重新构建 | `docker-compose up --build` |
+| 进入容器 | `docker-compose exec backend sh` |
+| 查看状态 | `docker-compose ps` |
+
+### 环境变量配置
+
+在 `docker-compose.yml` 中配置：
+
+```yaml
+environment:
+  - PORT=8080              # HTTP服务器端口
+  - NODE_ENV=development   # 环境：development/production
+  - WS_PATH=/ws           # WebSocket路径
+  - LOG_LEVEL=debug       # 日志级别
+```
+
+### 生产部署
+
+**方法1: 使用生产Dockerfile**
+
+```bash
+# 构建镜像
+docker build -t chatroom-backend:latest -f Dockerfile .
+
+# 运行容器
+docker run -d \
+  -p 8080:8080 \
+  -e NODE_ENV=production \
+  -e PORT=8080 \
+  --name chatroom-backend \
+  --restart unless-stopped \
+  chatroom-backend:latest
+```
+
+**方法2: Docker Compose生产配置**
+
+修改 `docker-compose.yml` 中的 `dockerfile: Dockerfile`，然后：
+
+```bash
+docker-compose -f docker-compose.yml up -d
+```
+
+### 故障排查
+
+#### 问题1: 端口被占用
+
+**错误**: `bind: address already in use`
+
+**解决** (Windows):
+```powershell
+# 查找占用端口的进程
+netstat -ano | findstr :8080
+
+# 终止进程
+taskkill /PID <PID> /F
+```
+
+**解决** (Mac/Linux):
+```bash
+# 查找并终止占用端口的进程
+lsof -ti:8080 | xargs kill -9
+```
+
+#### 问题2: Docker Desktop 未启动
+
+**错误**: `Cannot connect to the Docker daemon`
+
+**解决**: 启动 Docker Desktop，等待完全启动后重试
+
+#### 问题3: 代码修改未生效
+
+```bash
+# 重启容器
+docker-compose restart
+
+# 或完全重建
+docker-compose down
+docker-compose up --build
+```
+
+### 验证部署
 
 ```bash
 # 测试 HTTP API
@@ -122,198 +313,100 @@ backend/src/
     }
   }
 }
+# 健康检查
+curl http://localhost:8080/health
+# 预期: {"ok":true}
+
+# 查看容器状态
+docker-compose ps
 ```
 
-### WebSocket 协议
+---
 
-连接: `ws://localhost:8080/ws`
+## 📡 API 使用
 
-#### 消息格式
+### 核心概念
 
-```typescript
-{
-  "type": "MESSAGE_TYPE",
-  "data": { ... },
-  "timestamp": 1234567890000
-}
+**房间状态机**:
+```
+CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 ```
 
-#### 客户端 → 服务器
+**协议**:
+- HTTP: 创建房间 `POST /room/create`
+- WebSocket: 加入房间、实时聊天 `ws://localhost:8080/ws`
 
-| 消息类型 | 说明 |
-|----------|------|
-| `JOIN_ROOM` | 加入房间 |
-| `CHAT_SEND` | 发送聊天消息 |
-| `DRUM_TAP` | 击鼓点击 |
+### 详细 API 文档
 
-#### 服务器 → 客户端
+完整的 API 规格和使用示例请查看：
+- 📡 [HTTP & WebSocket API 完整文档](docs/api-specification.md) - 所有接口的详细说明
+- 🏠 [创建房间](docs/features/01-room-creation.md) - HTTP API 使用指南
+- 🔌 [加入房间](docs/features/02-join-room.md) - WebSocket 协议详解
+- 💬 [聊天消息](docs/features/03-chat-messaging.md) - 消息收发机制
+- ⚠️ [错误处理](docs/features/05-error-handling.md) - 错误码参考
 
-| 消息类型 | 说明 |
-|----------|------|
-| `JOIN_ACK` | 加入确认 |
-| `CHAT_RECEIVE` | 接收聊天消息 |
-| `DRUM_READY` | 游戏就绪 |
-| `DRUM_START` | 游戏开始 (含开始时间) |
-| `DRUM_TAP` | 对手点击 (转发) |
-| `DRUM_FINISH` | 游戏结束 |
-| `DRUM_RESULT` | 游戏结果 |
-| `ERROR` | 错误消息 |
-
-### 击鼓游戏流程
-
-```
-房间 READY (2人)
-    ↓ 自动启动
-DRUM_READY (服务器通知)
-    ↓
-DRUM_START (含开始时间)
-    ↓ 3秒倒计时
-游戏开始 (RUNNING)
-    ↓ 10秒游戏时间
-    ↓ DRUM_TAP 双向传输
-DRUM_FINISH
-    ↓
-DRUM_RESULT (最终结果)
-```
-
-**游戏配置**:
-- 倒计时: 3000ms
-- 游戏时长: 10000ms
-- 胜负规则: 分数高者胜，平局房主胜
-
-**玩家角色**:
-- `Organizer`: 房间创建者
-- `Joiner`: 加入者
-
-### 错误码
-
-| 错误码 | 说明 |
-|--------|------|
-| `INVALID_PAYLOAD` | 无效的消息格式 |
-| `ROOM_NOT_FOUND` | 房间不存在 |
-| `ROOM_FULL` | 房间已满 |
-| `ROOM_CLOSED` | 房间已关闭 |
-| `NOT_PARTICIPANT` | 不是房间参与者 |
-| `ROOM_NOT_READY` | 房间未就绪 |
-| `ALREADY_JOINED` | 已加入该房间 |
-| `INTERNAL_ERROR` | 服务器内部错误 |
+---
 
 ## 开发命令
 
 ```bash
-npm run dev          # 开发模式 (ts-node)
-npm run build        # 编译 TypeScript
-npm start            # 生产模式
-npm run lint         # ESLint 检查
-npm run lint:fix     # 自动修复
-npm run format       # 格式化代码
-npm run ws:test      # WebSocket 测试
+# 开发模式（使用 ts-node 直接运行）
+npm run dev
+
+# 编译 TypeScript 到 dist/
+npm run build
+
+# 运行编译后的代码（生产模式）
+npm start
+
+# 代码检查
+npm run lint
+
+# 自动修复代码问题
+npm run lint:fix
+
+# 代码格式化
+npm run format
+
+# 检查代码格式
+npm run format:check
+
+# WebSocket 测试脚本
+npm run ws:test
+
+# TypeScript 类型检查（不生成文件）
+npx tsc --noEmit
 ```
 
-## Docker 部署
+---
 
-### 快速启动
+## 🏗️ 项目架构
 
-```bash
-# Windows
-.\start-docker.bat
-
-# Mac/Linux
-chmod +x start-docker.sh && ./start-docker.sh
-
-# 或使用 docker-compose
-docker-compose up -d
-```
-
-### 常用命令
-
-| 操作 | 命令 |
-|------|------|
-| 构建镜像 | `docker-compose build` |
-| 启动服务 | `docker-compose up -d` |
-| 停止服务 | `docker-compose down` |
-| 查看日志 | `docker-compose logs -f` |
-| 重启服务 | `docker-compose restart` |
-
-## 架构设计
-
-### 三层架构
+本项目采用**三层架构**设计：
 
 ```
-Presentation Layer (Routes → Controllers)
-         ↓
-Business Logic Layer (Services, Handlers)
-         ↓
-Data Access Layer (Repositories - 预留)
+Routes (路由) → Controllers (控制器) → Services (服务) → Repositories (仓储)
 ```
 
-### 核心设计原则
+### 核心原则
 
-- **职责分离**: Routes 定义路由，Controllers 处理请求，Services 处理业务
-- **依赖方向**: Routes → Controllers → Services → Repositories
-- **可测试性**: 各层独立测试
+- ✅ **职责分离**: 每层只负责自己的职责
+- ✅ **单向依赖**: 上层依赖下层，下层不依赖上层
+- ✅ **可测试性**: 每层可独立测试
 
-### 数据流向
+### 详细架构文档
 
-**HTTP 创建房间**:
-```
-POST /room/create → RoomController → RoomService → 返回结果
-```
+完整的架构设计和最佳实践请查看：
+- 🏗️ [架构可视化文档](docs/architecture-visual.md) - 完整文件结构、数据流、分层职责
+- 📊 [数据模型](docs/data-models.md) - Room, User, Message 等实体定义
+- 📋 [产品需求](docs/product-requirements.md) - 功能需求和验收标准
 
-**WebSocket 加入房间**:
-```
-JOIN_ROOM → WSController → JoinRoomHandler → 广播 JOIN_ACK
-    ↓ 房间 READY
-启动游戏 → DrumGameManager → 广播 DRUM_READY, DRUM_START
-```
+## 更多信息
 
-**WebSocket 击鼓点击**:
-```
-DRUM_TAP → WSController → DrumTapHandler → DrumGameManager
-    ↓
-转发给对手 (broadcastToRoomExcept)
-```
+- 规范文档：[../.cursor/rules/04-websocket.md](../.cursor/rules/04-websocket.md)
 
-## 状态机
+---
 
-### 房间状态
-
-```
-CREATE (HTTP)
-     ↓
-  WAITING (1人)
-     ↓ 第二人 JOIN
-  READY (2人) ← 可聊天，自动启动游戏
-     ↓ 有人离开
-  CLOSED (删除)
-```
-
-### 游戏状态
-
-```
-房间 READY
-     ↓
-  WAITING (初始化)
-     ↓ DRUM_READY, DRUM_START
-  COUNTDOWN (3秒)
-     ↓
-  RUNNING (10秒) ← 接收 DRUM_TAP
-     ↓
-  FINISHED ← DRUM_FINISH, DRUM_RESULT
-```
-
-## 文档
-
-详细文档请查看 `docs/backend/`:
-
-- [架构设计](../docs/backend/architecture.md)
-- [HTTP API](../docs/backend/api.md)
-- [WebSocket 协议](../docs/backend/websocket.md)
-- [数据模型](../docs/backend/models.md)
-- [服务层](../docs/backend/services.md)
-- [配置管理](../docs/backend/configuration.md)
-- [中间件](../docs/backend/middleware.md)
-
-## 许可证
+## License
 
 ISC
