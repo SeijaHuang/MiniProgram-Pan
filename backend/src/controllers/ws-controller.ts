@@ -128,8 +128,8 @@ export class WebSocketController {
 
         // If room is ready (2 players), start drum game
         if (result.room.status === ERoomStatus.Ready) {
-            setTimeout(() => {            
-                WebSocketController.startDrumGame(result.room.roomId);
+            setTimeout(() => {
+                WebSocketController.startDrumGame(result.room.roomId)
             },WAITING_ROOM_CONFIG.COUNTDOWN_MS);
         }
     }
