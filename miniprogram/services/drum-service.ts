@@ -6,6 +6,7 @@
  * - Send tap messages (batched)
  * - Receive and parse drum messages (DRUM_TAP, DRUM_RESULT)
  * - Handle drum-related errors
+ * - Queue early messages before drum-room is ready
  */
 
 import { wsManager } from './websocket-manager';
@@ -69,8 +70,35 @@ class DrumService {
     private currentRoomId: string = '';
     private currentRole: EPlayerRole = EPlayerRole.Organizer;
 
+    /** Message queue for early messages (before drum-room is ready) */
+    private messageQueue: TDrumMessage[] = [];
+    private isListening: boolean = false;
+
+    /**
+     * Start listening for drum messages early
+     * Call this from waiting-room when room becomes ready
+     * Messages will be queued until initialize() is called
+     */
+    startListening(): void {
+        if (this.isListening) {
+            return;
+        }
+
+        this.isListening = true;
+        this.messageQueue = [];
+
+        wsManager.updateCallbacks({
+            onMessage: (data: string) => {
+                this.handleMessage(data);
+            },
+        });
+
+        console.log('[DrumService] Started listening for drum messages');
+    }
+
     /**
      * Initialize drum service with handlers
+     * Processes any queued messages from early listening
      */
     initialize(options: IDrumServiceOptions): void {
         this.currentRoomId = options.roomId;
@@ -82,13 +110,19 @@ class DrumService {
         this.resultHandler = options.onResult;
         this.errorHandler = options.onError;
 
-        wsManager.updateCallbacks({
-            onMessage: (data: string) => {
-                this.handleMessage(data);
-            },
-        });
+        // If not already listening, start now
+        if (!this.isListening) {
+            wsManager.updateCallbacks({
+                onMessage: (data: string) => {
+                    this.handleMessage(data);
+                },
+            });
+        }
 
         console.log('[DrumService] Initialized for room:', options.roomId);
+
+        // Process any queued messages
+        this.processQueuedMessages();
     }
 
     /**
@@ -106,11 +140,36 @@ class DrumService {
         this.startHandler = null;
         this.finishHandler = null;
 
+        this.messageQueue = [];
+        this.isListening = false;
+
         wsManager.updateCallbacks({
             onMessage: undefined,
         });
 
         console.log('[DrumService] Cleaned up');
+    }
+
+    /**
+     * Process queued messages
+     * Called after handlers are set up in initialize()
+     */
+    private processQueuedMessages(): void {
+        if (this.messageQueue.length === 0) {
+            return;
+        }
+
+        console.log(
+            '[DrumService] Processing queued messages:',
+            this.messageQueue.length
+        );
+
+        const messages: TDrumMessage[] = [...this.messageQueue];
+        this.messageQueue = [];
+
+        for (const message of messages) {
+            this.dispatchMessage(message);
+        }
     }
 
     /**
@@ -155,6 +214,7 @@ class DrumService {
 
     /**
      * Handle incoming WebSocket message
+     * Queues messages if handlers aren't ready yet
      */
     private handleMessage(data: string): void {
         const message: TDrumMessage | null = parseDrumMessage(data);
@@ -164,6 +224,25 @@ class DrumService {
 
         console.log('[DrumService] Message received:', message.type);
 
+        // If handlers aren't ready, queue DRUM_READY and DRUM_START messages
+        if (!this.readyHandler || !this.startHandler) {
+            if (
+                message.type === EDrumMessageType.DrumReady ||
+                message.type === EDrumMessageType.DrumStart
+            ) {
+                console.log('[DrumService] Queuing message:', message.type);
+                this.messageQueue.push(message);
+                return;
+            }
+        }
+
+        this.dispatchMessage(message);
+    }
+
+    /**
+     * Dispatch message to appropriate handler
+     */
+    private dispatchMessage(message: TDrumMessage): void {
         switch (message.type) {
             case EDrumMessageType.DrumReady:
                 this.handleReady(

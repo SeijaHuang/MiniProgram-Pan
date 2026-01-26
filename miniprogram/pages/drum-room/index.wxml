@@ -73,7 +73,7 @@
         <!-- Hint Text -->
         <view class="drum-hint">
             <text class="drum-hint__text" wx:if="{{ phase === 'RUNNING' }}">
-                5秒内疯狂点击！谁点得多谁先冤！
+                10秒内疯狂点击！谁点得多谁先冤！
             </text>
             <text class="drum-hint__text" wx:elif="{{ phase === 'INIT' }}">
                 等待开始...

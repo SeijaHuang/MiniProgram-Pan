@@ -105,7 +105,7 @@ function getScoreKey(role: EPlayerRole): 'organizerScore' | 'joinerScore' {
 
 /** Game timing constants */
 // const PREPARE_DURATION_MS: number = 3000;
-const RUNNING_DURATION_MS: number = 5000;
+const RUNNING_DURATION_MS: number = 10000;
 const RESULT_DISPLAY_MS: number = 2000;
 const FLY_TEXT_DURATION_MS: number = 800;
 const MAX_SCORE_FOR_PROGRESS: number = 100;
@@ -255,7 +255,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         this.setData({
             phase: 'RUNNING',
             tapEnabled: true,
-            runningLeftSec: 500,
+            runningLeftSec: Math.ceil(RUNNING_DURATION_MS / 1000),
             runningLeftMs: RUNNING_DURATION_MS,
         });
 

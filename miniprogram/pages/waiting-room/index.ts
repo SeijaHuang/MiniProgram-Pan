@@ -3,9 +3,11 @@
 import { roomService } from '../../services/room-service';
 import { roomWebSocketService } from '../../services/room-websocket-service';
 import { wsManager } from '../../services/websocket-manager';
+import { drumService } from '../../services/drum-service';
 import type { IUser } from '../../models/user';
 import type { IRoom } from '../../models/room';
 import { ERoomStatus } from '../../models/room';
+import { EPlayerRole } from '../../types/websocket-common';
 
 /**
  * 视图模式类型
@@ -521,7 +523,11 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             room.participants.length >= 2 &&
             room.status === ERoomStatus.Ready
         ) {
-            // 启动倒计时，准备进入聊天室
+            // Start listening for drum messages BEFORE countdown
+            // This queues DRUM_READY and DRUM_START messages
+            drumService.startListening();
+
+            // 启动倒计时，准备进入击鼓房间
             this.startCountdown();
         }
     },
@@ -562,8 +568,37 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         // 跳转到击鼓抢麦房间页面
         const { currentRoom, currentUser } = this.data;
         if (currentRoom && currentUser) {
+            // Determine self role: host is Organizer, otherwise Joiner
+            const isHost: boolean =
+                currentRoom.hostUserId === currentUser.userId;
+            const selfRole: EPlayerRole = isHost
+                ? EPlayerRole.Organizer
+                : EPlayerRole.Joiner;
+
+            // Find organizer and joiner names
+            const hostParticipant = currentRoom.participants.find(
+                p => p.user.userId === currentRoom.hostUserId
+            );
+            const joinerParticipant = currentRoom.participants.find(
+                p => p.user.userId !== currentRoom.hostUserId
+            );
+
+            const organizerName: string = encodeURIComponent(
+                hostParticipant?.user.nickname || '小冤家'
+            );
+            const joinerName: string = encodeURIComponent(
+                joinerParticipant?.user.nickname || '家冤小'
+            );
+
+            const url: string =
+                `/pages/drum-room/index?roomId=${currentRoom.roomId}` +
+                `&selfRole=${selfRole}` +
+                `&hostRole=${EPlayerRole.Organizer}` +
+                `&organizerName=${organizerName}` +
+                `&joinerName=${joinerName}`;
+
             void wx.navigateTo({
-                url: `/pages/drum-room/index`,
+                url,
                 fail: err => {
                     console.error('跳转失败:', err);
                     void wx.showToast({
