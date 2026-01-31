@@ -105,6 +105,7 @@ const REACTION_LANES = [0, 1, 2];
  * 注意：生产环境中 SECRET_ID 和 SECRET_KEY 应通过后端接口获取，避免暴露在前端代码中
  */
 const ASR_CONFIG = {
+    APP_ID: '', // TODO: 从后端获取或使用环境变量
     SECRET_ID: '', // TODO: 从后端获取或使用环境变量
     SECRET_KEY: '', // TODO: 从后端获取或使用环境变量
     ENGINE_MODEL_TYPE: '16k_zh', // 16k 中文普通话通用模型
@@ -151,14 +152,14 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const roomCode = options.roomCode ?? '';
         const localRole: Role = options.role === 'B' ? 'B' : 'A';
 
-        // 校验 roomCode
-        if (!roomCode) {
-            void wx.showToast({ title: '房间号无效', icon: 'error' });
-            setTimeout(() => {
-                void wx.navigateBack();
-            }, 1500);
-            return;
-        }
+        // // 校验 roomCode
+        // if (!roomCode) {
+        //     void wx.showToast({ title: '房间号无效', icon: 'error' });
+        //     setTimeout(() => {
+        //         void wx.navigateBack();
+        //     }, 1500);
+        //     return;
+        // }
 
         // 计算初始权限
         const canSpeak: boolean = this.computeCanSpeak('SPEAKER_A', localRole);
@@ -354,79 +355,67 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        // 类型断言，用于访问插件方法
         const manager = this.asrManager;
-        /**
-         * 1. 开始识别回调 (OnRecognitionStart)
-         * 当语音识别开始时触发
-         */
-        manager.OnRecognitionStart((res: unknown) => {
+
+        // 1. 开始识别
+        manager.OnRecognitionStart = (res: unknown) => {
             console.log('[ASR] 开始识别', res);
             this.setData({
                 isRecognizing: true,
                 recognizeError: null,
             });
-        });
+        };
 
-        /**
-         * 2. 一句话开始回调 (OnSentenceBegin)
-         * 当检测到一句话开始时触发
-         */
-        manager.OnSentenceBegin((res: unknown) => {
+        // 2. 一句话开始
+        manager.OnSentenceBegin = (res: unknown) => {
             console.log('[ASR] 一句话开始', res);
-        });
+        };
 
-        /**
-         * 3. 识别结果变化回调 (OnRecognitionResultChange)
-         * 实时返回识别中的文本（Partial 结果）
-         */
-        manager.OnRecognitionResultChange((res: unknown) => {
-            console.log('[ASR] 识别结果变化', res);
-
-            // 类型检查并提取文本
+        // 3. 识别变化时
+        manager.OnRecognitionResultChange = (res: unknown) => {
+            console.log('[ASR] 识别变化时', res);
             const result = res as {
                 result?: { voice_text_str?: string };
             } | null;
-
             if (result?.result?.voice_text_str) {
+                console.log(
+                    '[ASR] 实时识别文字:',
+                    result.result.voice_text_str
+                );
                 this.setData({
                     speechTextLive: result.result.voice_text_str,
                 });
             }
-        });
+        };
 
-        /**
-         * 4. 一句话结束回调 (OnSentenceEnd)
-         * 当一句话识别完成时触发，将结果固化
-         */
-        manager.OnSentenceEnd((res: unknown) => {
+        // 4. 一句话结束
+        manager.OnSentenceEnd = (res: unknown) => {
             console.log('[ASR] 一句话结束', res);
-
-            // 类型检查并提取文本
             const result = res as {
                 result?: { voice_text_str?: string };
             } | null;
-
             if (result?.result?.voice_text_str) {
+                console.log(
+                    '[ASR] 一句话识别文字:',
+                    result.result.voice_text_str
+                );
                 this.setData({
                     speechTextFinal: result.result.voice_text_str,
                 });
             }
-        });
+        };
 
-        /**
-         * 5. 识别完成回调 (OnRecognitionComplete)
-         * 当整个语音识别流程完成时触发
-         */
-        manager.OnRecognitionComplete((res: unknown) => {
-            console.log('[ASR] 识别完成', res);
-
-            // 类型检查并提取文本
+        // 5. 识别结束
+        manager.OnRecognitionComplete = (res: unknown) => {
+            console.log('[ASR] 识别结束', res);
             const result = res as {
                 result?: { voice_text_str?: string };
             } | null;
-
             if (result?.result?.voice_text_str) {
+                console.log(
+                    '[ASR] 最终识别文字:',
+                    result.result.voice_text_str
+                );
                 this.setData({
                     speechTextFinal: result.result.voice_text_str,
                     speechTextLive: result.result.voice_text_str,
@@ -437,48 +426,18 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                     isRecognizing: false,
                 });
             }
-        });
+        };
 
-        /**
-         * 6. 识别错误回调 (OnError)
-         * 当语音识别过程中发生错误时触发
-         */
-        manager.OnError((error: unknown) => {
-            console.error('[ASR] OnError callback:', error);
+        // 6. 识别错误
+        manager.OnError = (res: unknown) => {
+            console.log('[ASR] 识别失败', res);
+            this.handleRecognizeError('语音识别失败');
+        };
 
-            // 提取错误信息字符串
-            let errorMessage: string = '语音识别失败';
-            if (error && typeof error === 'object') {
-                const errorObj = error as { message?: string; errMsg?: string };
-                if (errorObj.message) {
-                    errorMessage = errorObj.message;
-                } else if (errorObj.errMsg) {
-                    errorMessage = errorObj.errMsg;
-                }
-            } else if (typeof error === 'string') {
-                errorMessage = error;
-            }
-
-            this.handleRecognizeError(errorMessage);
-        });
-
-        /**
-         * 7. 录音结束回调 (OnRecorderStop)
-         * 当录音停止时触发，返回录音文件的临时路径
-         */
-        manager.OnRecorderStop((res: unknown) => {
+        // 7. 录音结束（最长10分钟）时回调
+        manager.OnRecorderStop = (res: unknown) => {
             console.log('[ASR] 录音结束', res);
-
-            // 类型检查
-            const result = res as {
-                tempFilePath?: string;
-            } | null;
-
-            if (result?.tempFilePath) {
-                console.log('[ASR] 录音文件路径:', result.tempFilePath);
-                // TODO: 如需上传录音文件，可在此处理
-            }
-        });
+        };
 
         console.log('[ASR] All callbacks registered');
     },
@@ -648,8 +607,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 // 使用 ASR 插件的 start 方法（同时启动录音和识别）
                 if (this.asrManager) {
                     this.asrManager.start({
-                        secretId: ASR_CONFIG.SECRET_ID,
-                        secretKey: ASR_CONFIG.SECRET_KEY,
+                        secretkey: ASR_CONFIG.SECRET_KEY,
+                        secretid: ASR_CONFIG.SECRET_ID,
+                        appid: ASR_CONFIG.APP_ID,
                         engine_model_type: ASR_CONFIG.ENGINE_MODEL_TYPE,
                         voice_format: ASR_CONFIG.VOICE_FORMAT,
                     });
