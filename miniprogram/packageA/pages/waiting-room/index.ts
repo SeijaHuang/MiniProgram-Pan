@@ -1,14 +1,14 @@
 // pages/waiting-room/index.ts
 
+import { DEFAULT_USER_NAME } from '@/constants/defaultValue';
+import type { IRoom } from '@/models/room';
+import { ERoomStatus } from '@/models/room';
+import type { IUser } from '@/models/user';
+import { drumService } from '@/services/drum-service';
 import { roomService } from '@/services/room-service';
 import { roomWebSocketService } from '@/services/room-websocket-service';
 import { wsManager } from '@/services/websocket-manager';
-import { drumService } from '@/services/drum-service';
-import type { IUser } from '@/models/user';
-import type { IRoom } from '@/models/room';
-import { ERoomStatus } from '@/models/room';
 import { EPlayerRole } from '@/types/websocket-common';
-import { DEFAULT_USER_NAME } from '@/constants/defaultValue';
 
 /**
  * 视图模式类型

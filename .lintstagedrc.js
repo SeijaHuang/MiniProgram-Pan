@@ -5,15 +5,7 @@ module.exports = {
     'miniprogram/**/*.{ts,js}': ['eslint --fix', 'prettier --write'],
 
     // Backend files - run eslint from backend directory to use correct tsconfig
-    'backend/src/**/*.{ts,js}': filenames => {
-        const backendFiles = filenames.map(f =>
-            path.relative('backend', f).replace(/\\/g, '/')
-        );
-        return [
-            `cd backend && eslint --fix ${backendFiles.map(f => `"${f}"`).join(' ')}`,
-            `prettier --write ${filenames.map(f => `"${f}"`).join(' ')}`,
-        ];
-    },
+    'backend/src/**/*.{ts,js}': ['npm --prefix backend run lint:fix'],
 
     // Root level ts/js files (if any)
     '*.{ts,js}': ['eslint --fix', 'prettier --write'],

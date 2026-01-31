@@ -11,25 +11,25 @@
  */
 
 import {
-    nowServerMs,
-    getTimeRemainingMs,
-    setServerTimeOffset,
-} from '@/utils/time';
+    DEFAULT_HOST_NAME,
+    DEFAULT_USER_NAME,
+    DEFAULT_JOINER_NAME,
+} from '@/constants/defaultValue';
+import { drumService } from '@/services/drum-service';
+import { EPlayerRole } from '@/types/websocket-common';
+import { playDrumSound, destroyAudioPool } from '@/utils/audio';
+import { vibrateShort, vibrateLong } from '@/utils/haptic';
 import {
     getRandomFlyText,
     getRandomTrajectory,
     generateFlyTextId,
     getRandomInt,
 } from '@/utils/random';
-import { vibrateShort, vibrateLong } from '@/utils/haptic';
-import { playDrumSound, destroyAudioPool } from '@/utils/audio';
-import { EPlayerRole } from '@/types/websocket-common';
-import { drumService } from '@/services/drum-service';
 import {
-    DEFAULT_HOST_NAME,
-    DEFAULT_USER_NAME,
-    DEFAULT_JOINER_NAME,
-} from '@/constants/defaultValue';
+    nowServerMs,
+    getTimeRemainingMs,
+    setServerTimeOffset,
+} from '@/utils/time';
 
 /** Game phase states */
 type TGamePhase = 'INIT' | 'PREPARE_COUNTDOWN' | 'RUNNING' | 'RESULT';
