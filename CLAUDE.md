@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Quick Reference - Critical Rules
+
+| Rule           | Requirement                                                    |
+| -------------- | -------------------------------------------------------------- |
+| **Animation**  | `wx.createAnimation()` ONLY - CSS animations FORBIDDEN         |
+| **TypeScript** | NO `any` - explicit types on ALL variables, params, returns    |
+| **Styles**     | Use `rpx` units (750rpx = screen width), `px` for borders only |
+| **Lists**      | `wx:key` with unique ID required (not index)                   |
+
 ## Project Overview
 
 Two-player real-time interactive WeChat Mini Program ("申冤" app) with a Node.js backend. Users create/join rooms, compete in a drum-tapping game to decide speaking order, then take turns voicing grievances.
@@ -30,7 +39,7 @@ npm run format         # Format code with Prettier
 ```bash
 cd backend
 npm install            # Install dependencies
-npm run dev            # Start dev server (ts-node with watch)
+npm run dev            # Start dev server with ts-node
 npm run build          # Compile TypeScript to dist/
 npm start              # Run production build
 npm run ws:test        # Test WebSocket connection
@@ -51,10 +60,17 @@ npm run format         # Format code with Prettier
 
 ### Frontend Structure (miniprogram/)
 
+Uses subpackage loading for optimized bundle sizes:
+
+| Package  | Root              | Pages                     | Purpose                    |
+| -------- | ----------------- | ------------------------- | -------------------------- |
+| Main     | `pages/`          | welcome/                  | Entry page (always loaded) |
+| packageA | `packageA/pages/` | waiting-room/, drum-room/ | Room creation and game     |
+| packageB | `packageB/pages/` | chat-room/                | Voice chat                 |
+
 ```
 miniprogram/
 ├── app.ts              # App entry with App<IAppOption>()
-├── pages/              # welcome/, waiting-room/, drum-room/, chat-room/
 ├── components/         # styled-button/, styled-title/, countdown/
 ├── services/           # Business logic (room-service, websocket-manager, drum-service, chat-service)
 ├── models/             # Domain interfaces (IUser, IRoom, IMessage)
@@ -62,6 +78,8 @@ miniprogram/
 ├── constants/          # Centralized config
 └── utils/              # Pure utility functions (audio, haptic, random, time)
 ```
+
+**Path alias**: Use `@/*` for imports (maps to `miniprogram/*`), e.g., `import { config } from '@/constants/config';`
 
 ### Backend Structure (backend/src/)
 
@@ -103,6 +121,7 @@ backend/src/
 All animations MUST use `wx.createAnimation()` API. **CSS animations/transitions are FORBIDDEN**:
 
 ```typescript
+// In TypeScript
 const animation = wx.createAnimation({
     duration: 1000,
     timingFunction: 'ease',
@@ -111,27 +130,28 @@ animation.translateX(100).step();
 this.setData({ animationData: animation.export() });
 ```
 
-In WXML: `<view animation="{{ animationData }}"></view>`
+```xml
+<!-- In WXML -->
+<view animation="{{ animationData }}"></view>
+```
 
 ### TypeScript - MANDATORY
 
 - **No `any` types** - Use `unknown` with type guards instead
-- **Explicit types on all variables** - Every variable declaration must have an explicit type annotation
-- **Explicit types on all function parameters and return types** - Every function must specify types for all parameters and return value
-- **Interface prefix**: `I` (e.g., `IUser`, `IPageData`)
+- **Explicit types required** - All variables, function parameters, and return types
+- **Naming conventions**: Interface prefix `I` (e.g., `IUser`), Enum prefix `E` (e.g., `ERoomStatus`)
 - **Unused code**: Prefix intentionally unused params with `_`
 - **WeChat types**: Use `WechatMiniprogram` namespace
-- **Object parameters for 3+ arguments** - Functions with 3 or more parameters must use a single options object
+- **3+ parameters**: Use a single options object
 
 ```typescript
 // Correct
 const count: number = 0;
-const name: string = 'user';
 function add(a: number, b: number): number {
     return a + b;
 }
 
-// Wrong - missing type annotations
+// Wrong - missing type annotations (will fail ESLint)
 const count = 0;
 function add(a, b) {
     return a + b;
@@ -140,17 +160,11 @@ function add(a, b) {
 
 ### Code Style
 
-- 4 spaces indentation
-- Single quotes
-- Semicolons required
-- 80 character line width
+- 4 spaces indentation, single quotes, semicolons required, 80 char line width
 
 ### Pre-commit Hooks
 
-Husky + lint-staged auto-runs on commit:
-
-- ESLint + Prettier on `.ts`, `.js`, `.json`, `.md`
-- Commit blocked if unfixable errors exist
+Husky + lint-staged runs ESLint + Prettier on `.ts`, `.js`, `.json`, `.md`. Commit blocked if unfixable errors exist.
 
 ## WXML/WXSS Patterns
 
@@ -224,48 +238,16 @@ Husky + lint-staged auto-runs on commit:
 - **WeChat API types**: `miniprogram-api-typings` package, use `WechatMiniprogram` namespace
 - **Backend types**: `backend/src/types/` (http/, websocket/)
 - **Validation schemas**: `backend/src/models/schemas/` using Zod
+- **Key models**: See `miniprogram/models/` for `IUser`, `IRoom`, `IMessage` interfaces
 
-### Key Interfaces
-
-```typescript
-// Frontend models (miniprogram/models/)
-interface IUser {
-    userId: string;
-    nickname: string;
-}
-
-interface IRoom {
-    roomId: string;
-    roomCode: string;
-    hostUserId: string;
-    participants: IParticipant[];
-    status: ERoomStatus; // WAITING | READY | CLOSED
-}
-
-interface IMessage {
-    messageId: string;
-    roomId: string;
-    sender: IUser;
-    type: EMessageType;
-    content: IMessageContent;
-    createdAt: number;
-}
-```
-
-## SOLID Principles
+## Design Principles
 
 - **Single Responsibility**: Each function/class does one thing well
-- **Open/Closed**: Use interfaces for extension without modification
+- **Separation of Concerns**: Pages handle UI only; delegate business logic to services
 - **Interface Segregation**: Small, focused interfaces (e.g., separate IWebSocketLifecycle, IWebSocketMessageHandler)
 - **Dependency Inversion**: Depend on abstractions (interfaces), not concretions
 
-## Backend API Documentation
+## Additional Documentation
 
-See `backend/docs/` for detailed API specifications:
-
-- `api-specification.md` - Complete API reference
-- `features/01-room-creation.md` - HTTP room creation
-- `features/02-join-room.md` - WebSocket JOIN_ROOM flow
-- `features/03-chat-messaging.md` - WebSocket CHAT_SEND/RECEIVE
-- `features/04-connection-lifecycle.md` - Connection management
-- `features/05-error-handling.md` - Error codes and handling
+- **Backend-specific**: See `backend/CLAUDE.md` for backend architecture, WebSocket message types, and API details
+- **API Specification**: See `backend/docs/` for detailed API specifications
