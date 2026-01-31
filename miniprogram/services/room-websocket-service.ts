@@ -8,14 +8,11 @@
  * - Track room state from server
  */
 
-import { wsManager } from './websocket-manager';
-import type { IUser } from '../models/user';
-import type { IRoom } from '../models/room';
-import { EWSMessageType } from '../types/websocket-common';
-import type {
-    IJoinRoomMessage,
-    IJoinAckMessage,
-} from '../types/room-websocket';
+import { wsManager } from '@/services/websocket-manager';
+import type { IUser } from '@/models/user';
+import type { IRoom } from '@/models/room';
+import { EWSMessageType } from '@/types/websocket-common';
+import type { IJoinRoomMessage, IJoinAckMessage } from '@/types/room-websocket';
 
 type JoinAckHandler = (room: IRoom) => void;
 
