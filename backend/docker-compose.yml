@@ -1,4 +1,24 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chatroom-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: chatroom
+      POSTGRES_PASSWORD: chatroom_dev_pwd
+      POSTGRES_DB: chatroom
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatroom -d chatroom"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - chatroom-network
+
   backend:
     build:
       context: .
@@ -11,15 +31,23 @@ services:
       - NODE_ENV=development
       - WS_PATH=/ws
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://chatroom:chatroom_dev_pwd@postgres:5432/chatroom?schema=public
     volumes:
       # 挂载源代码 (支持热重载)
       - ./src:/app/src
       - ./scripts:/app/scripts
+      - ./prisma:/app/prisma
       # 防止 node_modules 被覆盖
       - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - chatroom-network
+
+volumes:
+  postgres_data:
 
 networks:
   chatroom-network:

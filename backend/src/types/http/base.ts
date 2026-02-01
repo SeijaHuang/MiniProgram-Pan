@@ -12,6 +12,8 @@ export enum EHttpErrorCode {
     RoomCreateFailed = 'ROOM_CREATE_FAILED',
     InvalidRequest = 'INVALID_REQUEST',
     InternalError = 'INTERNAL_ERROR',
+    TaskNotFound = 'TASK_NOT_FOUND',
+    TaskCreateFailed = 'TASK_CREATE_FAILED',
 }
 
 /**
