@@ -3,10 +3,10 @@
  * Message protocols for drum room real-time communication
  */
 
-import { EPlayerRole } from './websocket-common';
+import { EPlayerRole } from '@/types/websocket-common';
 
 // Re-export EPlayerRole for convenience
-export { EPlayerRole } from './websocket-common';
+export { EPlayerRole } from '@/types/websocket-common';
 
 /**
  * Drum Room Message Types

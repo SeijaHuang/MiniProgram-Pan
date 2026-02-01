@@ -119,8 +119,15 @@ CLOSED (cleanup)
 | `APP_CONFIG.PORT` | 8080 | HTTP/WS port |
 | `WS_CONFIG.PATH` | /ws | WebSocket endpoint |
 | `ROOM_CONFIG.MAX_PARTICIPANTS` | 2 | Max users per room |
+| `WAITING_ROOM_CONFIG.COUNTDOWN_MS` | 3000 | Waiting room countdown |
 | `DRUM_CONFIG.COUNTDOWN_MS` | 3000 | Pre-game countdown |
 | `DRUM_CONFIG.GAME_DURATION_MS` | 10000 | Game length |
+
+## Enums
+
+**`EPlayerRole`** (drum game context):
+- `Organizer` - Player who created the room
+- `Joiner` - Player who joined the room
 
 ## Docker
 
@@ -147,6 +154,10 @@ curl -X POST http://localhost:8080/room/create \
 # WebSocket test
 npm run ws:test
 ```
+
+## Database
+
+MongoDB configuration is stubbed in `src/database/config/mongodb.config.ts` but not yet active. Currently uses in-memory storage via `room-manager.ts`.
 
 ## Parent Documentation
 
