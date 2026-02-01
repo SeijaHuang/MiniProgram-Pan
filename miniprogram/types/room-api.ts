@@ -4,8 +4,8 @@
  * 用于 waiting-room 页面的房间创建功能
  */
 
-import type { IRoom } from '@/models/room';
-import type { IUser } from '@/models/user';
+import type { IRoom } from '../models/room';
+import type { IUser } from '../models/user';
 
 /**
  * HTTP Error Codes

@@ -9,7 +9,7 @@
  * - Connection state tracking
  */
 
-import { BACKEND_CONFIG, WS_CONFIG } from '@/constants/config';
+import { BACKEND_CONFIG, WS_CONFIG } from '../constants/config';
 
 type ConnectionState =
     | 'DISCONNECTED'

@@ -4,9 +4,10 @@
  * 用于 waiting-room 页面的房间加入功能
  */
 
-import type { IRoom } from '@/models/room';
-import type { IUser } from '@/models/user';
-import type { IWSMessage, EWSMessageType } from '@/types/websocket-common';
+import type { IRoom } from '../models/room';
+import type { IUser } from '../models/user';
+
+import type { IWSMessage, EWSMessageType } from './websocket-common';
 
 // ==================== Client → Server ====================
 

@@ -145,7 +145,7 @@ Chat Room (对簿公堂)
 ### WebSocketManager (单例)
 
 ```typescript
-import { WebSocketManager } from '@/services/websocket-manager';
+import { WebSocketManager } from './services/websocket-manager';
 
 const wsManager: WebSocketManager = WebSocketManager.getInstance();
 wsManager.connect(url);
@@ -163,7 +163,7 @@ wsManager.unregisterHandler('JOIN_ACK');
 ### RoomService
 
 ```typescript
-import { RoomService } from '@/services/room-service';
+import { RoomService } from './services/room-service';
 
 const room = await RoomService.createRoom(userId, nickname);
 ```
@@ -171,7 +171,7 @@ const room = await RoomService.createRoom(userId, nickname);
 ### DrumService
 
 ```typescript
-import { DrumService } from '@/services/drum-service';
+import { DrumService } from './services/drum-service';
 
 DrumService.registerHandlers();
 DrumService.sendTap(roomId, role, delta);

@@ -1,8 +1,8 @@
 {
     "usingComponents": {
-        "styled-button": "/components/styled-button/index",
-        "styled-title": "/components/styled-title/index",
-        "countdown": "/components/countdown/index"
+        "styled-button": "../../../components/styled-button/index",
+        "styled-title": "../../../components/styled-title/index",
+        "countdown": "../../../components/countdown/index"
     },
     "navigationStyle": "custom",
     "navigationBarTitleText": "连接孽缘"

@@ -2,10 +2,10 @@
  * Chat Room Page - 对簿公堂 / 语音申冤页
  */
 
-import type { IMessage } from '@/models/message';
-import { EMessageType } from '@/models/message';
-import { chatService } from '@/services/chat-service';
-import { EWSErrorCode } from '@/types/websocket-common';
+import type { IMessage } from '../../../models/message';
+import { EMessageType } from '../../../models/message';
+import { chatService } from '../../../services/chat-service';
+import { EWSErrorCode } from '../../../types/websocket-common';
 
 // 引入腾讯云语音识别插件
 const QCloudAIVoicePlugin = requirePlugin('QCloudAIVoice');
