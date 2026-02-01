@@ -2,10 +2,10 @@
  * Chat Room Page - 对簿公堂 / 语音申冤页
  */
 
-import { chatService } from '../../services/chat-service';
-import type { IMessage } from '../../models/message';
-import { EMessageType } from '../../models/message';
-import { EWSErrorCode } from '../../types/websocket-common';
+import type { IMessage } from '@/models/message';
+import { EMessageType } from '@/models/message';
+import { chatService } from '@/services/chat-service';
+import { EWSErrorCode } from '@/types/websocket-common';
 
 type Phase = 'SPEAKER_A' | 'SPEAKER_B' | 'DONE';
 type Role = 'A' | 'B';

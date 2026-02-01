@@ -4,8 +4,8 @@
  * 用于 chat-room 页面的消息收发功能
  */
 
-import type { IMessage, MessageContent } from '../models/message';
-import type { IWSMessage, EWSMessageType } from './websocket-common';
+import type { IMessage, MessageContent } from '@/models/message';
+import type { IWSMessage, EWSMessageType } from '@/types/websocket-common';
 
 // ==================== Client → Server ====================
 

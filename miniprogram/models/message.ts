@@ -3,7 +3,7 @@
  * Represents a chat message
  */
 
-import type { IUser } from './user';
+import type { IUser } from '@/models/user';
 
 export enum EMessageType {
     Text = 'TEXT',

@@ -1,14 +1,14 @@
 // pages/waiting-room/index.ts
 
-import { roomService } from '../../services/room-service';
-import { roomWebSocketService } from '../../services/room-websocket-service';
-import { wsManager } from '../../services/websocket-manager';
-import { drumService } from '../../services/drum-service';
-import type { IUser } from '../../models/user';
-import type { IRoom } from '../../models/room';
-import { ERoomStatus } from '../../models/room';
-import { EPlayerRole } from '../../types/websocket-common';
-import { DEFAULT_USER_NAME } from '../../constants/defaultValue';
+import { DEFAULT_USER_NAME } from '@/constants/defaultValue';
+import type { IRoom } from '@/models/room';
+import { ERoomStatus } from '@/models/room';
+import type { IUser } from '@/models/user';
+import { drumService } from '@/services/drum-service';
+import { roomService } from '@/services/room-service';
+import { roomWebSocketService } from '@/services/room-websocket-service';
+import { wsManager } from '@/services/websocket-manager';
+import { EPlayerRole } from '@/types/websocket-common';
 
 /**
  * 视图模式类型
@@ -592,7 +592,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             );
 
             const url: string =
-                `/pages/drum-room/index?roomId=${currentRoom.roomId}` +
+                `/packageA/pages/drum-room/index?roomId=${currentRoom.roomId}` +
                 `&selfRole=${selfRole}` +
                 `&hostRole=${EPlayerRole.Organizer}` +
                 `&organizerName=${organizerName}` +

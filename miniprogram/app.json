@@ -1,10 +1,5 @@
 {
-    "pages": [
-        "pages/welcome/index",
-        "pages/waiting-room/index",
-        "pages/drum-room/index",
-        "pages/chat-room/index"
-    ],
+    "pages": ["pages/welcome/index"],
     "window": {
         "navigationBarTextStyle": "black",
         "navigationBarTitleText": "Weixin",
@@ -12,5 +7,17 @@
     },
     "style": "v2",
     "componentFramework": "glass-easel",
-    "lazyCodeLoading": "requiredComponents"
+    "lazyCodeLoading": "requiredComponents",
+    "subPackages": [
+        {
+            "name": "packageA",
+            "root": "packageA",
+            "pages": ["pages/waiting-room/index", "pages/drum-room/index"]
+        },
+        {
+            "name": "packageB",
+            "root": "packageB",
+            "pages": ["pages/chat-room/index"]
+        }
+    ]
 }

@@ -9,14 +9,14 @@
  * - Queue early messages before drum-room is ready
  */
 
-import { wsManager } from './websocket-manager';
+import { wsManager } from '@/services/websocket-manager';
 import {
     EDrumMessageType,
     EPlayerRole,
     parseDrumMessage,
     createTapMessage,
     type TDrumMessage,
-} from '../types/drum-websocket';
+} from '@/types/drum-websocket';
 
 /** Handler for opponent tap events */
 type DrumTapHandler = (role: EPlayerRole, delta: number) => void;
