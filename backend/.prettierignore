@@ -1,0 +1,14 @@
+# 依赖
+node_modules/
+
+# 构建输出
+dist/
+
+# 日志
+*.log
+
+# Postman 导出文件
+postman_collection.json
+
+# 锁文件
+package-lock.json
