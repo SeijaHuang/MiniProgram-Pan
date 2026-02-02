@@ -2,10 +2,11 @@
  * Chat Room Page - 对簿公堂 / 语音申冤页
  */
 
-import type { IMessage } from '../../../models/message';
-import { EMessageType } from '../../../models/message';
-import { chatService } from '../../../services/chat-service';
-import { EWSErrorCode } from '../../../types/websocket-common';
+import type { IMessage } from '../../models/message';
+import { EMessageType } from '../../models/message';
+import { asrService } from '../../services/asr-service';
+import { chatService } from '../../services/chat-service';
+import { EWSErrorCode } from '../../types/websocket-common';
 
 // 引入腾讯云语音识别插件
 const QCloudAIVoicePlugin = requirePlugin('QCloudAIVoice');
@@ -57,11 +58,15 @@ interface IChatRoomPageData {
     reactions: IReaction[];
     emojiList: string[];
 
-    // 语音识别相关
+    // 语音识别相关（本地）
     speechTextLive: string; // 实时识别文本（Partial）
     speechTextFinal: string; // 最终识别文本（Final）
     isRecognizing: boolean; // 是否识别中
     recognizeError: string | null; // 识别错误信息
+
+    // 对方语音识别相关（通过 WebSocket 同步）
+    opponentTextLive: string; // 对方实时识别文本
+    opponentTextFinal: string; // 对方最终识别文本
 }
 
 interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
@@ -133,11 +138,15 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         reactions: [],
         emojiList: EMOJI_LIST,
 
-        // 语音识别相关
+        // 语音识别相关（本地）
         speechTextLive: '',
         speechTextFinal: '',
         isRecognizing: false,
         recognizeError: null,
+
+        // 对方语音识别相关
+        opponentTextLive: '',
+        opponentTextFinal: '',
     },
 
     timerId: null,
@@ -179,6 +188,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         // 初始化聊天服务
         this.initChatService();
 
+        // 初始化 ASR WebSocket 服务（需要在 chatService 之后初始化）
+        this.initASRService();
+
         // 初始化录音管理器
         this.initRecorderManager();
 
@@ -218,6 +230,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         if (this.recorderManager && this.data.isRecording) {
             this.recorderManager.stop();
         }
+
+        // 清理 ASR WebSocket 服务
+        asrService.cleanup();
 
         // 清理所有表情 timeout
         if (this.reactionTimeouts.length) {
@@ -267,6 +282,64 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 void wx.showToast({ title: errorMessage, icon: 'error' });
             }
         );
+    },
+
+    /**
+     * 初始化 ASR WebSocket 服务
+     * 处理 ASR 文本的 WebSocket 同步
+     */
+    initASRService(): void {
+        const { roomCode } = this.data;
+        const userId: string | null = wx.getStorageSync('userId');
+
+        if (!roomCode || !userId) {
+            console.warn(
+                '[ChatRoom] Cannot init ASR service: missing roomCode or userId'
+            );
+            return;
+        }
+
+        asrService.initialize(
+            roomCode,
+            userId,
+            // 处理对方的 ASR 文本
+            (
+                _speakerId: string,
+                text: string,
+                isFinal: boolean,
+                _seq: number
+            ) => {
+                this.handleOpponentASRText(text, isFinal);
+            },
+            // 处理错误
+            (errorMessage: string) => {
+                console.error('[ChatRoom] ASR service error:', errorMessage);
+            }
+        );
+
+        console.log('[ChatRoom] ASR service initialized');
+    },
+
+    /**
+     * 处理对方的 ASR 文本
+     * @param text 识别文本
+     * @param isFinal 是否为最终结果
+     */
+    handleOpponentASRText(text: string, isFinal: boolean): void {
+        if (isFinal) {
+            // 最终结果：固化文本
+            this.setData({
+                opponentTextFinal: text,
+                opponentTextLive: text,
+            });
+            console.log('[ChatRoom] Opponent final text:', text);
+        } else {
+            // 部分结果：只更新 live
+            this.setData({
+                opponentTextLive: text,
+            });
+            console.log('[ChatRoom] Opponent partial text:', text);
+        }
     },
 
     /**
@@ -371,56 +444,65 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             console.log('[ASR] 一句话开始', res);
         };
 
-        // 3. 识别变化时
+        // 3. 识别变化时（发送 partial，节流后）
         manager.OnRecognitionResultChange = (res: unknown) => {
             console.log('[ASR] 识别变化时', res);
             const result = res as {
                 result?: { voice_text_str?: string };
             } | null;
             if (result?.result?.voice_text_str) {
-                console.log(
-                    '[ASR] 实时识别文字:',
-                    result.result.voice_text_str
-                );
+                const text = result.result.voice_text_str;
+                console.log('[ASR] 实时识别文字:', text);
+
+                // 更新本地 UI
                 this.setData({
-                    speechTextLive: result.result.voice_text_str,
+                    speechTextLive: text,
                 });
+
+                // 发送 partial 到对方（节流）
+                asrService.sendPartial(text);
             }
         };
 
-        // 4. 一句话结束
+        // 4. 一句话结束（发送 final，立即）
         manager.OnSentenceEnd = (res: unknown) => {
             console.log('[ASR] 一句话结束', res);
             const result = res as {
                 result?: { voice_text_str?: string };
             } | null;
             if (result?.result?.voice_text_str) {
-                console.log(
-                    '[ASR] 一句话识别文字:',
-                    result.result.voice_text_str
-                );
+                const text = result.result.voice_text_str;
+                console.log('[ASR] 一句话识别文字:', text);
+
+                // 更新本地 UI
                 this.setData({
-                    speechTextFinal: result.result.voice_text_str,
+                    speechTextFinal: text,
                 });
+
+                // 发送 final 到对方（立即）- 一句话结束也是 final
+                asrService.sendFinal(text);
             }
         };
 
-        // 5. 识别结束
+        // 5. 识别结束（发送 final，立即）
         manager.OnRecognitionComplete = (res: unknown) => {
             console.log('[ASR] 识别结束', res);
             const result = res as {
                 result?: { voice_text_str?: string };
             } | null;
             if (result?.result?.voice_text_str) {
-                console.log(
-                    '[ASR] 最终识别文字:',
-                    result.result.voice_text_str
-                );
+                const text = result.result.voice_text_str;
+                console.log('[ASR] 最终识别文字:', text);
+
+                // 更新本地 UI
                 this.setData({
-                    speechTextFinal: result.result.voice_text_str,
-                    speechTextLive: result.result.voice_text_str,
+                    speechTextFinal: text,
+                    speechTextLive: text,
                     isRecognizing: false,
                 });
+
+                // 发送 final 到对方（立即）
+                asrService.sendFinal(text);
             } else {
                 this.setData({
                     isRecognizing: false,
@@ -528,6 +610,11 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 canSpeak: false,
                 canReact: false,
                 remaining: 0,
+                // 清空 ASR 文本
+                speechTextLive: '',
+                speechTextFinal: '',
+                opponentTextLive: '',
+                opponentTextFinal: '',
             });
             return;
 
@@ -544,7 +631,15 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 canReact,
                 countdownClass: this.getCountdownClass(totalPerTurn),
                 isRecording: false,
+                // 清空 ASR 文本
+                speechTextLive: '',
+                speechTextFinal: '',
+                opponentTextLive: '',
+                opponentTextFinal: '',
             });
+
+            // 重置 ASR 服务序列号
+            asrService.resetSequence();
         }
     },
 
@@ -600,6 +695,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             recognizeError: null,
             isRecognizing: false,
         });
+
+        // 重置 ASR 服务序列号（新的录音会话）
+        asrService.resetSequence();
 
         wx.authorize({
             scope: 'scope.record',

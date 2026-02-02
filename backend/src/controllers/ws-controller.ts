@@ -23,6 +23,11 @@ import {
     handleDrumTap,
     type TDrumTapHandlerResult,
 } from '../services/handlers/drum-tap-handler';
+import {
+    handleASRTextPush,
+    type TASRTextPushHandlerResult,
+    type IASRTextPushResult,
+} from '../services/handlers/asr-text-handler';
 import { drumGameManager } from '../services/websocket/drum-game-manager';
 import { roomManager } from '../services/websocket/room-manager';
 import type {
@@ -30,6 +35,7 @@ import type {
     IJoinRoomMessage,
     IChatSendMessage,
     IDrumTapMessage,
+    IASRTextPushMessage,
 } from '../types/websocket';
 import { EWSMessageType, EWSErrorCode } from '../types/websocket';
 import { EGamePhase } from '../types/websocket/drum';
@@ -70,6 +76,13 @@ export class WebSocketController {
                     WebSocketController.handleDrumTapMessage(
                         connectionId,
                         message as IDrumTapMessage
+                    );
+                    break;
+
+                case EWSMessageType.AsrTextPush:
+                    WebSocketController.handleASRTextPushMessage(
+                        connectionId,
+                        message as IASRTextPushMessage
                     );
                     break;
 
@@ -201,6 +214,65 @@ export class WebSocketController {
                 timestamp: Date.now(),
             },
             connectionId
+        );
+    }
+
+    /**
+     * Handle ASR_TEXT_PUSH message
+     * Calls business logic handler and broadcasts to other participants
+     */
+    private static handleASRTextPushMessage(
+        connectionId: string,
+        message: IASRTextPushMessage
+    ): void {
+        // Create broadcast callback for throttled partials
+        const onThrottledBroadcast = (result: IASRTextPushResult): void => {
+            WebSocketController.broadcastASRText(connectionId, result);
+        };
+
+        const result: TASRTextPushHandlerResult = handleASRTextPush(
+            connectionManager,
+            connectionId,
+            message,
+            onThrottledBroadcast
+        );
+
+        if (!result.success) {
+            WebSocketController.sendError(
+                connectionId,
+                result.code,
+                result.message
+            );
+            return;
+        }
+
+        // Broadcast immediately if shouldBroadcast is true (final messages)
+        if (result.shouldBroadcast) {
+            WebSocketController.broadcastASRText(connectionId, result);
+        }
+    }
+
+    /**
+     * Broadcast ASR_TEXT to room participants (excluding sender)
+     */
+    private static broadcastASRText(
+        senderConnectionId: string,
+        result: IASRTextPushResult
+    ): void {
+        connectionManager.broadcastToRoomExcept(
+            result.roomId,
+            {
+                type: EWSMessageType.AsrText,
+                data: {
+                    roomId: result.roomId,
+                    speakerId: result.speakerId,
+                    seq: result.seq,
+                    text: result.text,
+                    isFinal: result.isFinal,
+                },
+                timestamp: Date.now(),
+            },
+            senderConnectionId
         );
     }
 
