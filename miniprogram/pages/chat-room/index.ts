@@ -6,6 +6,8 @@ import type { IMessage } from '../../models/message';
 import { EMessageType } from '../../models/message';
 import { asrService } from '../../services/asr-service';
 import { chatService } from '../../services/chat-service';
+import { stsService } from '../../services/sts-service';
+import type { ISTSCredentials } from '../../types/sts-api';
 import { EWSErrorCode } from '../../types/websocket-common';
 
 // 引入腾讯云语音识别插件
@@ -76,6 +78,7 @@ interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     reactionTimeouts: number[];
     messageIdCounter: number;
     asrManager: AsrManager; // 语音识别管理器
+    stsCredentials: ISTSCredentials | null; // STS 临时凭证
 }
 
 const EMOJI_LIST = [
@@ -107,12 +110,10 @@ const REACTION_LANES = [0, 1, 2];
 
 /**
  * ASR 语音识别配置
- * 注意：生产环境中 SECRET_ID 和 SECRET_KEY 应通过后端接口获取，避免暴露在前端代码中
+ * SecretId 和 SecretKey 通过 STS 服务从后端获取临时凭证
  */
 const ASR_CONFIG = {
-    APP_ID: '', // TODO: 从后端获取或使用环境变量
-    SECRET_ID: '', // TODO: 从后端获取或使用环境变量
-    SECRET_KEY: '', // TODO: 从后端获取或使用环境变量
+    APP_ID: '1401269739',
     ENGINE_MODEL_TYPE: '16k_zh', // 16k 中文普通话通用模型
     VOICE_FORMAT: 1, // 1: PCM, 4: speex(sp)压缩, 6: silk, 8: mp3
 } as const;
@@ -155,6 +156,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     reactionTimeouts: [],
     messageIdCounter: 0,
     asrManager: null,
+    stsCredentials: null,
 
     onLoad(options): void {
         // 解析页面参数
@@ -672,6 +674,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     /**
      * 开始录音和语音识别
      * 使用 QCloudAIVoice 插件的 start 方法，同时启动录音和识别
+     * 凭证通过 STS 服务从后端获取
      */
     startRecording(): void {
         // 检查权限和 ASR 管理器
@@ -702,21 +705,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         wx.authorize({
             scope: 'scope.record',
             success: () => {
-                // 使用 ASR 插件的 start 方法（同时启动录音和识别）
-                if (this.asrManager) {
-                    this.asrManager.start({
-                        secretkey: ASR_CONFIG.SECRET_KEY,
-                        secretid: ASR_CONFIG.SECRET_ID,
-                        appid: ASR_CONFIG.APP_ID,
-                        engine_model_type: ASR_CONFIG.ENGINE_MODEL_TYPE,
-                        voice_format: ASR_CONFIG.VOICE_FORMAT,
-                    });
-
-                    // 设置录音状态
-                    // 注意：isRecognizing 会在 OnRecognitionStart 回调中设置
-                    this.setData({ isRecording: true });
-                    console.log('[ASR] Recording started');
-                }
+                // 获取 STS 临时凭证后启动 ASR
+                this.startAsrWithCredentials();
             },
             fail: () => {
                 void wx.showModal({
@@ -731,6 +721,40 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 });
             },
         });
+    },
+
+    /**
+     * 获取 STS 凭证并启动 ASR
+     * 使用 stsService 获取临时凭证，然后启动语音识别
+     */
+    async startAsrWithCredentials(): Promise<void> {
+        try {
+            // 获取临时凭证
+            const credentials = await stsService.getCredentials();
+            this.stsCredentials = credentials;
+
+            console.log('[ASR] Got STS credentials');
+
+            // 使用临时凭证启动 ASR
+            if (this.asrManager) {
+                this.asrManager.start({
+                    secretkey: credentials.TmpSecretKey,
+                    secretid: credentials.TmpSecretId,
+                    token: credentials.Token,
+                    appid: ASR_CONFIG.APP_ID,
+                    engine_model_type: ASR_CONFIG.ENGINE_MODEL_TYPE,
+                    voice_format: ASR_CONFIG.VOICE_FORMAT,
+                });
+
+                // 设置录音状态
+                // 注意：isRecognizing 会在 OnRecognitionStart 回调中设置
+                this.setData({ isRecording: true });
+                console.log('[ASR] Recording started with STS credentials');
+            }
+        } catch (error) {
+            console.error('[ASR] Failed to get STS credentials:', error);
+            this.handleRecognizeError('获取凭证失败');
+        }
     },
 
     /**
