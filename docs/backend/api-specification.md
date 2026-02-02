@@ -137,6 +137,81 @@ curl -X POST http://localhost:8080/room/create \
 
 ---
 
+### 2. 获取腾讯云 STS Token
+
+**Endpoint**: `GET /tencent/credentials`
+
+**描述**: 获取腾讯云临时安全凭证（STS Token），用于客户端直连腾讯云 ASR 服务
+
+#### Request
+
+**Headers**:
+```
+无需特殊 headers
+```
+
+**Query Parameters**: 无
+
+#### Response
+
+**成功响应** (200 OK):
+```typescript
+{
+  "Credentials": {
+    "Token": string,           // 临时安全令牌
+    "TmpSecretId": string,     // 临时 SecretId
+    "TmpSecretKey": string     // 临时 SecretKey
+  },
+  "Expiration": string,        // 过期时间（ISO 8601 格式）
+  "ExpiredTime": number,       // 过期时间戳（秒）
+  "RequestId": string          // 请求ID
+}
+```
+
+**错误响应** (500 Internal Server Error):
+```typescript
+{
+  "success": false,
+  "error": {
+    "code": "STS_GET_FAILED",
+    "message": string  // 具体错误信息
+  }
+}
+```
+
+#### 示例
+
+**cURL**:
+```bash
+curl -X GET http://localhost:8080/tencent/credentials
+```
+
+**成功响应示例**:
+```json
+{
+  "Credentials": {
+    "Token": "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "TmpSecretId": "AKIDxxxxxxxxxxxxxx",
+    "TmpSecretKey": "xxxxxxxxxxxxxxxx"
+  },
+  "Expiration": "2026-02-02T12:00:00Z",
+  "ExpiredTime": 1738497600,
+  "RequestId": "abcd1234-5678-90ef-ghij-klmnopqrstuv"
+}
+```
+
+**使用场景**:
+- 小程序客户端在开始 ASR 会话前，先调用此接口获取临时凭证
+- 使用临时凭证直连腾讯云实时语音识别服务
+- Token 有效期通常为 1-2 小时，过期前需重新获取
+
+**安全说明**:
+- 使用 STS 临时凭证代替永久密钥，提高安全性
+- 临时凭证权限被限制为仅能访问 ASR 服务（`name/asr:*`）
+- 即使凭证泄露，影响范围也被限制且有时效性
+
+---
+
 ## WebSocket API
 
 ### 连接
@@ -535,6 +610,7 @@ type IMessageContent = {
 |---------|-----------|------|
 | `INVALID_REQUEST` | 400 | 请求参数验证失败 |
 | `ROOM_CREATE_FAILED` | 500 | 房间创建失败 |
+| `STS_GET_FAILED` | 500 | 获取 STS Token 失败 |
 
 ### WebSocket 错误代码
 
@@ -843,6 +919,7 @@ npm run ws:test
 
 ## 参考文档
 
+- [腾讯云 STS Token 获取](features/08-tencent-sts-token.md)
 - [ASR 实时语音识别详细文档](features/07-asr-real-time-speech.md)
 - [震天鼓游戏](features/06-drum-game.md)
 - [数据模型](data-models.md)

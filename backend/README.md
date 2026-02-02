@@ -36,6 +36,9 @@
 | 💬 [聊天消息](docs/features/03-chat-messaging.md) | 实时聊天消息收发 | `CHAT_SEND/RECEIVE` |
 | 🔗 [连接管理](docs/features/04-connection-lifecycle.md) | WebSocket 连接生命周期 | 连接/断开处理 |
 | ⚠️ [错误处理](docs/features/05-error-handling.md) | 统一错误码和处理机制 | 错误响应规范 |
+| 🥁 [震天鼓游戏](docs/features/06-drum-game.md) | 击鼓游戏机制 | `DRUM_TAP` 消息 |
+| 🎤 [ASR 语音识别](docs/features/07-asr-real-time-speech.md) | 实时语音转文字 | `ASR_*` 消息 |
+| 🔑 [腾讯云 STS Token](docs/features/08-tencent-sts-token.md) | 获取临时安全凭证 | `GET /tencent/credentials` |
 
 ### 核心概念文档
 
@@ -59,13 +62,21 @@ npm install
 
 ### 2. 配置环境变量
 
-创建 `.env` 文件:
+创建 `.env` 文件（参考 `.env.example`）:
 
 ```env
+# 基础配置
 PORT=8080
 WS_PATH=/ws
 NODE_ENV=development
+
+# 腾讯云配置（用于 ASR 语音识别服务）
+TENCENT_SECRET_ID=your_secret_id
+TENCENT_SECRET_KEY=your_secret_key
+TENCENT_REGION=ap-guangzhou
 ```
+
+**注意**: 如果需要使用 ASR（语音识别）功能，必须配置腾讯云相关环境变量。
 
 ### 3. 启动服务器
 
@@ -96,6 +107,12 @@ curl -X POST http://localhost:8080/room/create \
 
 ```bash
 npm run ws:test
+```
+
+**测试腾讯云 STS Token：**
+
+```bash
+curl http://localhost:8080/tencent/credentials
 ```
 
 ---
@@ -313,9 +330,33 @@ backend/src/
     }
   }
 }
-# 健康检查
+```
+
+#### GET /tencent/credentials
+
+获取腾讯云临时安全凭证（用于 ASR 服务）。
+
+**响应** (200):
+```json
+{
+  "Credentials": {
+    "Token": "temporary_token",
+    "TmpSecretId": "temp_id",
+    "TmpSecretKey": "temp_key"
+  },
+  "Expiration": "2026-02-02T12:00:00Z",
+  "ExpiredTime": 1738497600
+}
+```
+
+#### GET /health
+
+健康检查。
+
+```bash
 curl http://localhost:8080/health
 # 预期: {"ok":true}
+```
 
 # 查看容器状态
 docker-compose ps
@@ -334,7 +375,8 @@ CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 
 **协议**:
 - HTTP: 创建房间 `POST /room/create`
-- WebSocket: 加入房间、实时聊天 `ws://localhost:8080/ws`
+- HTTP: 获取腾讯云 STS Token `GET /tencent/credentials`
+- WebSocket: 加入房间、实时聊天、语音识别 `ws://localhost:8080/ws`
 
 ### 详细 API 文档
 
@@ -343,6 +385,7 @@ CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 - 🏠 [创建房间](docs/features/01-room-creation.md) - HTTP API 使用指南
 - 🔌 [加入房间](docs/features/02-join-room.md) - WebSocket 协议详解
 - 💬 [聊天消息](docs/features/03-chat-messaging.md) - 消息收发机制
+- 🔑 [腾讯云 STS Token](docs/features/08-tencent-sts-token.md) - 获取临时凭证
 - ⚠️ [错误处理](docs/features/05-error-handling.md) - 错误码参考
 
 ---

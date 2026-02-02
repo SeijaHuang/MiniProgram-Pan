@@ -10,6 +10,7 @@
 
 import express from 'express';
 import roomRoutes from './routes/room-routes';
+import tencentRoutes from './routes/tencent-routes';
 
 const app = express();
 
@@ -28,5 +29,11 @@ app.get('/health', (_req, res) => {
  * /room/*
  */
 app.use('/room', roomRoutes);
+
+/**
+ * Tencent routes
+ * /tencent/*
+ */
+app.use('/tencent', tencentRoutes);
 
 export default app;

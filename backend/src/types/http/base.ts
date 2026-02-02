@@ -12,6 +12,7 @@ export enum EHttpErrorCode {
     RoomCreateFailed = 'ROOM_CREATE_FAILED',
     InvalidRequest = 'INVALID_REQUEST',
     InternalError = 'INTERNAL_ERROR',
+    STSGetFailed = 'STS_GET_FAILED',
 }
 
 /**
