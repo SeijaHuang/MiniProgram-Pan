@@ -14,8 +14,19 @@
 
         <!-- 发言舞台区 -->
         <view class="chat-room__stage">
-            <!-- 非录音状态显示文案 -->
-            <view class="chat-room__stage-hint" wx:if="{{!isRecording}}">
+            <!-- 自己说话时：显示累积文字 + 实时识别文字（开始发言后框不消失） -->
+            <view class="chat-room__speech-text" wx:if="{{canSpeak && hasStartedSpeaking}}">
+                <text class="chat-room__speech-text-content" wx:if="{{speechTextFinal || speechTextLive}}">{{speechTextFinal}}{{speechTextLive}}</text>
+                <text class="chat-room__speech-text-placeholder" wx:else>正在聆听...</text>
+            </view>
+
+            <!-- 对方说话时：显示对方的实时识别文字 -->
+            <view class="chat-room__speech-text chat-room__speech-text--opponent" wx:elif="{{!canSpeak && opponentTextLive}}">
+                <text class="chat-room__speech-text-content">{{opponentTextLive}}</text>
+            </view>
+
+            <!-- 无文字时显示提示文案 -->
+            <view class="chat-room__stage-hint" wx:elif="{{(canSpeak && !hasStartedSpeaking) || (!canSpeak && !opponentTextLive)}}">
                 <text wx:if="{{canSpeak}}">点击麦克风开始申冤...</text>
                 <text wx:else>等待对方陈述...</text>
             </view>
@@ -50,11 +61,6 @@
         scroll-with-animation="{{true}}"
     >
         <view class="chat-room__dialog-inner">
-            <!-- 空状态提示 -->
-            <view class="chat-room__dialog-empty" wx:if="{{messages.length === 0}}">
-                <text class="chat-room__dialog-empty-text">控诉内容将在此显示...</text>
-            </view>
-
             <!-- 消息列表 -->
             <view
                 wx:for="{{messages}}"

@@ -65,10 +65,14 @@ interface IChatRoomPageData {
     speechTextFinal: string; // 最终识别文本（Final）
     isRecognizing: boolean; // 是否识别中
     recognizeError: string | null; // 识别错误信息
+    hasStartedSpeaking: boolean; // 是否已开始发言（用于保持对话框显示）
 
     // 对方语音识别相关（通过 WebSocket 同步）
     opponentTextLive: string; // 对方实时识别文本
     opponentTextFinal: string; // 对方最终识别文本
+
+    // 麦克风权限状态
+    hasMicPermission: boolean; // 是否已获得麦克风权限
 }
 
 interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
@@ -100,7 +104,7 @@ const EMOJI_LIST = [
 const MAX_REACTIONS = 3;
 const REACTION_DURATION_MIN = 3000;
 const REACTION_DURATION_MAX = 5000;
-const TOTAL_PER_TURN = 20;
+const TOTAL_PER_TURN = 60;
 const PHASE_TRANSITION: Record<Phase, Phase> = {
     SPEAKER_A: 'SPEAKER_B',
     SPEAKER_B: 'DONE',
@@ -144,10 +148,14 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         speechTextFinal: '',
         isRecognizing: false,
         recognizeError: null,
+        hasStartedSpeaking: false,
 
         // 对方语音识别相关
         opponentTextLive: '',
         opponentTextFinal: '',
+
+        // 麦克风权限状态
+        hasMicPermission: false,
     },
 
     timerId: null,
@@ -199,13 +207,16 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         // 初始化语音识别管理器（需要在录音管理器之后初始化）
         this.initAsrManager();
 
-        // 启动倒计时
-        this.startTimer();
+        // 权限检查移到用户按下麦克风时进行
     },
 
     onShow(): void {
-        // 如果定时器不存在且不是 DONE 状态，重新启动
-        if (!this.timerId && this.data.phase !== 'DONE') {
+        // 如果定时器不存在且不是 DONE 状态且已获得麦克风权限，重新启动
+        if (
+            !this.timerId &&
+            this.data.phase !== 'DONE' &&
+            this.data.hasMicPermission
+        ) {
             this.startTimer();
         }
     },
@@ -441,11 +452,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             });
         };
 
-        // 2. 一句话开始
-        manager.OnSentenceBegin = (res: unknown) => {
-            console.log('[ASR] 一句话开始', res);
-        };
-
         // 3. 识别变化时（发送 partial，节流后）
         manager.OnRecognitionResultChange = (res: unknown) => {
             console.log('[ASR] 识别变化时', res);
@@ -467,6 +473,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         };
 
         // 4. 一句话结束（发送 final，立即）
+        // 注意：不在此处更新 speechTextFinal，由 OnRecognitionComplete 统一处理累积
         manager.OnSentenceEnd = (res: unknown) => {
             console.log('[ASR] 一句话结束', res);
             const result = res as {
@@ -475,11 +482,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             if (result?.result?.voice_text_str) {
                 const text = result.result.voice_text_str;
                 console.log('[ASR] 一句话识别文字:', text);
-
-                // 更新本地 UI
-                this.setData({
-                    speechTextFinal: text,
-                });
 
                 // 发送 final 到对方（立即）- 一句话结束也是 final
                 asrService.sendFinal(text);
@@ -496,19 +498,49 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 const text = result.result.voice_text_str;
                 console.log('[ASR] 最终识别文字:', text);
 
+                // 追加到已有的最终文字后面（多次录音累积），每次录音结果后加句号
+                const existingFinal = this.data.speechTextFinal;
+                const textWithPeriod = text + '。';
+                const newFinal = existingFinal
+                    ? existingFinal + textWithPeriod
+                    : textWithPeriod;
+                console.log(
+                    '[ASR] 累积文字 - 已有:',
+                    existingFinal,
+                    '新增:',
+                    textWithPeriod,
+                    '合并后:',
+                    newFinal
+                );
+
                 // 更新本地 UI
                 this.setData({
-                    speechTextFinal: text,
-                    speechTextLive: text,
+                    speechTextFinal: newFinal,
+                    speechTextLive: '',
                     isRecognizing: false,
                 });
 
                 // 发送 final 到对方（立即）
                 asrService.sendFinal(text);
             } else {
-                this.setData({
-                    isRecognizing: false,
-                });
+                // 没有返回最终文字时，将实时文字保留到 speechTextFinal
+                const existingFinal = this.data.speechTextFinal;
+                const liveText = this.data.speechTextLive;
+                if (liveText) {
+                    const liveTextWithPeriod = liveText + '。';
+                    const newFinal = existingFinal
+                        ? existingFinal + liveTextWithPeriod
+                        : liveTextWithPeriod;
+                    this.setData({
+                        speechTextFinal: newFinal,
+                        speechTextLive: '',
+                        isRecognizing: false,
+                    });
+                } else {
+                    this.setData({
+                        isRecognizing: false,
+                    });
+                }
             }
         };
 
@@ -548,6 +580,96 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             icon: 'error',
             duration: 2000,
         });
+    },
+
+    /**
+     * 检查麦克风权限
+     * 用户按下麦克风时调用，权限通过后启动倒计时并开始录音
+     */
+    checkMicrophonePermission(): void {
+        wx.getSetting({
+            success: res => {
+                const recordAuth = res.authSetting['scope.record'];
+                if (recordAuth === true) {
+                    // 已有权限，启动倒计时并开始录音
+                    this.onMicPermissionGranted();
+                } else if (recordAuth === false) {
+                    // 用户之前拒绝过，显示弹窗引导去设置
+                    this.showMicPermissionDeniedModal();
+                } else {
+                    // 未请求过，请求权限
+                    this.requestMicrophonePermission();
+                }
+            },
+            fail: () => {
+                // 获取设置失败，尝试请求权限
+                this.requestMicrophonePermission();
+            },
+        });
+    },
+
+    /**
+     * 请求麦克风权限
+     */
+    requestMicrophonePermission(): void {
+        wx.authorize({
+            scope: 'scope.record',
+            success: () => {
+                // 授权成功，启动倒计时并开始录音
+                this.onMicPermissionGranted();
+            },
+            fail: () => {
+                // 授权失败，显示弹窗
+                this.showMicPermissionDeniedModal();
+            },
+        });
+    },
+
+    /**
+     * 显示麦克风权限被拒绝的弹窗
+     */
+    showMicPermissionDeniedModal(): void {
+        void wx.showModal({
+            title: '需要录音权限',
+            content: '小主，没有麦麦怎么伸冤',
+            confirmText: '去设置',
+            cancelText: '取消',
+            success: res => {
+                if (res.confirm) {
+                    void wx.openSetting({
+                        success: settingRes => {
+                            if (
+                                settingRes.authSetting['scope.record'] === true
+                            ) {
+                                // 用户在设置中开启了权限，启动倒计时并开始录音
+                                this.onMicPermissionGranted();
+                            } else {
+                                // 用户仍未开启权限，再次显示弹窗
+                                this.showMicPermissionDeniedModal();
+                            }
+                        },
+                    });
+                }
+                // 如果用户点取消，不启动定时器，页面停留在未开始状态
+            },
+        });
+    },
+
+    /**
+     * 麦克风权限获得后的回调
+     * 设置权限状态、启动倒计时并开始录音
+     */
+    onMicPermissionGranted(): void {
+        this.setData({ hasMicPermission: true });
+
+        // 启动倒计时
+        if (!this.timerId) {
+            this.startTimer();
+        }
+
+        // 震动反馈并开始录音
+        void wx.vibrateShort({ type: 'light' });
+        this.startRecording();
     },
 
     /**
@@ -617,6 +739,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 speechTextFinal: '',
                 opponentTextLive: '',
                 opponentTextFinal: '',
+                hasStartedSpeaking: false,
             });
             return;
 
@@ -638,6 +761,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 speechTextFinal: '',
                 opponentTextLive: '',
                 opponentTextFinal: '',
+                hasStartedSpeaking: false,
             });
 
             // 重置 ASR 服务序列号
@@ -647,14 +771,25 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
     /**
      * 麦克风按下
+     * 首次按下时检查权限，权限通过后启动倒计时并开始录音
      */
     onMicTouchStart(): void {
         if (!this.data.canSpeak) {
             return;
         }
 
-        void wx.vibrateShort({ type: 'light' });
-        this.startRecording();
+        // 如果已有权限，直接开始录音
+        if (this.data.hasMicPermission) {
+            // 首次按下麦克风时启动倒计时
+            if (!this.timerId) {
+                this.startTimer();
+            }
+            void wx.vibrateShort({ type: 'light' });
+            this.startRecording();
+        } else {
+            // 没有权限，先检查并请求权限
+            this.checkMicrophonePermission();
+        }
     },
 
     /**
@@ -691,36 +826,20 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        // 清空识别状态
+        // 清空实时识别状态（保留已累积的 speechTextFinal）
+        // 设置 hasStartedSpeaking 确保对话框不会消失
         this.setData({
             speechTextLive: '',
-            speechTextFinal: '',
             recognizeError: null,
             isRecognizing: false,
+            hasStartedSpeaking: true,
         });
 
         // 重置 ASR 服务序列号（新的录音会话）
         asrService.resetSequence();
 
-        wx.authorize({
-            scope: 'scope.record',
-            success: () => {
-                // 获取 STS 临时凭证后启动 ASR
-                this.startAsrWithCredentials();
-            },
-            fail: () => {
-                void wx.showModal({
-                    title: '需要录音权限',
-                    content: '请在设置中开启录音权限',
-                    confirmText: '去设置',
-                    success: res => {
-                        if (res.confirm) {
-                            void wx.openSetting();
-                        }
-                    },
-                });
-            },
-        });
+        // 权限已在 onMicTouchStart 中检查过，直接启动 ASR
+        this.startAsrWithCredentials();
     },
 
     /**

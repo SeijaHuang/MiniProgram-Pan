@@ -10,7 +10,8 @@
             "Bash(npx lint-staged:*)",
             "Bash(node:*)",
             "Bash(dir:*)",
-            "Bash(npx tsc:*)"
+            "Bash(npx tsc:*)",
+            "Bash(findstr:*)"
         ]
     }
 }
