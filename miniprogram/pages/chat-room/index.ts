@@ -498,17 +498,18 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 const text = result.result.voice_text_str;
                 console.log('[ASR] 最终识别文字:', text);
 
-                // 追加到已有的最终文字后面（多次录音累积），每次录音结果后加句号
+                // 追加到已有的最终文字后面（多次录音累积）
+                // 如果文本已经以标点符号结尾，则不再添加句号
                 const existingFinal = this.data.speechTextFinal;
-                const textWithPeriod = text + '。';
+                const textWithPunctuation = this.addPeriodIfNeeded(text);
                 const newFinal = existingFinal
-                    ? existingFinal + textWithPeriod
-                    : textWithPeriod;
+                    ? existingFinal + textWithPunctuation
+                    : textWithPunctuation;
                 console.log(
                     '[ASR] 累积文字 - 已有:',
                     existingFinal,
                     '新增:',
-                    textWithPeriod,
+                    textWithPunctuation,
                     '合并后:',
                     newFinal
                 );
@@ -527,10 +528,11 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 const existingFinal = this.data.speechTextFinal;
                 const liveText = this.data.speechTextLive;
                 if (liveText) {
-                    const liveTextWithPeriod = liveText + '。';
+                    const liveTextWithPunctuation =
+                        this.addPeriodIfNeeded(liveText);
                     const newFinal = existingFinal
-                        ? existingFinal + liveTextWithPeriod
-                        : liveTextWithPeriod;
+                        ? existingFinal + liveTextWithPunctuation
+                        : liveTextWithPunctuation;
                     this.setData({
                         speechTextFinal: newFinal,
                         speechTextLive: '',
@@ -1002,5 +1004,23 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         if (role === this.data.localRole) {
             chatService.sendTextMessage(content);
         }
+    },
+
+    /**
+     * 判断文本是否以标点符号结尾，如果没有则添加句号
+     * @param text 输入文本
+     * @returns 处理后的文本
+     */
+    addPeriodIfNeeded(text: string): string {
+        if (!text) {
+            return text;
+        }
+        // 中英文标点符号
+        const punctuationMarks = '。！？；：，、…—·.!?,;:';
+        const lastChar = text.charAt(text.length - 1);
+        if (punctuationMarks.includes(lastChar)) {
+            return text;
+        }
+        return text + '。';
     },
 });

@@ -23,10 +23,18 @@ const policy = {
     statement: [{ effect: 'allow', action: ['name/asr:*'], resource: '*' }],
 };
 
+// Token duration: 24 hours in seconds
+const TOKEN_DURATION_SECONDS = 24 * 60 * 60;
+// Refresh threshold: 1 minute in seconds
+const REFRESH_THRESHOLD_SECONDS = 60;
+
+// Cached token storage
+let cachedToken: GetFederationTokenResponse | null = null;
+
 export class TencentController {
-    static async getSTSToken(req: Request, res: Response): Promise<void> {
+    static async getSTSToken(_req: Request, res: Response): Promise<void> {
         try {
-            const response = await this._getSTSToken();
+            const response = await this._getSTSTokenWithCache();
             res.status(200).json(response);
             return;
         } catch (error: unknown) {
@@ -46,10 +54,37 @@ export class TencentController {
         }
     }
 
-    private static _getSTSToken(): Promise<GetFederationTokenResponse> {
+    private static async _getSTSTokenWithCache(): Promise<GetFederationTokenResponse> {
+        // Check if cached token exists and is still valid
+        if (cachedToken && this._isTokenValid(cachedToken)) {
+            console.log('[TencentController] Using cached STS token');
+            return cachedToken;
+        }
+
+        // Fetch new token
+        console.log('[TencentController] Fetching new STS token');
+        const newToken = await this._fetchSTSToken();
+        cachedToken = newToken;
+        return newToken;
+    }
+
+    private static _isTokenValid(token: GetFederationTokenResponse): boolean {
+        if (!token.ExpiredTime) {
+            return false;
+        }
+
+        const currentTimeSeconds = Math.floor(Date.now() / 1000);
+        const remainingSeconds = token.ExpiredTime - currentTimeSeconds;
+
+        // Token is valid if remaining time > refresh threshold (1 minute)
+        return remainingSeconds > REFRESH_THRESHOLD_SECONDS;
+    }
+
+    private static _fetchSTSToken(): Promise<GetFederationTokenResponse> {
         const getFederationTokenRequest: GetFederationTokenRequest = {
             Name: 'pan-asr',
             Policy: JSON.stringify(policy),
+            DurationSeconds: TOKEN_DURATION_SECONDS,
         };
         return stsClient.GetFederationToken(getFederationTokenRequest);
     }
