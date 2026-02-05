@@ -1,5 +1,5 @@
 {
-    "pages": ["pages/chat-room/index"],
+    "pages": ["pages/welcome/index"],
     "window": {
         "navigationBarTextStyle": "black",
         "navigationBarTitleText": "Weixin",
@@ -23,7 +23,7 @@
         {
             "name": "packageB",
             "root": "packageB",
-            "pages": ["pages/logs/logs", "pages/logs/welcome/index"]
+            "pages": ["pages/chat-room/index"]
         }
     ]
 }
