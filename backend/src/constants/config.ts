@@ -29,3 +29,9 @@ export const DRUM_CONFIG = {
     /** Game duration (ms) */
     GAME_DURATION_MS: 10000,
 } as const;
+
+export const TENCENT_CONFIG = {
+    SECRET_ID: process.env.TENCENT_SECRET_ID,
+    SECRET_KEY: process.env.TENCENT_SECRET_KEY,
+    REGION: process.env.TENCENT_REGION,
+} as const;

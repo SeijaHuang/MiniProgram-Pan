@@ -137,6 +137,81 @@ curl -X POST http://localhost:8080/room/create \
 
 ---
 
+### 2. 获取腾讯云 STS Token
+
+**Endpoint**: `GET /tencent/credentials`
+
+**描述**: 获取腾讯云临时安全凭证（STS Token），用于客户端直连腾讯云 ASR 服务
+
+#### Request
+
+**Headers**:
+```
+无需特殊 headers
+```
+
+**Query Parameters**: 无
+
+#### Response
+
+**成功响应** (200 OK):
+```typescript
+{
+  "Credentials": {
+    "Token": string,           // 临时安全令牌
+    "TmpSecretId": string,     // 临时 SecretId
+    "TmpSecretKey": string     // 临时 SecretKey
+  },
+  "Expiration": string,        // 过期时间（ISO 8601 格式）
+  "ExpiredTime": number,       // 过期时间戳（秒）
+  "RequestId": string          // 请求ID
+}
+```
+
+**错误响应** (500 Internal Server Error):
+```typescript
+{
+  "success": false,
+  "error": {
+    "code": "STS_GET_FAILED",
+    "message": string  // 具体错误信息
+  }
+}
+```
+
+#### 示例
+
+**cURL**:
+```bash
+curl -X GET http://localhost:8080/tencent/credentials
+```
+
+**成功响应示例**:
+```json
+{
+  "Credentials": {
+    "Token": "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "TmpSecretId": "AKIDxxxxxxxxxxxxxx",
+    "TmpSecretKey": "xxxxxxxxxxxxxxxx"
+  },
+  "Expiration": "2026-02-02T12:00:00Z",
+  "ExpiredTime": 1738497600,
+  "RequestId": "abcd1234-5678-90ef-ghij-klmnopqrstuv"
+}
+```
+
+**使用场景**:
+- 小程序客户端在开始 ASR 会话前，先调用此接口获取临时凭证
+- 使用临时凭证直连腾讯云实时语音识别服务
+- Token 有效期通常为 1-2 小时，过期前需重新获取
+
+**安全说明**:
+- 使用 STS 临时凭证代替永久密钥，提高安全性
+- 临时凭证权限被限制为仅能访问 ASR 服务（`name/asr:*`）
+- 即使凭证泄露，影响范围也被限制且有时效性
+
+---
+
 ## WebSocket API
 
 ### 连接
@@ -325,6 +400,138 @@ curl -X POST http://localhost:8080/room/create \
 
 ---
 
+### 3. ASR 实时语音识别
+
+ASR（Automatic Speech Recognition）功能为 Chat Room 提供实时语音转文字能力。
+
+#### 3.1 开始 ASR 会话 (ASR_START)
+
+**方向**: Client → Server
+
+**描述**: 用户按下麦克风按钮时，创建 ASR 会话
+
+**消息格式**:
+```typescript
+{
+  "type": "ASR_START",
+  "data": {
+    "roomId": string,      // 房间ID
+    "speakerId": string,   // 发言者 userId
+    "sessionId": string    // 客户端生成的会话ID（UUID）
+  },
+  "timestamp": number
+}
+```
+
+**验证规则**:
+- 发言者必须是房间参与者
+- sessionId 必须唯一（幂等性控制）
+
+**错误代码**:
+- `ROOM_NOT_FOUND`: 房间不存在
+- `NOT_PARTICIPANT`: 用户不是房间参与者
+- `ASR_SERVICE_ERROR`: ASR 服务连接失败
+
+---
+
+#### 3.2 发送音频数据 (ASR_AUDIO)
+
+**方向**: Client → Server
+
+**描述**: 持续发送音频分片给服务器
+
+**消息格式**:
+```typescript
+{
+  "type": "ASR_AUDIO",
+  "data": {
+    "roomId": string,
+    "sessionId": string,   // 会话ID
+    "seq": number,         // 音频帧序号（从1开始，单调递增）
+    "audio": string,       // Base64 编码的音频数据
+    "format": "pcm" | "opus",  // 音频格式
+    "sampleRate": number   // 采样率（Hz）
+  },
+  "timestamp": number
+}
+```
+
+**音频规范**:
+- 格式: PCM 16位单声道 / Opus
+- 采样率: 16000 Hz（推荐）
+- 分片大小: 建议 3.2KB（对应 100ms 的 PCM）
+- 发送频率: 建议 100-200ms 间隔
+
+**幂等性**: 
+- `seq ≤ lastSeq` 的帧会被丢弃
+- 会话已结束的音频会被丢弃
+
+**错误代码**:
+- `SESSION_NOT_FOUND`: 会话不存在或已结束
+- `AUDIO_FORMAT_ERROR`: 音频格式错误
+
+---
+
+#### 3.3 停止 ASR 会话 (ASR_STOP)
+
+**方向**: Client → Server
+
+**描述**: 用户松开麦克风或倒计时结束时，结束 ASR 会话
+
+**消息格式**:
+```typescript
+{
+  "type": "ASR_STOP",
+  "data": {
+    "roomId": string,
+    "sessionId": string    // 会话ID
+  },
+  "timestamp": number
+}
+```
+
+**行为**:
+- 服务器关闭与腾讯云的连接
+- 等待最后的 Final 文本（约5秒）
+- 清理会话资源
+
+**幂等性**: 重复 STOP 会被忽略
+
+---
+
+#### 3.4 接收识别文本 (ASR_TEXT)
+
+**方向**: Server → All Participants (广播)
+
+**描述**: 服务器广播识别的文本结果
+
+**消息格式**:
+```typescript
+{
+  "type": "ASR_TEXT",
+  "data": {
+    "roomId": string,
+    "speakerId": string,   // 发言者 userId
+    "sessionId": string,   // 会话ID
+    "isFinal": boolean,    // false=实时文本（可覆盖），true=最终文本（固化）
+    "text": string,        // 识别文本
+    "confidence": number   // 置信度（0-1）
+  },
+  "timestamp": number
+}
+```
+
+**文本类型**:
+- **Partial** (`isFinal: false`): 实时识别的中间结果，会不断更新覆盖
+- **Final** (`isFinal: true`): 最终确认的文本，不再变化
+
+**关键行为**:
+- ✅ 广播给房间内所有参与者
+- ✅ 新的 Partial 覆盖旧 Partial
+- ✅ Final 出现后，文本固定，不再接受 Partial 更新
+
+---
+
 ## 数据模型
 
 ### Room（房间）
@@ -403,6 +610,7 @@ type IMessageContent = {
 |---------|-----------|------|
 | `INVALID_REQUEST` | 400 | 请求参数验证失败 |
 | `ROOM_CREATE_FAILED` | 500 | 房间创建失败 |
+| `STS_GET_FAILED` | 500 | 获取 STS Token 失败 |
 
 ### WebSocket 错误代码
 
@@ -415,6 +623,9 @@ type IMessageContent = {
 | `ALREADY_JOINED` | 用户已在房间中 |
 | `NOT_PARTICIPANT` | 用户不是房间参与者 |
 | `ROOM_NOT_READY` | 房间未就绪（参与者不足2人） |
+| `SESSION_NOT_FOUND` | ASR 会话不存在或已结束 |
+| `ASR_SERVICE_ERROR` | ASR 服务连接失败 |
+| `AUDIO_FORMAT_ERROR` | 音频格式错误 |
 | `INTERNAL_ERROR` | 服务器内部错误 |
 
 ---
@@ -702,4 +913,14 @@ npm run ws:test
 - ❌ 用户注册/登录
 - ❌ 房间持久化（重启后丢失）
 - ❌ 文件/图片消息
+- ❌ ASR 音频存储和文本持久化
+
+---
+
+## 参考文档
+
+- [腾讯云 STS Token 获取](features/08-tencent-sts-token.md)
+- [ASR 实时语音识别详细文档](features/07-asr-real-time-speech.md)
+- [震天鼓游戏](features/06-drum-game.md)
+- [数据模型](data-models.md)
 

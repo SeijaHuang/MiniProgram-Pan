@@ -8,17 +8,18 @@
  * - Handle chat-related errors
  */
 
-import { EMessageType, type IMessage } from '@/models/message';
-import { wsManager } from '@/services/websocket-manager';
+import { EMessageType, type IMessage } from '../models/message';
 import type {
     IChatSendMessage,
     IChatReceiveMessage,
-} from '@/types/chat-websocket';
+} from '../types/chat-websocket';
 import {
     EWSMessageType,
     EWSErrorCode,
     type IErrorMessage,
-} from '@/types/websocket-common';
+} from '../types/websocket-common';
+
+import { wsManager } from './websocket-manager';
 
 type ChatReceiveHandler = (message: IMessage) => void;
 type ChatErrorHandler = (code: EWSErrorCode, message: string) => void;

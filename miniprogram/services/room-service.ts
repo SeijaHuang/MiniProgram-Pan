@@ -3,9 +3,9 @@
  * Handles room creation via HTTP API
  */
 
-import { BACKEND_CONFIG } from '@/constants/config';
-import type { IRoom } from '@/models/room';
-import type { ICreateRoomResponse } from '@/types/room-api';
+import { BACKEND_CONFIG } from '../constants/config';
+import type { IRoom } from '../models/room';
+import type { ICreateRoomResponse } from '../types/room-api';
 
 class RoomService {
     /**

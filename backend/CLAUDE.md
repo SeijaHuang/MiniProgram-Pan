@@ -40,6 +40,7 @@ Three-layer architecture: Routes → Controllers → Services → (Repositories)
 | `src/app.ts` | Express app configuration |
 | `src/ws.ts` | WebSocket server initialization |
 | `src/controllers/ws-controller.ts` | Routes WS messages to handlers |
+| `src/controllers/tencent-controller.ts` | Handles Tencent Cloud STS token requests |
 | `src/services/websocket/connection-manager.ts` | Tracks WS connections |
 | `src/services/websocket/room-manager.ts` | Room state management |
 | `src/services/websocket/drum-game-manager.ts` | Drum game state |
@@ -122,6 +123,9 @@ CLOSED (cleanup)
 | `WAITING_ROOM_CONFIG.COUNTDOWN_MS` | 3000 | Waiting room countdown |
 | `DRUM_CONFIG.COUNTDOWN_MS` | 3000 | Pre-game countdown |
 | `DRUM_CONFIG.GAME_DURATION_MS` | 10000 | Game length |
+| `TENCENT_CONFIG.SECRET_ID` | from env | Tencent Cloud Secret ID |
+| `TENCENT_CONFIG.SECRET_KEY` | from env | Tencent Cloud Secret Key |
+| `TENCENT_CONFIG.REGION` | from env | Tencent Cloud Region |
 
 ## Enums
 
@@ -151,13 +155,58 @@ curl -X POST http://localhost:8080/room/create \
   -H "Content-Type: application/json" \
   -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
 
+# Get Tencent Cloud STS Token (for ASR service)
+curl http://localhost:8080/tencent/credentials
+
 # WebSocket test
 npm run ws:test
 ```
 
+## HTTP Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| POST | `/room/create` | Create a new room |
+| GET | `/tencent/credentials` | Get Tencent Cloud STS token for ASR |
+
 ## Database
 
 MongoDB configuration is stubbed in `src/database/config/mongodb.config.ts` but not yet active. Currently uses in-memory storage via `room-manager.ts`.
+
+## Environment Variables
+
+Required environment variables (see `.env.example`):
+
+```bash
+# Server
+PORT=8080
+NODE_ENV=development
+
+# WebSocket
+WS_PATH=/ws
+
+# Tencent Cloud (required for ASR service)
+TENCENT_SECRET_ID=your_secret_id
+TENCENT_SECRET_KEY=your_secret_key
+TENCENT_REGION=ap-guangzhou
+```
+
+## External Dependencies
+
+### Tencent Cloud SDK
+
+Used for STS (Security Token Service) to provide temporary credentials for ASR:
+
+```json
+{
+  "tencentcloud-sdk-nodejs-sts": "^4.1.100"
+}
+```
+
+**Purpose**: Generate temporary security credentials for client-side ASR (Automatic Speech Recognition) access.
+
+**Security**: Keeps permanent credentials server-side, only exposes time-limited tokens to clients.
 
 ## Parent Documentation
 

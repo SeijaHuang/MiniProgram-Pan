@@ -79,7 +79,7 @@ miniprogram/
 └── utils/              # Pure utility functions (audio, haptic, random, time)
 ```
 
-**Path alias**: Use `@/*` for imports (maps to `miniprogram/*`), e.g., `import { config } from '@/constants/config';`
+**Imports**: Use relative paths for all imports, e.g., `import { config } from '../constants/config';`
 
 ### Backend Structure (backend/src/)
 

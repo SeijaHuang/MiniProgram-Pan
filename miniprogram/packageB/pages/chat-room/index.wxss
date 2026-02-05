@@ -163,6 +163,34 @@
     border-radius: 16rpx;
 }
 
+/* Speech Text - 实时语音识别文字 */
+.chat-room__speech-text {
+    max-width: 600rpx;
+    padding: 24rpx 32rpx;
+    background: rgba(74, 222, 128, 0.15);
+    border: 2rpx solid rgba(74, 222, 128, 0.3);
+    border-radius: 16rpx;
+    margin-bottom: 20rpx;
+}
+
+.chat-room__speech-text--opponent {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.chat-room__speech-text-content {
+    font-size: 32rpx;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    word-wrap: break-word;
+}
+
+.chat-room__speech-text-placeholder {
+    font-size: 28rpx;
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+}
+
 /* Recording Wave Animation */
 .chat-room__recording-wave {
     display: flex;

@@ -341,6 +341,158 @@ interface IConnectionData {
 
 ---
 
+### IAsrSession（ASR 会话）
+
+ASR 实时语音识别会话的运行时数据。
+
+#### 定义
+
+```typescript
+interface IAsrSession {
+  sessionId: string;          // 会话唯一标识（客户端生成的 UUID）
+  roomId: string;             // 所属房间ID
+  speakerId: string;          // 发言者 userId
+  status: EAsrSessionStatus;  // 会话状态
+  startedAt: number;          // 开始时间戳（毫秒）
+  lastAudioSeq: number;       // 最后接收的音频序号
+  tencentWsConn?: WebSocket;  // 腾讯云 ASR WebSocket 连接
+}
+```
+
+#### 字段说明
+
+| 字段 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `sessionId` | string | 客户端生成的唯一标识（UUID） | `"session-abc-def-ghi"` |
+| `roomId` | string | 所属房间ID | `"room-123456"` |
+| `speakerId` | string | 发言者用户ID | `"user-12345"` |
+| `status` | EAsrSessionStatus | 会话状态 | `"ACTIVE"`, `"STOPPED"`, `"ERROR"` |
+| `startedAt` | number | Unix 时间戳（毫秒） | `1737849600000` |
+| `lastAudioSeq` | number | 用于检测乱序和重复 | `42` |
+| `tencentWsConn` | WebSocket? | 腾讯云连接对象 | - |
+
+#### 业务约束
+
+- ✅ `sessionId` 由客户端生成（幂等性控制）
+- ✅ `lastAudioSeq` 单调递增，用于丢弃重复帧
+- ✅ 会话超时：30s 无音频自动 STOP
+- ✅ 会话清理：STOP 后 5s 自动清理资源
+
+#### 生命周期
+
+```
+1. ASR_START → 创建会话（ACTIVE）
+2. ASR_AUDIO × N → 更新 lastAudioSeq
+3. ASR_STOP → 状态变为 STOPPED
+4. 5秒后 → 清理会话
+```
+
+#### 示例
+
+```json
+{
+  "sessionId": "session-f47ac10b-58cc",
+  "roomId": "room-123456",
+  "speakerId": "user-12345",
+  "status": "ACTIVE",
+  "startedAt": 1737849600000,
+  "lastAudioSeq": 42
+}
+```
+
+---
+
+### EAsrSessionStatus（ASR 会话状态）
+
+ASR 会话的状态枚举。
+
+#### 定义
+
+```typescript
+enum EAsrSessionStatus {
+  Active = 'ACTIVE',      // 会话进行中
+  Stopped = 'STOPPED',    // 已停止
+  Error = 'ERROR',        // 异常结束
+}
+```
+
+#### 状态转换图
+
+```
+[ASR_START]
+   ↓
+ACTIVE (录音中)
+   ↓ (ASR_STOP / 超时)
+STOPPED (已结束)
+   ↓ (5秒后)
+[清理]
+
+[异常]
+   ↓
+ERROR
+   ↓ (立即)
+[清理]
+```
+
+#### 转换规则
+
+| 当前状态 | 事件 | 新状态 |
+|---------|------|--------|
+| - | ASR_START | `ACTIVE` |
+| `ACTIVE` | ASR_STOP | `STOPPED` |
+| `ACTIVE` | 30s 无音频 | `STOPPED` |
+| `ACTIVE` | ASR 服务异常 | `ERROR` |
+| `STOPPED` | 5s 后 | 清理 |
+| `ERROR` | 立即 | 清理 |
+
+---
+
+### EAsrTextType（ASR 文本类型）
+
+ASR 识别文本的类型枚举。
+
+#### 定义
+
+```typescript
+enum EAsrTextType {
+  Partial = 'PARTIAL',    // 实时文本（非稳态）
+  Final = 'FINAL',        // 最终文本（稳态）
+}
+```
+
+#### 类型说明
+
+| 类型 | 描述 | 用途 | 覆盖规则 |
+|------|------|------|---------|
+| `PARTIAL` | 实时转写中间结果 | 实时展示 | 新的覆盖旧的 |
+| `FINAL` | 已确认文本 | 固化展示、用于分析 | 不可覆盖 |
+
+#### 在 ASR_TEXT 消息中的体现
+
+```typescript
+// Partial 示例
+{
+  "type": "ASR_TEXT",
+  "data": {
+    "isFinal": false,  // ← 对应 Partial
+    "text": "我觉得你刚才…",
+    // ...
+  }
+}
+
+// Final 示例
+{
+  "type": "ASR_TEXT",
+  "data": {
+    "isFinal": true,   // ← 对应 Final
+    "text": "我觉得你刚才说的不对",
+    // ...
+  }
+}
+```
+
+---
+
 ## 数据传输对象（DTO）
 
 ### CreateRoomRequest
@@ -482,6 +634,83 @@ interface IErrorMessage {
 
 ---
 
+### IAsrStartMessage
+
+开始 ASR 会话消息（客户端 → 服务器）。
+
+```typescript
+interface IAsrStartMessage {
+  type: "ASR_START";
+  data: {
+    roomId: string;
+    speakerId: string;
+    sessionId: string;
+  };
+  timestamp: number;
+}
+```
+
+---
+
+### IAsrAudioMessage
+
+发送音频数据消息（客户端 → 服务器）。
+
+```typescript
+interface IAsrAudioMessage {
+  type: "ASR_AUDIO";
+  data: {
+    roomId: string;
+    sessionId: string;
+    seq: number;
+    audio: string;              // Base64 编码
+    format: 'pcm' | 'opus';
+    sampleRate: number;
+  };
+  timestamp: number;
+}
+```
+
+---
+
+### IAsrStopMessage
+
+停止 ASR 会话消息（客户端 → 服务器）。
+
+```typescript
+interface IAsrStopMessage {
+  type: "ASR_STOP";
+  data: {
+    roomId: string;
+    sessionId: string;
+  };
+  timestamp: number;
+}
+```
+
+---
+
+### IAsrTextMessage
+
+接收识别文本消息（服务器 → 客户端）。
+
+```typescript
+interface IAsrTextMessage {
+  type: "ASR_TEXT";
+  data: {
+    roomId: string;
+    speakerId: string;
+    sessionId: string;
+    isFinal: boolean;
+    text: string;
+    confidence: number;
+  };
+  timestamp: number;
+}
+```
+
+---
+
 ## 数据存储
 
 ### 内存存储结构
@@ -493,6 +722,10 @@ class RoomRepository {
   private roomsById: Map<string, IRoom>;      // roomId → Room
   private roomsByCode: Map<string, string>;   // roomCode → roomId
 }
+
+class AsrManager {
+  private sessions: Map<string, IAsrSession>; // sessionId → AsrSession
+}
 ```
 
 ### 索引策略
@@ -501,6 +734,7 @@ class RoomRepository {
 |------|----|----|------|
 | `roomsById` | roomId | IRoom | 根据 ID 查找房间 |
 | `roomsByCode` | roomCode | roomId | 根据代码查找房间 |
+| `sessions` | sessionId | IAsrSession | 根据会话ID查找 ASR 会话 |
 
 ### 数据持久化（未来）
 
@@ -616,6 +850,18 @@ IMessage
 ├── content: IMessageContent
 │   └── { type: "TEXT", text: string }
 └── createdAt: number
+
+IAsrSession
+├── sessionId: string
+├── roomId: string
+├── speakerId: string
+├── status: EAsrSessionStatus
+│   ├── ACTIVE
+│   ├── STOPPED
+│   └── ERROR
+├── startedAt: number
+├── lastAudioSeq: number
+└── tencentWsConn?: WebSocket
 ```
 
 ---
@@ -648,3 +894,4 @@ IMessage
 - [加入房间](features/02-join-room.md)
 - [聊天消息](features/03-chat-messaging.md)
 - [错误处理](features/05-error-handling.md)
+- [ASR 实时语音识别](features/07-asr-real-time-speech.md)

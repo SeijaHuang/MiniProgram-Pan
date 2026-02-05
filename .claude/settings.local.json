@@ -9,7 +9,9 @@
             "Bash(npm run format:*)",
             "Bash(npx lint-staged:*)",
             "Bash(node:*)",
-            "Bash(dir:*)"
+            "Bash(dir:*)",
+            "Bash(npx tsc:*)",
+            "Bash(findstr:*)"
         ]
     }
 }

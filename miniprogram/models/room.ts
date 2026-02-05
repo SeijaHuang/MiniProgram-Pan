@@ -3,7 +3,7 @@
  * Represents a chat room
  */
 
-import type { IUser } from '@/models/user';
+import type { IUser } from './user';
 
 export enum ERoomStatus {
     Waiting = 'WAITING',

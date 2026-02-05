@@ -12,10 +12,12 @@ export enum EWSMessageType {
     // Client → Server
     JoinRoom = 'JOIN_ROOM',
     ChatSend = 'CHAT_SEND',
+    AsrTextPush = 'ASR_TEXT_PUSH',
 
     // Server → Client
     JoinAck = 'JOIN_ACK',
     ChatReceive = 'CHAT_RECEIVE',
+    AsrText = 'ASR_TEXT',
     Error = 'ERROR',
 }
 

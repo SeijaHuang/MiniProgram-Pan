@@ -12,14 +12,7 @@
         "plugin:prettier/recommended"
     ],
     "plugins": ["@typescript-eslint", "prettier", "import"],
-    "settings": {
-        "import/resolver": {
-            "typescript": {
-                "alwaysTryTypes": true,
-                "project": "./tsconfig.json"
-            }
-        }
-    },
+    "settings": {},
     "env": {
         "es6": true,
         "node": true
@@ -54,14 +47,6 @@
                     "sibling",
                     "index"
                 ],
-                "pathGroups": [
-                    {
-                        "pattern": "@/**",
-                        "group": "internal",
-                        "position": "after"
-                    }
-                ],
-                "pathGroupsExcludedImportTypes": ["builtin"],
                 "newlines-between": "always",
                 "alphabetize": {
                     "order": "asc",
@@ -75,8 +60,8 @@
             {
                 "patterns": [
                     {
-                        "group": ["../*", "./*"],
-                        "message": "请使用 @/ 别名路径代替相对路径"
+                        "group": ["@/*"],
+                        "message": "请使用相对路径代替 @/ 别名路径"
                     }
                 ]
             }
