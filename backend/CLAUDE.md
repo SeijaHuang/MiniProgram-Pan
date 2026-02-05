@@ -73,9 +73,9 @@ Three-layer architecture: Routes → Controllers → Services → (Repositories)
 
 ## WebSocket Message Protocol
 
-**Client → Server**: `JOIN_ROOM`, `DRUM_TAP`, `CHAT_SEND`
+**Client → Server**: `JOIN_ROOM`, `CHAT_SEND`, `ASR_TEXT_PUSH`, `DRUM_TAP`
 
-**Server → Client**: `JOIN_ACK`, `DRUM_READY`, `DRUM_START`, `DRUM_TAP`, `DRUM_FINISH`, `DRUM_RESULT`, `CHAT_RECEIVE`, `ERROR`
+**Server → Client**: `JOIN_ACK`, `CHAT_RECEIVE`, `ASR_TEXT`, `DRUM_READY`, `DRUM_START`, `DRUM_TAP`, `DRUM_FINISH`, `DRUM_RESULT`, `ERROR`
 
 All messages follow structure:
 ```typescript
