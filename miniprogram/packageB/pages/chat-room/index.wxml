@@ -72,7 +72,7 @@
                     <text class="chat-room__message-text">{{item.content}}</text>
                 </view>
                 <view class="chat-room__message-role">
-                    <text>{{item.role === 'A' ? '原告' : '被告'}}</text>
+                    <text>{{item.role === 'Organizer' ? '原告' : '被告'}}</text>
                 </view>
             </view>
         </view>

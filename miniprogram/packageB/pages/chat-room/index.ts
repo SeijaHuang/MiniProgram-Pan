@@ -8,7 +8,7 @@ import { asrService } from '../../../services/asr-service';
 import { chatService } from '../../../services/chat-service';
 import { stsService } from '../../../services/sts-service';
 import type { ISTSCredentials } from '../../../types/sts-api';
-import { EWSErrorCode } from '../../../types/websocket-common';
+import { EPlayerRole } from '../../../types/websocket-common';
 
 // 引入腾讯云语音识别插件
 const QCloudAIVoicePlugin = requirePlugin('QCloudAIVoice');
@@ -17,11 +17,10 @@ type AsrManager = ReturnType<
 >;
 
 type Phase = 'SPEAKER_A' | 'SPEAKER_B' | 'DONE';
-type Role = 'A' | 'B';
 
 interface IDisplayMessage {
     id: number;
-    role: Role;
+    role: EPlayerRole;
     content: string;
     timestamp: number;
 }
@@ -39,7 +38,7 @@ interface IChatRoomPageData {
 
     // 核心状态机字段
     phase: Phase;
-    localRole: Role;
+    localRole: EPlayerRole;
     remaining: number;
     totalPerTurn: number;
 
@@ -77,7 +76,6 @@ interface IChatRoomPageData {
 
 interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     timerId: number | null;
-    recorderManager: WechatMiniprogram.RecorderManager | null;
     reactionIdCounter: number;
     reactionTimeouts: number[];
     messageIdCounter: number;
@@ -127,7 +125,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         roomCode: '',
 
         phase: 'SPEAKER_A',
-        localRole: 'A',
+        localRole: EPlayerRole.Organizer,
         remaining: TOTAL_PER_TURN,
         totalPerTurn: TOTAL_PER_TURN,
 
@@ -159,7 +157,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     timerId: null,
-    recorderManager: null,
     reactionIdCounter: 0,
     reactionTimeouts: [],
     messageIdCounter: 0,
@@ -169,16 +166,19 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     onLoad(options): void {
         // 解析页面参数
         const roomCode = options.roomCode ?? '';
-        const localRole: Role = options.role === 'B' ? 'B' : 'A';
+        const localRole: EPlayerRole =
+            options.role === EPlayerRole.Joiner
+                ? EPlayerRole.Joiner
+                : EPlayerRole.Organizer;
 
-        // // 校验 roomCode
-        // if (!roomCode) {
-        //     void wx.showToast({ title: '房间号无效', icon: 'error' });
-        //     setTimeout(() => {
-        //         void wx.navigateBack();
-        //     }, 1500);
-        //     return;
-        // }
+        // 校验 roomCode
+        if (!roomCode) {
+            void wx.showToast({ title: '房间号无效', icon: 'error' });
+            setTimeout(() => {
+                void wx.navigateBack();
+            }, 1500);
+            return;
+        }
 
         // 计算初始权限
         const canSpeak: boolean = this.computeCanSpeak('SPEAKER_A', localRole);
@@ -195,16 +195,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             countdownClass: this.getCountdownClass(TOTAL_PER_TURN),
         });
 
-        // 初始化聊天服务
-        this.initChatService();
-
-        // 初始化 ASR WebSocket 服务（需要在 chatService 之后初始化）
+        // 初始化 ASR WebSocket 服务
         this.initASRService();
 
-        // 初始化录音管理器
-        this.initRecorderManager();
-
-        // 初始化语音识别管理器（需要在录音管理器之后初始化）
+        // 初始化语音识别管理器
         this.initAsrManager();
 
         // 权限检查移到用户按下麦克风时进行
@@ -239,9 +233,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             this.timerId = null;
         }
 
-        // 停止录音
-        if (this.recorderManager && this.data.isRecording) {
-            this.recorderManager.stop();
+        // 停止语音识别
+        if (this.asrManager && this.data.isRecording) {
+            this.asrManager.stop();
         }
 
         // 清理 ASR WebSocket 服务
@@ -258,13 +252,15 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
     /**
      * 计算 canSpeak 权限
+     * SPEAKER_A 阶段：Organizer（赢家）先说
+     * SPEAKER_B 阶段：Joiner（输家）后说
      */
-    computeCanSpeak(phase: Phase, localRole: Role): boolean {
+    computeCanSpeak(phase: Phase, localRole: EPlayerRole): boolean {
         if (phase === 'SPEAKER_A') {
-            return localRole === 'A';
+            return localRole === EPlayerRole.Organizer;
         }
         if (phase === 'SPEAKER_B') {
-            return localRole === 'B';
+            return localRole === EPlayerRole.Joiner;
         }
         return false;
     },
@@ -280,21 +276,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return 'warn';
         }
         return 'normal';
-    },
-
-    /**
-     * 初始化聊天服务
-     */
-    initChatService(): void {
-        chatService.initialize(
-            (message: IMessage) => {
-                this.handleMessageReceived(message);
-            },
-            (code: EWSErrorCode, errorMessage: string) => {
-                console.error('[ChatRoom] Chat error:', code, errorMessage);
-                void wx.showToast({ title: errorMessage, icon: 'error' });
-            }
-        );
     },
 
     /**
@@ -365,9 +346,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             role:
                 message.sender.userId === wx.getStorageSync('userId')
                     ? localRole
-                    : localRole === 'A'
-                      ? 'B'
-                      : 'A',
+                    : localRole === EPlayerRole.Organizer
+                      ? EPlayerRole.Joiner
+                      : EPlayerRole.Organizer,
             content:
                 message.type === EMessageType.Text &&
                 message.content.type === EMessageType.Text
@@ -378,28 +359,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         this.setData({
             messages: [...this.data.messages, displayMessage],
-        });
-    },
-
-    /**
-     * 初始化录音管理器
-     */
-    initRecorderManager(): void {
-        this.recorderManager = wx.getRecorderManager();
-
-        this.recorderManager.onStart(() => {
-            this.setData({ isRecording: true });
-        });
-
-        this.recorderManager.onStop(() => {
-            this.setData({ isRecording: false });
-            // TODO: 后续对接 WebSocket，发送录音文件
-        });
-
-        this.recorderManager.onError(err => {
-            console.error('[ChatRoom] Recording error', err);
-            this.setData({ isRecording: false });
-            void wx.showToast({ title: '录音出错', icon: 'error' });
         });
     },
 
@@ -717,9 +676,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     switchPhase(): void {
         const { phase, localRole, totalPerTurn } = this.data;
 
-        // 强制停止录音
-        if (this.recorderManager && this.data.isRecording) {
-            this.recorderManager.stop();
+        // 强制停止语音识别
+        if (this.asrManager && this.data.isRecording) {
+            this.asrManager.stop();
         }
 
         const nextPhase: Phase = PHASE_TRANSITION[phase];
@@ -949,8 +908,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         this.setData({
             reactions: [...this.data.reactions, newReaction],
         });
-
-        // TODO: 后续对接 WebSocket，发送表情给对方
     },
 
     /**
@@ -985,7 +942,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * @param role 发送者角色
      * @param content 语音转文字内容
      */
-    addMessage(role: Role, content: string): void {
+    addMessage(role: EPlayerRole, content: string): void {
         const id: number = ++this.messageIdCounter;
         const timestamp: number = Date.now();
 

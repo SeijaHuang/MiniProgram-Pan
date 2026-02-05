@@ -368,14 +368,19 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Navigate to chat room after delay
         this._resultTimer = setTimeout(() => {
-            // const { roomId, organizerScore, joinerScore } = this.data;
-            // const url: string = `/pages/chat-room/index?roomId=${roomId}&firstSpeaker=${winnerRole}&organizerScore=${organizerScore}&joinerScore=${joinerScore}`;
-            // wx.redirectTo({
-            //     url,
-            //     fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
-            //         console.error('[DrumRoom] Navigate failed:', err);
-            //     },
-            // });
+            const { roomId, selfRole } = this.data;
+            // Winner speaks first (Organizer), loser speaks second (Joiner)
+            const chatRole: EPlayerRole =
+                selfRole === winnerRole
+                    ? EPlayerRole.Organizer
+                    : EPlayerRole.Joiner;
+            const url: string = `/packageB/pages/chat-room/index?roomCode=${roomId}&role=${chatRole}`;
+            wx.redirectTo({
+                url,
+                fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
+                    console.error('[DrumRoom] Navigate failed:', err);
+                },
+            });
         }, RESULT_DISPLAY_MS);
     },
 
