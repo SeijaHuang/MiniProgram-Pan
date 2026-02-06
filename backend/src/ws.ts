@@ -26,6 +26,7 @@ export function initWebSocket(server: HttpServer): void {
 
     wss.on('connection', (ws: WebSocket) => {
         const connectionId = generateConnectionId();
+        console.log(`[WebSocket] Client connected: ${connectionId}`);
 
         // Register connection
         connectionManager.registerConnection(connectionId, ws);

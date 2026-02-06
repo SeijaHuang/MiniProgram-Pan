@@ -24,6 +24,10 @@ import {
     type TDrumTapHandlerResult,
 } from '../services/handlers/drum-tap-handler';
 import {
+    handleEmojiText,
+    type TEmojiTextHandlerResult,
+} from '../services/handlers/emoji-text-handler';
+import {
     handleASRTextPush,
     type TASRTextPushHandlerResult,
     type IASRTextPushResult,
@@ -36,9 +40,9 @@ import type {
     IChatSendMessage,
     IDrumTapMessage,
     IASRTextPushMessage,
+    IEmojiSendMessage,
 } from '../types/websocket';
-import { EWSMessageType, EWSErrorCode } from '../types/websocket';
-import { EGamePhase } from '../types/websocket/drum';
+import { EWSMessageType, EWSErrorCode, EGamePhase } from '../types/websocket';
 import { ERoomStatus } from '../models/entities/room';
 import { DRUM_CONFIG, WAITING_ROOM_CONFIG } from '../constants/config';
 
@@ -51,10 +55,6 @@ export class WebSocketController {
         try {
             const messageText = WebSocketController.rawDataToText(data);
             const message = JSON.parse(messageText) as IWSMessage;
-
-            console.log(
-                `[WebSocketController] Received ${message.type} from ${connectionId}`
-            );
 
             // Route message to appropriate handler
             switch (message.type) {
@@ -83,6 +83,13 @@ export class WebSocketController {
                     WebSocketController.handleASRTextPushMessage(
                         connectionId,
                         message as IASRTextPushMessage
+                    );
+                    break;
+
+                case EWSMessageType.EmojiSend:
+                    WebSocketController.handleEmojiSendMessage(
+                        connectionId,
+                        message as IEmojiSendMessage
                     );
                     break;
 
@@ -250,6 +257,44 @@ export class WebSocketController {
         if (result.shouldBroadcast) {
             WebSocketController.broadcastASRText(connectionId, result);
         }
+    }
+
+    /**
+     * Handle EMOJI_SEND message
+     * Calls business logic handler and broadcasts to other participants
+     */
+    private static handleEmojiSendMessage(
+        connectionId: string,
+        message: IEmojiSendMessage
+    ): void {
+        const result: TEmojiTextHandlerResult = handleEmojiText(
+            connectionManager,
+            connectionId,
+            message
+        );
+
+        if (!result.success) {
+            WebSocketController.sendError(
+                connectionId,
+                result.code,
+                result.message
+            );
+            return;
+        }
+
+        // Broadcast EMOJI_RECEIVE to ALL participants
+        connectionManager.broadcastToRoomExcept(
+            result.roomId,
+            {
+                type: EWSMessageType.EmojiReceive,
+                data: {
+                    roomId: result.roomId,
+                    emoji: result.message.emoji,
+                },
+                timestamp: Date.now(),
+            },
+            connectionId
+        );
     }
 
     /**
