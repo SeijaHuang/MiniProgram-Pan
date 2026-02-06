@@ -13,13 +13,21 @@
 
 ## 特性
 
-- ✅ 严格的双人房间系统（最多2人）
-- ✅ HTTP用于房间创建，WebSocket用于实时通信
-- ✅ 房间状态机：WAITING → READY → CLOSED
-- ✅ 完整的错误处理和验证
-- ✅ TypeScript类型安全
-- ✅ 三层架构设计，职责分离
-- ✅ Repository模式，支持未来数据库集成
+### 核心功能
+
+- ✅ **双人房间系统**: 严格的2人房间限制，房间代码邀请机制
+- ✅ **震天鼓游戏**: 实时竞技小游戏，决定发言顺序
+- ✅ **实时聊天**: WebSocket 双向通信，消息广播
+- ✅ **语音识别（ASR）**: 客户端直连腾讯云 ASR，后端负责文本同步
+- ✅ **STS Token 服务**: 为客户端提供临时安全凭证
+
+### 技术特性
+
+- ✅ **房间状态机**: WAITING → READY → CLOSED
+- ✅ **完整的错误处理**: 统一错误码和验证
+- ✅ **TypeScript 类型安全**: 所有接口完全类型化
+- ✅ **三层架构设计**: Controller → Service → Repository
+- ✅ **去重和节流**: ASR 文本同步优化机制
 
 ---
 
@@ -287,7 +295,8 @@ backend/src/
 │   └── handlers/           # 消息处理器
 │       ├── join-room-handler.ts
 │       ├── chat-send-handler.ts
-│       └── drum-tap-handler.ts
+│       ├── drum-tap-handler.ts
+│       └── asr-text-handler.ts
 ├── models/
 │   ├── entities/           # 领域实体 (Room, User, Message)
 │   ├── schemas/            # Zod 验证
@@ -376,7 +385,24 @@ CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 **协议**:
 - HTTP: 创建房间 `POST /room/create`
 - HTTP: 获取腾讯云 STS Token `GET /tencent/credentials`
-- WebSocket: 加入房间、实时聊天、语音识别 `ws://localhost:8080/ws`
+- WebSocket: 加入房间、实时聊天、语音识别、震天鼓游戏 `ws://localhost:8080/ws`
+
+### WebSocket 消息类型
+
+| 消息类型 | 方向 | 功能 |
+|---------|------|------|
+| `JOIN_ROOM` | Client → Server | 加入房间 |
+| `JOIN_ACK` | Server → Client | 确认加入（广播） |
+| `CHAT_SEND` | Client → Server | 发送文本消息 |
+| `CHAT_RECEIVE` | Server → Client | 接收消息（广播） |
+| `ASR_TEXT_PUSH` | Client → Server | 推送语音识别文本 |
+| `ASR_TEXT` | Server → Client | 广播识别文本 |
+| `DRUM_READY` | Server → Client | 游戏准备 |
+| `DRUM_START` | Server → Client | 游戏开始 |
+| `DRUM_TAP` | Bidirectional | 点击事件 |
+| `DRUM_FINISH` | Server → Client | 游戏结束 |
+| `DRUM_RESULT` | Server → Client | 最终结果 |
+| `ERROR` | Server → Client | 错误通知 |
 
 ### 详细 API 文档
 
@@ -444,9 +470,51 @@ Routes (路由) → Controllers (控制器) → Services (服务) → Repositori
 - 📊 [数据模型](docs/data-models.md) - Room, User, Message 等实体定义
 - 📋 [产品需求](docs/product-requirements.md) - 功能需求和验收标准
 
+---
+
+## 🎤 ASR 语音识别架构
+
+本项目采用**客户端直连架构**实现 ASR 功能：
+
+```
+┌─────────────┐                    ┌──────────────────┐
+│   客户端 A   │◄──────WebSocket───►│   后端服务器      │
+│  (发言者)    │                    │                  │
+└─────────────┘                    │  - 去重 (seq)     │
+       │                           │  - 节流 (200ms)   │
+       │ 临时凭证                   │  - 广播           │
+       ↓                           └──────────────────┘
+┌─────────────┐                            │
+│ 腾讯云 ASR   │                            │ ASR_TEXT
+│  WebSocket  │                            ↓
+└─────────────┘                    ┌─────────────┐
+       │                            │   客户端 B   │
+       │ 识别结果                    │  (听众)      │
+       └──► 本地显示 + ASR_TEXT_PUSH ►└─────────────┘
+```
+
+### 工作流程
+
+1. **客户端获取临时凭证**: `GET /tencent/credentials`
+2. **客户端直连腾讯云 ASR**: 使用临时凭证进行语音识别
+3. **客户端推送识别结果**: 通过 `ASR_TEXT_PUSH` 发送给后端
+4. **后端处理和广播**: 去重、节流后通过 `ASR_TEXT` 广播给其他参与者
+
+### 优势
+
+- ✅ **低延迟**: 客户端直连，无服务器中转
+- ✅ **高可用**: 后端故障不影响语音识别
+- ✅ **省带宽**: 音频数据不经过后端
+- ✅ **安全**: 使用 STS 临时凭证，永久密钥不暴露
+
+详细文档：[ASR 实时语音识别](docs/features/07-asr-real-time-speech.md)
+
+---
+
 ## 更多信息
 
 - 规范文档：[../.cursor/rules/04-websocket.md](../.cursor/rules/04-websocket.md)
+- 后端 CLAUDE 指南：[CLAUDE.md](CLAUDE.md)
 
 ---
 

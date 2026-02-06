@@ -19,11 +19,17 @@ miniprogram/
 ├── app.json                # 全局配置
 ├── app.wxss                # 全局样式
 │
-├── pages/                  # 页面目录
-│   ├── welcome/            # 欢迎页 - 首页入口
-│   ├── waiting-room/       # 等待房间 - 创建/加入房间
-│   ├── drum/               # 震天鼓 - 10秒点击竞争
-│   └── chat-room/          # 对簿公堂 - 轮流语音申冤
+├── pages/                  # 主包页面
+│   └── welcome/            # 欢迎页 - 首页入口
+│
+├── packageA/               # 分包 A - 房间和游戏
+│   └── pages/
+│       ├── waiting-room/   # 等待房间 - 创建/加入房间
+│       └── drum-room/      # 震天鼓 - 10秒点击竞争
+│
+├── packageB/               # 分包 B - 聊天功能
+│   └── pages/
+│       └── chat-room/      # 对簿公堂 - 轮流语音申冤
 │
 ├── components/             # 自定义组件
 │   ├── styled-button/      # 样式化按钮 (多色、动画、按压反馈)
@@ -35,7 +41,9 @@ miniprogram/
 │   ├── room-service.ts         # HTTP 房间服务
 │   ├── room-websocket-service.ts # WebSocket 房间服务
 │   ├── drum-service.ts         # 击鼓游戏服务
-│   └── chat-service.ts         # 聊天服务
+│   ├── chat-service.ts         # 聊天服务
+│   ├── asr-service.ts          # ASR 语音识别服务
+│   └── sts-service.ts          # STS Token 服务
 │
 ├── models/                 # 领域模型
 │   ├── user.ts             # IUser
@@ -43,14 +51,23 @@ miniprogram/
 │   └── message.ts          # IMessage
 │
 ├── types/                  # 类型定义
-│   ├── ws-messages.ts      # WebSocket 消息类型
-│   └── api.ts              # HTTP API 类型
+│   ├── websocket-common.ts      # WebSocket 通用类型
+│   ├── room-websocket.ts        # 房间 WebSocket 类型
+│   ├── drum-websocket.ts        # 震天鼓 WebSocket 类型
+│   ├── chat-websocket.ts        # 聊天 WebSocket 类型
+│   ├── asr-websocket.ts         # ASR WebSocket 类型
+│   ├── room-api.ts              # 房间 HTTP API 类型
+│   └── sts-api.ts               # STS Token API 类型
 │
 ├── constants/              # 常量配置
 │   └── config.ts           # API_URL, WS_URL 等
 │
 ├── utils/                  # 工具函数
-│   └── time.ts             # 时间格式化等
+│   ├── time.ts             # 时间格式化
+│   ├── audio.ts            # 音频处理
+│   ├── haptic.ts           # 触觉反馈
+│   ├── random.ts           # 随机数生成
+│   └── util.ts             # 通用工具
 │
 └── assets/                 # 静态资源
     └── images/             # 图片资源
@@ -96,10 +113,16 @@ Chat Room (对簿公堂)
 
 ### 4. 对簿公堂 (Chat Room)
 
-- 顶部倒计时 (颜色、动画变化)
-- 发言舞台区域
-- 麦克风按钮 (可发言/录音中/禁用)
-- 表情互动系统 (仅监听方可用)
+- **顶部倒计时**: 颜色、动画变化（绿色→黄色→红色）
+- **发言舞台区域**:
+    - 本地语音识别文字实时显示（Partial + Final）
+    - 对方语音识别文字实时显示（通过 WebSocket 同步）
+- **麦克风按钮**: 可发言/录音中/禁用三种状态
+- **表情互动系统**: 仅监听方可用，实时飘屏动画
+- **ASR 语音识别**:
+    - 客户端直连腾讯云 ASR
+    - 实时语音转文字（边说边出字）
+    - 通过 WebSocket 同步给对方
 
 ## 组件说明
 
@@ -171,12 +194,134 @@ const room = await RoomService.createRoom(userId, nickname);
 ### DrumService
 
 ```typescript
-import { DrumService } from './services/drum-service';
+import { drumService } from './services/drum-service';
 
-DrumService.registerHandlers();
-DrumService.sendTap(roomId, role, delta);
-DrumService.unregisterHandlers();
+drumService.registerHandlers();
+drumService.sendTap(roomId, role, delta);
+drumService.unregisterHandlers();
 ```
+
+### ChatService
+
+```typescript
+import { chatService } from './services/chat-service';
+
+// 发送文本消息
+chatService.sendTextMessage('Hello');
+
+// 发送表情反应
+chatService.sendReaction('😀');
+
+// 初始化聊天服务
+chatService.initialize(onChatReceive, onError, onReactionReceive);
+```
+
+### ASRService
+
+```typescript
+import { asrService } from './services/asr-service';
+
+// 推送识别文本到服务器
+asrService.sendPartial('我认为...'); // 实时文本
+asrService.sendFinal('我认为这样不对'); // 最终文本
+
+// 重置序列号（新的录音会话）
+asrService.resetSequence();
+```
+
+### STSService
+
+```typescript
+import { stsService } from './services/sts-service';
+
+// 获取腾讯云临时凭证
+const credentials = await stsService.getCredentials();
+// {
+//   token: string,
+//   tmpSecretId: string,
+//   tmpSecretKey: string,
+//   expiredTime: number
+// }
+```
+
+## ASR 语音识别架构
+
+本项目采用**客户端直连架构**实现实时语音转文字功能：
+
+```
+┌─────────────────┐
+│   Chat Room     │
+│   (发言者)       │
+└────────┬────────┘
+         │
+         │ 1. 获取 STS Token
+         ↓
+┌─────────────────┐
+│  STS Service    │──► GET /tencent/credentials
+└────────┬────────┘
+         │
+         │ 2. 使用临时凭证连接
+         ↓
+┌─────────────────┐
+│  腾讯云 ASR      │
+│  WebSocket      │
+└────────┬────────┘
+         │
+         │ 3. 返回识别结果
+         ↓
+┌─────────────────┐
+│  ASR Service    │
+│  (本地显示)      │
+└────────┬────────┘
+         │
+         │ 4. 推送文本到服务器
+         ↓
+┌─────────────────┐
+│  WebSocket      │──► ASR_TEXT_PUSH
+│  (后端服务器)    │
+└────────┬────────┘
+         │
+         │ 5. 广播给对方
+         ↓
+┌─────────────────┐
+│  Chat Room      │◄─── ASR_TEXT
+│  (听众)          │
+└─────────────────┘
+```
+
+### 工作流程
+
+1. **获取临时凭证**: 页面加载时调用 `GET /tencent/credentials`
+2. **连接腾讯云 ASR**: 使用 STS Token 初始化腾讯云语音识别插件
+3. **本地语音识别**: 客户端直接与腾讯云通信，获得实时识别结果
+4. **推送识别文本**: 通过 `ASR_TEXT_PUSH` 消息发送给后端
+5. **广播给对方**: 后端进行去重、节流后通过 `ASR_TEXT` 广播
+
+### 优势
+
+- ✅ **低延迟**: 客户端直连腾讯云，无服务器中转
+- ✅ **高可用**: 后端故障不影响语音识别功能
+- ✅ **安全**: 使用临时凭证，永久密钥不暴露
+- ✅ **实时体验**: 边说边显示，即时反馈
+
+### WebSocket 消息类型
+
+| 消息类型        | 方向            | 说明             |
+| --------------- | --------------- | ---------------- |
+| `JOIN_ROOM`     | Client → Server | 加入房间         |
+| `JOIN_ACK`      | Server → Client | 确认加入（广播） |
+| `CHAT_SEND`     | Client → Server | 发送文本消息     |
+| `CHAT_RECEIVE`  | Server → Client | 接收消息（广播） |
+| `ASR_TEXT_PUSH` | Client → Server | 推送识别文本     |
+| `ASR_TEXT`      | Server → Client | 广播识别文本     |
+| `DRUM_READY`    | Server → Client | 游戏准备         |
+| `DRUM_START`    | Server → Client | 游戏开始         |
+| `DRUM_TAP`      | Bidirectional   | 点击事件         |
+| `DRUM_FINISH`   | Server → Client | 游戏结束         |
+| `DRUM_RESULT`   | Server → Client | 最终结果         |
+| `ERROR`         | Server → Client | 错误通知         |
+
+---
 
 ## 开发规范
 
@@ -266,6 +411,50 @@ WebSocketManager.getInstance().registerHandler('DRUM_TAP', this.handleDrumTap);
 WebSocketManager.getInstance().unregisterHandler('DRUM_TAP');
 ```
 
+## 依赖插件
+
+### 腾讯云实时语音识别插件
+
+本项目使用腾讯云官方语音识别插件：
+
+```json
+{
+    "plugins": {
+        "QCloudAIVoice": {
+            "version": "latest",
+            "provider": "wxee1a5830fc02fadc"
+        }
+    }
+}
+```
+
+**使用**:
+
+```typescript
+const QCloudAIVoicePlugin = requirePlugin('QCloudAIVoice');
+const manager = QCloudAIVoicePlugin.speechRecognizerManager();
+
+// 初始化
+manager.init({
+    secretId: credentials.tmpSecretId,
+    secretKey: credentials.tmpSecretKey,
+    token: credentials.token,
+});
+
+// 监听识别结果
+manager.OnRecognitionResultChange = res => {
+    const text = res.result?.voice_text_str;
+    // 处理实时识别文本
+};
+
+manager.OnRecognitionComplete = res => {
+    const text = res.result?.voice_text_str;
+    // 处理最终识别文本
+};
+```
+
+---
+
 ## 文档
 
 详细文档请查看 `docs/miniprogram/`:
@@ -274,6 +463,7 @@ WebSocketManager.getInstance().unregisterHandler('DRUM_TAP');
 - [等待房间](../docs/miniprogram/waiting-room.md)
 - [震天鼓](../docs/miniprogram/drum-room.md)
 - [对簿公堂](../docs/miniprogram/chat-room.md)
+- [ASR 实时语音识别 PRD](../docs/miniprogram/chat-room-asr-prd.md)
 - [组件文档](../docs/miniprogram/components.md)
 - [服务文档](../docs/miniprogram/services.md)
 
