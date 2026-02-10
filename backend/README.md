@@ -395,6 +395,8 @@ CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 | `JOIN_ACK` | Server → Client | 确认加入（广播） |
 | `CHAT_SEND` | Client → Server | 发送文本消息 |
 | `CHAT_RECEIVE` | Server → Client | 接收消息（广播） |
+| `EMOJI_SEND` | Client → Server | 发送 Emoji 表情 |
+| `EMOJI_RECEIVE` | Server → Client | 接收 Emoji（广播） |
 | `ASR_TEXT_PUSH` | Client → Server | 推送语音识别文本 |
 | `ASR_TEXT` | Server → Client | 广播识别文本 |
 | `DRUM_READY` | Server → Client | 游戏准备 |
@@ -403,6 +405,293 @@ CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 | `DRUM_FINISH` | Server → Client | 游戏结束 |
 | `DRUM_RESULT` | Server → Client | 最终结果 |
 | `ERROR` | Server → Client | 错误通知 |
+
+### WebSocket 消息格式详解
+
+#### 1. 加入房间 (JOIN_ROOM / JOIN_ACK)
+
+**Client → Server: JOIN_ROOM**
+
+```json
+{
+    "type": "JOIN_ROOM",
+    "data": {
+        "roomCode": "A1B2C3",
+        "user": {
+            "userId": "user_alice_1738426800000",
+            "nickname": "Alice"
+        }
+    },
+    "timestamp": 1738426800000
+}
+```
+
+**Server → Client: JOIN_ACK** (广播给房间内所有用户)
+
+```json
+{
+    "type": "JOIN_ACK",
+    "data": {
+        "room": {
+            "roomId": "room_A1B2C3_1738426800000",
+            "roomCode": "A1B2C3",
+            "status": "READY",
+            "hostUserId": "user_alice_1738426800000",
+            "participants": [
+                {
+                    "user": {
+                        "userId": "user_alice_1738426800000",
+                        "nickname": "Alice"
+                    },
+                    "joinedAt": 1738426800000
+                },
+                {
+                    "user": {
+                        "userId": "user_bob_1738426810000",
+                        "nickname": "Bob"
+                    },
+                    "joinedAt": 1738426810000
+                }
+            ],
+            "createdAt": 1738426800000
+        }
+    },
+    "timestamp": 1738426810100
+}
+```
+
+#### 2. 文字聊天 (CHAT_SEND / CHAT_RECEIVE)
+
+**Client → Server: CHAT_SEND**
+
+```json
+{
+    "type": "CHAT_SEND",
+    "data": {
+        "content": {
+            "type": "TEXT",
+            "text": "Hello, world!"
+        }
+    },
+    "timestamp": 1738426850000
+}
+```
+
+**Server → Client: CHAT_RECEIVE** (广播给房间内所有用户)
+
+```json
+{
+    "type": "CHAT_RECEIVE",
+    "data": {
+        "message": {
+            "messageId": "msg_abc123",
+            "roomId": "room_A1B2C3_1738426800000",
+            "sender": {
+                "userId": "user_alice_1738426800000",
+                "nickname": "Alice"
+            },
+            "type": "TEXT",
+            "content": {
+                "type": "TEXT",
+                "text": "Hello, world!"
+            },
+            "createdAt": 1738426850000
+        }
+    },
+    "timestamp": 1738426850100
+}
+```
+
+#### 3. Emoji 表情 (EMOJI_SEND / EMOJI_RECEIVE)
+
+**Client → Server: EMOJI_SEND**
+
+```json
+{
+    "type": "EMOJI_SEND",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "senderId": "user_alice_1738426800000",
+        "emoji": "👍"
+    },
+    "timestamp": 1738426860000
+}
+```
+
+**Server → Client: EMOJI_RECEIVE** (发送给对方用户)
+
+```json
+{
+    "type": "EMOJI_RECEIVE",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "senderId": "user_alice_1738426800000",
+        "emoji": "👍"
+    },
+    "timestamp": 1738426860100
+}
+```
+
+#### 4. 语音识别 (ASR_TEXT_PUSH / ASR_TEXT)
+
+**Client → Server: ASR_TEXT_PUSH**
+
+```json
+{
+    "type": "ASR_TEXT_PUSH",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "speakerId": "user_alice_1738426800000",
+        "seq": 1,
+        "text": "这是识别的文本",
+        "isFinal": false
+    },
+    "timestamp": 1738426870000
+}
+```
+
+**Server → Client: ASR_TEXT** (广播给对方用户)
+
+```json
+{
+    "type": "ASR_TEXT",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "speakerId": "user_alice_1738426800000",
+        "seq": 1,
+        "text": "这是识别的文本",
+        "isFinal": false
+    },
+    "timestamp": 1738426870100
+}
+```
+
+**说明**:
+- `seq`: 序列号，用于去重（客户端递增）
+- `isFinal`: `false` 表示中间结果，`true` 表示最终结果
+- 后端会进行去重（基于 seq）和节流（200ms）处理
+
+#### 5. 震天鼓游戏
+
+**5.1 Server → Client: DRUM_READY** (房间准备就绪)
+
+```json
+{
+    "type": "DRUM_READY",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "serverTimeMs": 1738426900000,
+        "hostRole": "Organizer",
+        "organizerName": "Alice",
+        "joinerName": "Bob"
+    },
+    "timestamp": 1738426900000
+}
+```
+
+**5.2 Server → Client: DRUM_START** (游戏开始)
+
+```json
+{
+    "type": "DRUM_START",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "startAtMs": 1738426903000
+    },
+    "timestamp": 1738426900100
+}
+```
+
+**5.3 Client → Server: DRUM_TAP** (玩家点击)
+
+```json
+{
+    "type": "DRUM_TAP",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "role": "Organizer",
+        "delta": 5,
+        "clientTimeMs": 1738426905000
+    },
+    "timestamp": 1738426905000
+}
+```
+
+**5.4 Server → Client: DRUM_TAP** (广播对手点击)
+
+```json
+{
+    "type": "DRUM_TAP",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "role": "Joiner",
+        "delta": 3,
+        "clientTimeMs": 1738426905100
+    },
+    "timestamp": 1738426905100
+}
+```
+
+**5.5 Server → Client: DRUM_FINISH** (游戏结束)
+
+```json
+{
+    "type": "DRUM_FINISH",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "endAtMs": 1738426913000
+    },
+    "timestamp": 1738426913000
+}
+```
+
+**5.6 Server → Client: DRUM_RESULT** (最终结果)
+
+```json
+{
+    "type": "DRUM_RESULT",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "organizerScore": 152,
+        "joinerScore": 148,
+        "winnerRole": "Organizer"
+    },
+    "timestamp": 1738426913100
+}
+```
+
+**说明**:
+- `role`: 玩家角色，`"Organizer"` (开房者) 或 `"Joiner"` (加入者)
+- `delta`: 本次批量点击的次数
+- 游戏时长固定为 10 秒
+
+#### 6. 错误通知 (ERROR)
+
+**Server → Client: ERROR**
+
+```json
+{
+    "type": "ERROR",
+    "data": {
+        "code": "ROOM_NOT_FOUND",
+        "message": "Room not found"
+    },
+    "timestamp": 1738426920000
+}
+```
+
+**错误码列表**:
+
+| 错误码 | 说明 |
+|--------|------|
+| `INVALID_PAYLOAD` | 消息格式错误 |
+| `ROOM_NOT_FOUND` | 房间不存在 |
+| `ROOM_FULL` | 房间已满（2人） |
+| `ROOM_CLOSED` | 房间已关闭 |
+| `NOT_PARTICIPANT` | 不是房间成员 |
+| `ROOM_NOT_READY` | 房间未准备好（需要2人） |
+| `ALREADY_JOINED` | 已经加入房间 |
+| `INTERNAL_ERROR` | 服务器内部错误 |
 
 ### 详细 API 文档
 

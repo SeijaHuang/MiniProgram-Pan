@@ -34,6 +34,7 @@ type ASRTextReceiveHandler = (
     seq: number
 ) => void;
 type ASRErrorHandler = (message: string) => void;
+type UnhandledMessageHandler = (data: string) => void;
 
 interface IASRServiceState {
     /** Current room ID */
@@ -51,6 +52,7 @@ interface IASRServiceState {
 class ASRService {
     private asrTextReceiveHandler: ASRTextReceiveHandler | null = null;
     private asrErrorHandler: ASRErrorHandler | null = null;
+    private unhandledMessageHandler: UnhandledMessageHandler | null = null;
 
     private state: IASRServiceState = {
         roomId: null,
@@ -67,17 +69,19 @@ class ASRService {
      * @param onASRTextReceive - Callback when ASR text is received from another participant
      * @param onError - Callback for errors
      */
-    initialize(
-        roomId: string,
-        speakerId: string,
-        onASRTextReceive: ASRTextReceiveHandler,
-        onError?: ASRErrorHandler
-    ): void {
-        this.state.roomId = roomId;
-        this.state.speakerId = speakerId;
+    initialize(options: {
+        roomId: string;
+        speakerId: string;
+        onASRTextReceive: ASRTextReceiveHandler;
+        onError?: ASRErrorHandler;
+        onUnhandledMessage?: UnhandledMessageHandler;
+    }): void {
+        this.state.roomId = options.roomId;
+        this.state.speakerId = options.speakerId;
         this.state.seq = 0;
-        this.asrTextReceiveHandler = onASRTextReceive;
-        this.asrErrorHandler = onError ?? null;
+        this.asrTextReceiveHandler = options.onASRTextReceive;
+        this.asrErrorHandler = options.onError ?? null;
+        this.unhandledMessageHandler = options.onUnhandledMessage ?? null;
 
         // Register message handler
         wsManager.updateCallbacks({
@@ -87,7 +91,7 @@ class ASRService {
         });
 
         console.log(
-            `[ASRService] Initialized for room ${roomId}, speaker ${speakerId}`
+            `[ASRService] Initialized for room ${options.roomId}, speaker ${options.speakerId}`
         );
     }
 
@@ -163,6 +167,7 @@ class ASRService {
         this.state.seq = 0;
         this.asrTextReceiveHandler = null;
         this.asrErrorHandler = null;
+        this.unhandledMessageHandler = null;
 
         console.log('[ASRService] Cleaned up');
     }
@@ -226,6 +231,8 @@ class ASRService {
                 this.handleASRText(message as unknown as IASRTextMessage);
             } else if (message.type === EWSMessageType.Error) {
                 this.handleError(message as unknown as IErrorMessage);
+            } else if (this.unhandledMessageHandler) {
+                this.unhandledMessageHandler(data);
             }
         } catch (error) {
             console.error('[ASRService] Failed to parse message:', error);

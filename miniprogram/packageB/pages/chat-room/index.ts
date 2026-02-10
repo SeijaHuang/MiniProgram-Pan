@@ -2,13 +2,12 @@
  * Chat Room Page - 对簿公堂 / 语音申冤页
  */
 
-import type { IMessage } from '../../../models/message';
-import { EMessageType } from '../../../models/message';
 import { asrService } from '../../../services/asr-service';
-import { chatService } from '../../../services/chat-service';
 import { stsService } from '../../../services/sts-service';
+import { wsManager } from '../../../services/websocket-manager';
+import type { IEmojiReceiveData } from '../../../types/emoji-websocket';
 import type { ISTSCredentials } from '../../../types/sts-api';
-import { EPlayerRole } from '../../../types/websocket-common';
+import { EWSMessageType, EPlayerRole } from '../../../types/websocket-common';
 
 // 引入腾讯云语音识别插件
 const QCloudAIVoicePlugin = requirePlugin('QCloudAIVoice');
@@ -16,7 +15,16 @@ type AsrManager = ReturnType<
     typeof QCloudAIVoicePlugin.speechRecognizerManager
 >;
 
-type Phase = 'SPEAKER_A' | 'SPEAKER_B' | 'DONE';
+enum EPhase {
+    SpeakerA = 'SPEAKER_A',
+    SpeakerB = 'SPEAKER_B',
+    Done = 'DONE',
+}
+
+enum EReactionSource {
+    My = 'my',
+    Opponent = 'opponent',
+}
 
 interface IDisplayMessage {
     id: number;
@@ -30,6 +38,7 @@ interface IReaction {
     emoji: string;
     lane: number; // 0, 1, 2 三条轨道
     timeoutId: number;
+    animationData: WechatMiniprogram.AnimationExportResult;
 }
 
 interface IChatRoomPageData {
@@ -37,7 +46,7 @@ interface IChatRoomPageData {
     roomCode: string;
 
     // 核心状态机字段
-    phase: Phase;
+    phase: EPhase;
     localRole: EPlayerRole;
     remaining: number;
     totalPerTurn: number;
@@ -56,8 +65,10 @@ interface IChatRoomPageData {
     messages: IDisplayMessage[];
 
     // 表情系统
-    reactions: IReaction[];
+    myReactions: IReaction[];
+    opponentReactions: IReaction[];
     emojiList: string[];
+    emojiAnimations: WechatMiniprogram.AnimationExportResult[];
 
     // 语音识别相关（本地）
     speechTextLive: string; // 实时识别文本（Partial）
@@ -77,7 +88,9 @@ interface IChatRoomPageData {
 interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     timerId: number | null;
     reactionIdCounter: number;
-    reactionTimeouts: number[];
+    myReactionTimeouts: number[];
+    opponentReactionTimeouts: number[];
+    rpxToPx: number;
     messageIdCounter: number;
     asrManager: AsrManager; // 语音识别管理器
     stsCredentials: ISTSCredentials | null; // STS 临时凭证
@@ -103,10 +116,10 @@ const MAX_REACTIONS = 3;
 const REACTION_DURATION_MIN = 3000;
 const REACTION_DURATION_MAX = 5000;
 const TOTAL_PER_TURN = 60;
-const PHASE_TRANSITION: Record<Phase, Phase> = {
-    SPEAKER_A: 'SPEAKER_B',
-    SPEAKER_B: 'DONE',
-    DONE: 'DONE',
+const PHASE_TRANSITION: Record<EPhase, EPhase> = {
+    [EPhase.SpeakerA]: EPhase.SpeakerB,
+    [EPhase.SpeakerB]: EPhase.Done,
+    [EPhase.Done]: EPhase.Done,
 };
 const REACTION_LANES = [0, 1, 2];
 
@@ -124,7 +137,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     data: {
         roomCode: '',
 
-        phase: 'SPEAKER_A',
+        phase: EPhase.SpeakerA,
         localRole: EPlayerRole.Organizer,
         remaining: TOTAL_PER_TURN,
         totalPerTurn: TOTAL_PER_TURN,
@@ -138,8 +151,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         messages: [],
 
-        reactions: [],
+        myReactions: [],
+        opponentReactions: [],
         emojiList: EMOJI_LIST,
+        emojiAnimations: [],
 
         // 语音识别相关（本地）
         speechTextLive: '',
@@ -158,7 +173,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
     timerId: null,
     reactionIdCounter: 0,
-    reactionTimeouts: [],
+    myReactionTimeouts: [],
+    opponentReactionTimeouts: [],
+    rpxToPx: 0.5,
     messageIdCounter: 0,
     asrManager: null,
     stsCredentials: null,
@@ -181,18 +198,34 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         }
 
         // 计算初始权限
-        const canSpeak: boolean = this.computeCanSpeak('SPEAKER_A', localRole);
+        const canSpeak: boolean = this.computeCanSpeak(
+            EPhase.SpeakerA,
+            localRole
+        );
         const canReact: boolean = !canSpeak;
+
+        // 计算 rpx → px 换算比例
+        const sysInfo = wx.getSystemInfoSync();
+        this.rpxToPx = sysInfo.windowWidth / 750;
+
+        // 初始化表情按钮动画数据
+        const emojiAnimations: WechatMiniprogram.AnimationExportResult[] =
+            EMOJI_LIST.map(() => {
+                const a = wx.createAnimation({ duration: 0 });
+                a.step();
+                return a.export();
+            });
 
         this.setData({
             roomCode,
             localRole,
             totalPerTurn: TOTAL_PER_TURN,
             remaining: TOTAL_PER_TURN,
-            phase: 'SPEAKER_A',
+            phase: EPhase.SpeakerA,
             canSpeak,
             canReact,
             countdownClass: this.getCountdownClass(TOTAL_PER_TURN),
+            emojiAnimations,
         });
 
         // 初始化 ASR WebSocket 服务
@@ -208,7 +241,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         // 如果定时器不存在且不是 DONE 状态且已获得麦克风权限，重新启动
         if (
             !this.timerId &&
-            this.data.phase !== 'DONE' &&
+            this.data.phase !== EPhase.Done &&
             this.data.hasMicPermission
         ) {
             this.startTimer();
@@ -242,12 +275,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         asrService.cleanup();
 
         // 清理所有表情 timeout
-        if (this.reactionTimeouts.length) {
-            this.reactionTimeouts.forEach(id => {
+        [...this.myReactionTimeouts, ...this.opponentReactionTimeouts].forEach(
+            id => {
                 clearTimeout(id);
-            });
-            this.reactionTimeouts = [];
-        }
+            }
+        );
+        this.myReactionTimeouts = [];
+        this.opponentReactionTimeouts = [];
     },
 
     /**
@@ -255,11 +289,11 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * SPEAKER_A 阶段：Organizer（赢家）先说
      * SPEAKER_B 阶段：Joiner（输家）后说
      */
-    computeCanSpeak(phase: Phase, localRole: EPlayerRole): boolean {
-        if (phase === 'SPEAKER_A') {
+    computeCanSpeak(phase: EPhase, localRole: EPlayerRole): boolean {
+        if (phase === EPhase.SpeakerA) {
             return localRole === EPlayerRole.Organizer;
         }
-        if (phase === 'SPEAKER_B') {
+        if (phase === EPhase.SpeakerB) {
             return localRole === EPlayerRole.Joiner;
         }
         return false;
@@ -293,11 +327,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        asrService.initialize(
-            roomCode,
-            userId,
-            // 处理对方的 ASR 文本
-            (
+        asrService.initialize({
+            roomId: roomCode,
+            speakerId: userId,
+            onASRTextReceive: (
                 _speakerId: string,
                 text: string,
                 isFinal: boolean,
@@ -305,11 +338,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             ) => {
                 this.handleOpponentASRText(text, isFinal);
             },
-            // 处理错误
-            (errorMessage: string) => {
+            onError: (errorMessage: string) => {
                 console.error('[ChatRoom] ASR service error:', errorMessage);
-            }
-        );
+            },
+            onUnhandledMessage: (data: string) => {
+                this.handleUnhandledWsMessage(data);
+            },
+        });
 
         console.log('[ChatRoom] ASR service initialized');
     },
@@ -334,32 +369,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             });
             console.log('[ChatRoom] Opponent partial text:', text);
         }
-    },
-
-    /**
-     * 处理接收到的消息
-     */
-    handleMessageReceived(message: IMessage): void {
-        const { localRole } = this.data;
-        const displayMessage: IDisplayMessage = {
-            id: this.messageIdCounter++,
-            role:
-                message.sender.userId === wx.getStorageSync('userId')
-                    ? localRole
-                    : localRole === EPlayerRole.Organizer
-                      ? EPlayerRole.Joiner
-                      : EPlayerRole.Organizer,
-            content:
-                message.type === EMessageType.Text &&
-                message.content.type === EMessageType.Text
-                    ? message.content.text
-                    : '[语音消息]',
-            timestamp: message.createdAt,
-        };
-
-        this.setData({
-            messages: [...this.data.messages, displayMessage],
-        });
     },
 
     /**
@@ -681,9 +690,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             this.asrManager.stop();
         }
 
-        const nextPhase: Phase = PHASE_TRANSITION[phase];
+        const nextPhase: EPhase = PHASE_TRANSITION[phase];
 
-        if (nextPhase === 'DONE') {
+        if (nextPhase === EPhase.Done) {
             // 清理定时器
             if (this.timerId) {
                 clearInterval(this.timerId);
@@ -691,7 +700,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             }
 
             this.setData({
-                phase: 'DONE',
+                phase: EPhase.Done,
                 canSpeak: false,
                 canReact: false,
                 remaining: 0,
@@ -855,7 +864,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
-     * 发送表情
+     * 发送表情（自己点击表情时）
      */
     onEmojiTap(e: WechatMiniprogram.TouchEvent): void {
         if (!this.data.canReact) {
@@ -867,20 +876,129 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        // 同屏最多 3 个表情
-        if (this.data.reactions.length >= MAX_REACTIONS) {
+        // 自己的表情同屏最多 3 个
+        if (this.data.myReactions.length >= MAX_REACTIONS) {
             return;
         }
 
         void wx.vibrateShort({ type: 'light' });
 
+        // 表情按钮弹跳动画
+        const index = e.currentTarget.dataset.index as number;
+        this.animateEmojiButton(index);
+
+        // 通过 WebSocket 发送表情给对方
+        this.sendEmojiViaWs(emoji);
+
+        // 本地显示自己的表情
+        this.addReaction(EReactionSource.My, emoji);
+    },
+
+    /**
+     * 表情按钮弹跳动画
+     */
+    animateEmojiButton(index: number): void {
+        const anim = wx.createAnimation({
+            duration: 100,
+            timingFunction: 'ease-out',
+        });
+
+        // 放大弹跳
+        anim.scale(1.4).step({ duration: 100 });
+        // 回弹复位
+        anim.scale(1.0).step({ duration: 150 });
+
+        this.setData({
+            [`emojiAnimations[${index}]`]: anim.export(),
+        });
+    },
+
+    /**
+     * 通过 WebSocket 发送表情
+     */
+    sendEmojiViaWs(emoji: string): void {
+        if (!wsManager.isConnected()) {
+            console.error('[ChatRoom] WebSocket not connected');
+            return;
+        }
+
+        const roomId: string = this.data.roomCode;
+        const senderId: string = wx.getStorageSync('userId') ?? '';
+
+        if (!roomId || !senderId) {
+            return;
+        }
+
+        wsManager.send({
+            type: EWSMessageType.EmojiSend,
+            data: { roomId, senderId, emoji },
+            timestamp: Date.now(),
+        });
+
+        console.log('[ChatRoom] Sent emoji:', emoji);
+    },
+
+    /**
+     * 处理未被 ASR 服务处理的 WebSocket 消息
+     */
+    handleUnhandledWsMessage(data: string): void {
+        try {
+            const message = JSON.parse(data) as {
+                type: EWSMessageType;
+                data: IEmojiReceiveData;
+            };
+
+            if (message.type === EWSMessageType.EmojiReceive) {
+                this.handleEmojiReceive(message.data.emoji);
+            }
+        } catch (error) {
+            console.error(
+                '[ChatRoom] Failed to parse unhandled message:',
+                error
+            );
+        }
+    },
+
+    /**
+     * 处理收到对方的表情
+     */
+    handleEmojiReceive(emoji: string): void {
+        // 对方表情同屏最多 3 个
+        if (this.data.opponentReactions.length >= MAX_REACTIONS) {
+            return;
+        }
+
+        console.log('[ChatRoom] Received emoji from opponent:', emoji);
+
+        this.addReaction(EReactionSource.Opponent, emoji);
+    },
+
+    /**
+     * 添加表情反应（自己或对方）
+     * 两步动画：先添加元素（空动画）→ 等 DOM 渲染后再设置飞行动画
+     * 必须分两步，因为 wx.createAnimation 只在 animation 属性「变化」时才触发
+     */
+    addReaction(source: EReactionSource, emoji: string): void {
+        const reactions =
+            source === EReactionSource.My
+                ? this.data.myReactions
+                : this.data.opponentReactions;
+        const timeouts =
+            source === EReactionSource.My
+                ? this.myReactionTimeouts
+                : this.opponentReactionTimeouts;
+        const dataKey =
+            source === EReactionSource.My ? 'myReactions' : 'opponentReactions';
+
         // 分配轨道
-        const usedLanes = this.data.reactions.map(r => r.lane);
+        const usedLanes = reactions.map((r: IReaction) => r.lane);
         const availableLanes = REACTION_LANES.filter(
             lane => !usedLanes.includes(lane)
         );
 
-        if (!availableLanes.length) return;
+        if (!availableLanes.length) {
+            return;
+        }
 
         const lane =
             availableLanes[Math.floor(Math.random() * availableLanes.length)];
@@ -893,73 +1011,96 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             Math.random() * (REACTION_DURATION_MAX - REACTION_DURATION_MIN);
 
         const timeoutId = setTimeout(() => {
-            this.removeReaction(id);
+            this.removeReaction(source, id);
         }, duration) as unknown as number;
 
-        this.reactionTimeouts.push(timeoutId);
+        timeouts.push(timeoutId);
+
+        // 第一步：空动画，仅用于创建 DOM 元素
+        const initAnim = wx.createAnimation({ duration: 0 });
+        initAnim.step();
 
         const newReaction: IReaction = {
             id,
             emoji,
             lane,
             timeoutId,
+            animationData: initAnim.export(),
         };
 
+        // 第二步：先 setData 创建元素，回调中延迟触发飞行动画
+        this.setData({ [dataKey]: [...reactions, newReaction] }, () => {
+            setTimeout(() => {
+                this.startReactionAnimation(dataKey, id);
+            }, 50);
+        });
+    },
+
+    /**
+     * 启动表情飞行动画（使用 wx.createAnimation）
+     * 三阶段：弹跳放大 → 上浮回弹 → 继续上升淡出
+     */
+    startReactionAnimation(
+        dataKey: 'myReactions' | 'opponentReactions',
+        reactionId: number
+    ): void {
+        const reactions = this.data[dataKey];
+        const idx = reactions.findIndex((r: IReaction) => r.id === reactionId);
+        if (idx === -1) {
+            return;
+        }
+
+        const flyMid = Math.round(-150 * this.rpxToPx);
+        const flyEnd = Math.round(-400 * this.rpxToPx);
+
+        const animation = wx.createAnimation({
+            duration: 200,
+            timingFunction: 'ease-out',
+        });
+
+        // 第一阶段：弹跳放大
+        animation.scale(1.4).step({ duration: 200 });
+        // 第二阶段：上浮 + 回弹到正常大小
+        animation
+            .translateY(flyMid)
+            .scale(1.0)
+            .step({ duration: 1200, timingFunction: 'ease-out' });
+        // 第三阶段：继续上升 + 缩小 + 淡出
+        animation
+            .translateY(flyEnd)
+            .scale(0.6)
+            .opacity(0)
+            .step({ duration: 1000, timingFunction: 'ease-in' });
+
         this.setData({
-            reactions: [...this.data.reactions, newReaction],
+            [`${dataKey}[${idx}].animationData`]: animation.export(),
         });
     },
 
     /**
      * 移除表情
      */
-    removeReaction(id: number): void {
-        const reactions = this.data.reactions.filter(r => r.id !== id);
-        this.setData({ reactions });
+    removeReaction(source: EReactionSource, id: number): void {
+        const dataKey =
+            source === EReactionSource.My ? 'myReactions' : 'opponentReactions';
+        const timeouts =
+            source === EReactionSource.My
+                ? this.myReactionTimeouts
+                : this.opponentReactionTimeouts;
+
+        const reactions = this.data[dataKey];
+        const reaction = reactions.find((r: IReaction) => r.id === id);
+
+        const filtered = reactions.filter((r: IReaction) => r.id !== id);
+        this.setData({ [dataKey]: filtered });
 
         // 从 timeout 列表中移除
-        const reaction = this.data.reactions.find(r => r.id === id);
         if (reaction) {
-            const idx = this.reactionTimeouts.indexOf(reaction.timeoutId);
+            const idx = timeouts.indexOf(reaction.timeoutId);
             if (idx > -1) {
-                clearTimeout(id);
-                this.reactionTimeouts.splice(idx, 1);
+                clearTimeout(reaction.timeoutId);
+                timeouts.splice(idx, 1);
             }
-        }
-    },
-
-    /**
-     * 格式化时间
-     */
-    formatTime(seconds: number): string {
-        const mins: number = Math.floor(seconds / 60);
-        const secs: number = seconds % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    },
-
-    /**
-     * 添加消息到对话列表
-     * @param role 发送者角色
-     * @param content 语音转文字内容
-     */
-    addMessage(role: EPlayerRole, content: string): void {
-        const id: number = ++this.messageIdCounter;
-        const timestamp: number = Date.now();
-
-        const newMessage: IDisplayMessage = {
-            id,
-            role,
-            content,
-            timestamp,
-        };
-
-        this.setData({
-            messages: [...this.data.messages, newMessage],
-        });
-
-        // 发送到服务器
-        if (role === this.data.localRole) {
-            chatService.sendTextMessage(content);
         }
     },
 
