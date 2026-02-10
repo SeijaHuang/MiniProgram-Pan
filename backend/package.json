@@ -15,7 +15,9 @@
         "prisma:migrate": "prisma migrate dev",
         "prisma:migrate:deploy": "prisma migrate deploy",
         "prisma:studio": "prisma studio",
-        "worker:dev": "ts-node src/worker/index.ts"
+        "worker:llm": "ts-node src/worker/index.ts",
+        "worker:llm:prod": "node dist/worker/index.js",
+        "test:llm": "ts-node scripts/test-llm-e2e.ts"
     },
     "keywords": [],
     "author": "",

@@ -10,7 +10,7 @@
 
 import express, { Request, Response } from 'express';
 import roomRoutes from './routes/room-routes';
-import llmRoutes from './routes/llm-routes';
+import llmJudgementRoutes from './routes/llm-judgement.routes';
 import { prisma } from './database/prisma';
 
 const app = express();
@@ -53,10 +53,10 @@ app.get('/health', async (_req: Request, res: Response) => {
 app.use('/room', roomRoutes);
 
 /**
- * LLM routes (v1 API)
- * /v1/rooms/:roomId/llm/*
- * /v1/llm/*
+ * LLM Judgement routes (v1 API)
+ * POST /v1/rooms/:roomId/llm/judgement
+ * GET  /v1/llm/tasks/:taskId
  */
-app.use('/v1', llmRoutes);
+app.use('/v1', llmJudgementRoutes);
 
 export default app;

@@ -1,50 +1,29 @@
 # 后端文档中心
 
-双人聊天室后端服务完整文档与使用指南。
+双人聊天室后端服务 + 异步 LLM 判决系统。
 
 ## 技术栈
 
-- **Runtime**: Node.js 18+
-- **Language**: TypeScript 5+
-- **HTTP Framework**: Express
-- **WebSocket**: ws library
-- **Validation**: Zod
-- **Architecture**: Controller → Service → Repository
+| 类别         | 技术                                           |
+| ------------ | ---------------------------------------------- |
+| Runtime      | Node.js 18+                                    |
+| Language     | TypeScript 5+ (strict, no `any`)               |
+| HTTP         | Express 5                                      |
+| WebSocket    | ws library                                     |
+| Database     | PostgreSQL + Prisma ORM                        |
+| Validation   | Zod                                            |
+| LLM          | OpenAI API (gpt-4o)                            |
+| Architecture | Routes → Controllers → Services → Repositories |
 
 ## 特性
 
-- ✅ 严格的双人房间系统（最多2人）
-- ✅ HTTP用于房间创建，WebSocket用于实时通信
-- ✅ 房间状态机：WAITING → READY → CLOSED
-- ✅ 完整的错误处理和验证
-- ✅ TypeScript类型安全
-- ✅ 三层架构设计，职责分离
-- ✅ Repository模式，支持未来数据库集成
-
----
-
-## 📚 完整文档导航
-
-### 功能特性文档
-
-按功能模块划分的详细实现文档：
-
-| 文档 | 描述 | 路径 |
-|------|------|------|
-| 🏠 [创建房间](docs/features/01-room-creation.md) | HTTP API 创建房间流程 | `POST /room/create` |
-| 🔌 [加入房间](docs/features/02-join-room.md) | WebSocket 加入房间协议 | `JOIN_ROOM` 消息 |
-| 💬 [聊天消息](docs/features/03-chat-messaging.md) | 实时聊天消息收发 | `CHAT_SEND/RECEIVE` |
-| 🔗 [连接管理](docs/features/04-connection-lifecycle.md) | WebSocket 连接生命周期 | 连接/断开处理 |
-| ⚠️ [错误处理](docs/features/05-error-handling.md) | 统一错误码和处理机制 | 错误响应规范 |
-
-### 核心概念文档
-
-| 文档 | 描述 |
-|------|------|
-| 📊 [数据模型](docs/data-models.md) | Room, User, Message 等实体定义 |
-| 🏗️ [架构可视化](docs/architecture-visual.md) | 三层架构可视化和文件结构 |
-| 📋 [产品需求](docs/product-requirements.md) | 完整的功能需求和验收标准 |
-| 📡 [API 完整规格](docs/api-specification.md) | 所有 API 的详细规格说明 |
+- 严格的双人房间系统（最多 2 人）
+- HTTP 用于房间创建，WebSocket 用于实时通信
+- 房间状态机：WAITING → READY → CLOSED
+- 异步 LLM 判决：HTTP 创建任务，独立 Worker 进程执行
+- 幂等任务创建 + 房间级互斥锁
+- 完整的错误处理和 Zod 校验
+- TypeScript 类型安全，三层架构职责分离
 
 ---
 
@@ -59,351 +38,379 @@ npm install
 
 ### 2. 配置环境变量
 
-创建 `.env` 文件:
-
-```env
-PORT=8080
-WS_PATH=/ws
-NODE_ENV=development
-```
-
-### 3. 启动服务器
+复制 `.env.example` 为 `.env` 并填写：
 
 ```bash
-# 开发模式 (推荐)
+cp .env.example .env
+```
+
+必需变量：
+
+```env
+# 服务器
+PORT=8080
+NODE_ENV=development
+WS_PATH=/ws
+
+# PostgreSQL（必需）
+DATABASE_URL=postgresql://chatroom:chatroom_dev_pwd@localhost:5432/chatroom?schema=public
+
+# OpenAI（Worker 必需）
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4o
+# OPENAI_BASE_URL=https://api.openai.com/v1  # 可选，兼容其他 API
+```
+
+### 3. 初始化数据库
+
+```bash
+# 生成 Prisma Client
+npx prisma generate
+
+# 创建数据库表（开发环境）
+npx prisma migrate dev
+
+# 或部署已有迁移（生产环境）
+npx prisma migrate deploy
+```
+
+### 4. 启动服务
+
+需要同时运行两个进程：
+
+```bash
+# 终端 1：API 服务器
 npm run dev
 
-# 生产模式
-npm run build && npm start
+# 终端 2：LLM Worker（判决任务处理）
+npm run worker:llm
 ```
 
 服务器: `http://localhost:8080`
 WebSocket: `ws://localhost:8080/ws`
 
-### 4. 验证服务器运行
-
-**测试 HTTP API：**
+### 5. 验证
 
 ```bash
+# 健康检查（含数据库连通性）
+curl http://localhost:8080/health
+
+# 创建房间
 curl -X POST http://localhost:8080/room/create \
   -H "Content-Type: application/json" \
   -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
-```
 
-**测试 WebSocket：**
-
-使用提供的测试脚本：
-
-```bash
+# WebSocket 测试
 npm run ws:test
+
+# LLM 模块 E2E 自测（需要 API 服务器已启动）
+npm run test:llm
 ```
-
----
-
-## 🐳 Docker 部署
-
-### 前置要求
-
-- 安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- 确保 Docker Desktop 正在运行
-
-### Docker 镜像说明
-
-**Dockerfile.dev - 开发环境**
-- 包含所有依赖（含devDependencies）
-- 支持热重载
-- 挂载源代码目录
-- 使用`ts-node`直接运行TypeScript
-
-**Dockerfile - 生产环境**
-- 多阶段构建，优化镜像大小
-- 只包含生产依赖
-- TypeScript编译为JavaScript
-- 使用编译后的`dist`目录运行
-
-### 快速启动
-
-#### Windows 用户
-
-双击运行 `start-docker.bat` 或在 PowerShell 中执行：
-
-```powershell
-.\start-docker.bat
-```
-
-#### Mac/Linux 用户
-
-```bash
-chmod +x start-docker.sh
-./start-docker.sh
-```
-
-#### 使用 docker-compose 命令
-
-```bash
-# 构建并启动（开发模式，支持热重载）
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
-
-# 重新构建
-docker-compose up --build -d
-```
-
-### Docker 常用命令
-
-| 操作 | 命令 |
-|------|------|
-| 启动服务 | `docker-compose up -d` |
-| 停止服务 | `docker-compose down` |
-| 查看日志 | `docker-compose logs -f` |
-| 实时日志 | `docker-compose logs -f backend` |
-| 重启服务 | `docker-compose restart` |
-| 重新构建 | `docker-compose up --build` |
-| 进入容器 | `docker-compose exec backend sh` |
-| 查看状态 | `docker-compose ps` |
-
-### 环境变量配置
-
-在 `docker-compose.yml` 中配置：
-
-```yaml
-environment:
-  - PORT=8080              # HTTP服务器端口
-  - NODE_ENV=development   # 环境：development/production
-  - WS_PATH=/ws           # WebSocket路径
-  - LOG_LEVEL=debug       # 日志级别
-```
-
-### 生产部署
-
-**方法1: 使用生产Dockerfile**
-
-```bash
-# 构建镜像
-docker build -t chatroom-backend:latest -f Dockerfile .
-
-# 运行容器
-docker run -d \
-  -p 8080:8080 \
-  -e NODE_ENV=production \
-  -e PORT=8080 \
-  --name chatroom-backend \
-  --restart unless-stopped \
-  chatroom-backend:latest
-```
-
-**方法2: Docker Compose生产配置**
-
-修改 `docker-compose.yml` 中的 `dockerfile: Dockerfile`，然后：
-
-```bash
-docker-compose -f docker-compose.yml up -d
-```
-
-### 故障排查
-
-#### 问题1: 端口被占用
-
-**错误**: `bind: address already in use`
-
-**解决** (Windows):
-```powershell
-# 查找占用端口的进程
-netstat -ano | findstr :8080
-
-# 终止进程
-taskkill /PID <PID> /F
-```
-
-**解决** (Mac/Linux):
-```bash
-# 查找并终止占用端口的进程
-lsof -ti:8080 | xargs kill -9
-```
-
-#### 问题2: Docker Desktop 未启动
-
-**错误**: `Cannot connect to the Docker daemon`
-
-**解决**: 启动 Docker Desktop，等待完全启动后重试
-
-#### 问题3: 代码修改未生效
-
-```bash
-# 重启容器
-docker-compose restart
-
-# 或完全重建
-docker-compose down
-docker-compose up --build
-```
-
-### 验证部署
-
-```bash
-# 测试 HTTP API
-curl -X POST http://localhost:8080/room/create \
-  -H "Content-Type: application/json" \
-  -d '{"creator":{"userId":"test","nickname":"Test"}}'
-
-# 测试 WebSocket
-npm run ws:test
-```
-
-## 项目结构
-
-```
-backend/src/
-├── routes/                 # HTTP 路由
-├── controllers/            # 控制器 (HTTP/WebSocket)
-├── services/
-│   ├── core/               # 核心业务 (RoomService)
-│   ├── websocket/          # WebSocket 管理
-│   │   ├── connection-manager.ts
-│   │   ├── room-manager.ts
-│   │   └── drum-game-manager.ts
-│   └── handlers/           # 消息处理器
-│       ├── join-room-handler.ts
-│       ├── chat-send-handler.ts
-│       └── drum-tap-handler.ts
-├── models/
-│   ├── entities/           # 领域实体 (Room, User, Message)
-│   ├── schemas/            # Zod 验证
-│   ├── dto/                # 数据传输对象
-│   └── enums/              # 枚举类型
-├── middlewares/            # 中间件
-├── types/                  # TypeScript 类型
-├── constants/              # 常量配置
-└── utils/                  # 工具函数
-```
-
-## API 文档
-
-### HTTP API
-
-#### POST /room/create
-
-创建新房间。
-
-**请求**:
-```json
-{
-  "creator": {
-    "userId": "user_alice",
-    "nickname": "Alice"
-  }
-}
-```
-
-**响应** (201):
-```json
-{
-  "success": true,
-  "data": {
-    "room": {
-      "roomId": "room_abc123",
-      "roomCode": "123456",
-      "status": "WAITING",
-      "participants": [...]
-    }
-  }
-}
-# 健康检查
-curl http://localhost:8080/health
-# 预期: {"ok":true}
-
-# 查看容器状态
-docker-compose ps
-```
-
----
-
-## 📡 API 使用
-
-### 核心概念
-
-**房间状态机**:
-```
-CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
-```
-
-**协议**:
-- HTTP: 创建房间 `POST /room/create`
-- WebSocket: 加入房间、实时聊天 `ws://localhost:8080/ws`
-
-### 详细 API 文档
-
-完整的 API 规格和使用示例请查看：
-- 📡 [HTTP & WebSocket API 完整文档](docs/api-specification.md) - 所有接口的详细说明
-- 🏠 [创建房间](docs/features/01-room-creation.md) - HTTP API 使用指南
-- 🔌 [加入房间](docs/features/02-join-room.md) - WebSocket 协议详解
-- 💬 [聊天消息](docs/features/03-chat-messaging.md) - 消息收发机制
-- ⚠️ [错误处理](docs/features/05-error-handling.md) - 错误码参考
 
 ---
 
 ## 开发命令
 
 ```bash
-# 开发模式（使用 ts-node 直接运行）
-npm run dev
+# --- API 服务器 ---
+npm run dev              # 开发模式（ts-node，热重载）
+npm run build            # 编译 TypeScript（含 prisma generate）
+npm start                # 运行编译产物 dist/index.js
 
-# 编译 TypeScript 到 dist/
-npm run build
+# --- LLM Worker ---
+npm run worker:llm       # 开发模式（ts-node）
+npm run worker:llm:prod  # 生产模式（需先 npm run build）
 
-# 运行编译后的代码（生产模式）
-npm start
+# --- 代码质量 ---
+npm run lint             # ESLint 检查
+npm run lint:fix         # ESLint 自动修复
+npm run format           # Prettier 格式化
+npm run format:check     # Prettier 检查
+npx tsc --noEmit         # TypeScript 类型检查
 
-# 代码检查
-npm run lint
+# --- 数据库 ---
+npx prisma generate      # 生成 Prisma Client
+npx prisma migrate dev   # 创建/应用迁移（开发）
+npx prisma migrate deploy # 应用迁移（生产）
+npx prisma studio        # 可视化数据库浏览
 
-# 自动修复代码问题
-npm run lint:fix
-
-# 代码格式化
-npm run format
-
-# 检查代码格式
-npm run format:check
-
-# WebSocket 测试脚本
-npm run ws:test
-
-# TypeScript 类型检查（不生成文件）
-npx tsc --noEmit
+# --- 测试 ---
+npm run ws:test          # WebSocket 连接测试
+npm run test:llm         # LLM 模块 E2E 自测
 ```
 
 ---
 
-## 🏗️ 项目架构
-
-本项目采用**三层架构**设计：
+## 项目结构
 
 ```
-Routes (路由) → Controllers (控制器) → Services (服务) → Repositories (仓储)
+backend/
+├── prisma/
+│   └── schema.prisma           # 数据库模型（LlmTask, RoomLlmLock）
+├── scripts/
+│   └── test-llm-e2e.ts         # LLM E2E 自测脚本
+└── src/
+    ├── index.ts                # API 服务器入口
+    ├── app.ts                  # Express 配置 + 路由挂载
+    ├── ws.ts                   # WebSocket 服务器初始化
+    ├── clients/
+    │   └── openai.client.ts    # OpenAI 封装（仅 Worker 使用）
+    ├── constants/
+    │   └── config.ts           # 所有配置常量
+    ├── controllers/
+    │   ├── room-controller.ts          # 房间 HTTP
+    │   ├── ws-controller.ts            # WebSocket 消息路由
+    │   ├── llm-judgement.controller.ts # LLM 判决 HTTP
+    │   └── tencent-controller.ts       # 腾讯云 STS
+    ├── database/
+    │   └── prisma.ts           # PrismaClient 单例
+    ├── models/
+    │   ├── entities/           # 领域实体（Room, User, Message）
+    │   ├── schemas/            # Zod 校验 schema
+    │   └── dto/                # 请求/响应 DTO
+    ├── repositories/
+    │   ├── llm-task.repository.ts      # LLM 任务数据访问
+    │   └── room-llm-lock.repository.ts # 房间锁数据访问
+    ├── routes/
+    │   ├── room-routes.ts              # /room/*
+    │   ├── llm-judgement.routes.ts     # /v1/rooms/:roomId/llm/*
+    │   └── tencent-routes.ts           # /tencent/*
+    ├── services/
+    │   ├── core/
+    │   │   └── llm-judgement.service.ts  # LLM 判决业务逻辑
+    │   ├── websocket/
+    │   │   ├── connection-manager.ts   # WS 连接管理
+    │   │   ├── room-manager.ts         # 房间状态机（内存）
+    │   │   └── drum-game-manager.ts    # 鼓点游戏状态
+    │   └── handlers/                   # WS 消息处理器
+    ├── types/
+    │   ├── http/               # HTTP 类型 + 错误码
+    │   ├── websocket/          # WS 消息类型
+    │   └── llm/                # LLM 类型定义
+    ├── utils/                  # 工具函数
+    └── worker/
+        ├── index.ts                    # Worker 入口（加载 .env）
+        └── llm-judgement.worker.ts     # Worker 轮询主循环
 ```
 
-### 核心原则
+---
 
-- ✅ **职责分离**: 每层只负责自己的职责
-- ✅ **单向依赖**: 上层依赖下层，下层不依赖上层
-- ✅ **可测试性**: 每层可独立测试
+## HTTP API
 
-### 详细架构文档
+### 房间
 
-完整的架构设计和最佳实践请查看：
-- 🏗️ [架构可视化文档](docs/architecture-visual.md) - 完整文件结构、数据流、分层职责
-- 📊 [数据模型](docs/data-models.md) - Room, User, Message 等实体定义
-- 📋 [产品需求](docs/product-requirements.md) - 功能需求和验收标准
+| Method | Path                   | Description                |
+| ------ | ---------------------- | -------------------------- |
+| GET    | `/health`              | 健康检查（含数据库连通性） |
+| POST   | `/room/create`         | 创建房间                   |
+| GET    | `/tencent/credentials` | 腾讯云 STS 临时凭证        |
 
-## 更多信息
+### LLM 判决（v1）
 
-- 规范文档：[../.cursor/rules/04-websocket.md](../.cursor/rules/04-websocket.md)
+| Method | Path                              | Description          |
+| ------ | --------------------------------- | -------------------- |
+| POST   | `/v1/rooms/:roomId/llm/judgement` | 创建判决任务（幂等） |
+| GET    | `/v1/llm/tasks/:taskId`           | 查询任务状态/结果    |
+
+#### POST /v1/rooms/:roomId/llm/judgement
+
+创建 LLM 判决任务。同一 `idempotencyKey` 多次调用返回相同 `taskId`。
+
+**请求**:
+
+```json
+{
+    "hostText": "我每天加班到很晚，非常辛苦",
+    "participantText": "我也很辛苦，而且工资更低",
+    "idempotencyKey": "room123_round1"
+}
+```
+
+**响应** (200):
+
+```json
+{
+    "success": true,
+    "data": {
+        "taskId": "550e8400-e29b-41d4-a716-446655440000",
+        "status": "queued"
+    }
+}
+```
+
+#### GET /v1/llm/tasks/:taskId
+
+**响应** (200 - succeeded):
+
+```json
+{
+    "success": true,
+    "data": {
+        "taskId": "550e8400-e29b-41d4-a716-446655440000",
+        "status": "succeeded",
+        "resultJson": {
+            "verdict": "host",
+            "reasons": ["..."],
+            "suggestions": ["..."],
+            "quotes": { "host": ["..."], "participant": ["..."] }
+        },
+        "errorMessage": null,
+        "createdAt": "2026-02-10T12:00:00.000Z",
+        "startedAt": "2026-02-10T12:00:01.000Z",
+        "finishedAt": "2026-02-10T12:00:05.000Z"
+    }
+}
+```
+
+#### 错误响应
+
+所有错误统一格式：
+
+```json
+{
+    "success": false,
+    "error": { "code": "ERROR_CODE", "message": "描述" }
+}
+```
+
+| HTTP Status | Code                 | 场景           |
+| ----------- | -------------------- | -------------- |
+| 400         | `INVALID_REQUEST`    | 请求参数不合法 |
+| 404         | `ROOM_NOT_FOUND`     | 房间不存在     |
+| 404         | `TASK_NOT_FOUND`     | 任务不存在     |
+| 500         | `TASK_CREATE_FAILED` | 创建任务异常   |
+| 500         | `INTERNAL_ERROR`     | 服务器内部错误 |
+
+---
+
+## WebSocket 协议
+
+连接地址: `ws://localhost:8080/ws`
+
+### 房间流程
+
+```
+POST /room/create → roomCode
+    ↓
+WS JOIN_ROOM (roomCode) → JOIN_ACK
+    ↓ (第二人加入)
+READY → 3s 倒计时 → 鼓点游戏(10s) → 聊天室
+```
+
+### 消息类型
+
+**Client → Server**: `JOIN_ROOM` | `DRUM_TAP` | `CHAT_SEND` | `ASR_TEXT_PUSH`
+
+**Server → Client**: `JOIN_ACK` | `DRUM_READY` | `DRUM_START` | `DRUM_TAP` | `DRUM_FINISH` | `DRUM_RESULT` | `CHAT_RECEIVE` | `ASR_TEXT` | `ERROR`
+
+消息格式: `{ "type": "MESSAGE_TYPE", "data": {...}, "timestamp": 1234567890 }`
+
+---
+
+## LLM 判决模块
+
+### 架构
+
+```
+客户端 → POST 创建任务 → [llm_tasks 表: queued]
+                                ↓
+                    Worker 轮询 claimNextQueuedTask()
+                                ↓
+                    tryAcquireRoomLock() → 获得锁
+                                ↓
+                    OpenAI API → 解析 JSON 结果
+                                ↓
+                    markSucceeded() + releaseRoomLock()
+                                ↓
+客户端 ← GET 查询结果 ← [llm_tasks 表: succeeded]
+```
+
+### 任务状态流转
+
+```
+queued → running → succeeded
+                 → failed
+```
+
+### 调用链
+
+```
+HTTP:   routes → controller → service → repository → PostgreSQL
+Worker: pollLoop → repository.claim → openai.client → repository.markSucceeded
+```
+
+关键约束：
+
+- **OpenAI 仅在 Worker 中调用**，HTTP 层不 import `openai.client.ts`
+- **同一房间串行执行**，`room_llm_locks` 表保证互斥
+- **幂等创建**，相同 `idempotencyKey` 返回已有任务
+
+### 环境变量
+
+```env
+# Worker 调优（可选，均有默认值）
+LLM_WORKER_POLL_INTERVAL_MS=500    # 轮询间隔（默认 500ms）
+LLM_WORKER_LOCK_TIMEOUT_MS=60000   # 房间锁 TTL（默认 60s）
+LLM_MAX_RETRIES=3                  # 最大重试（默认 3）
+```
+
+### 常见问题
+
+| 问题                    | 排查                                    |
+| ----------------------- | --------------------------------------- |
+| 任务一直 queued         | Worker 是否在运行？`npm run worker:llm` |
+| ROOM_LOCKED 失败        | 同房间有任务执行中，等待完成或锁过期    |
+| OpenAI 超时             | 检查网络和 API Key，超时默认 60s        |
+| 数据库连接失败          | 检查 `DATABASE_URL` 和 PostgreSQL 状态  |
+| `OPENAI_API_KEY 未配置` | Worker 的 `.env` 中需要设置 API Key     |
+
+---
+
+## Docker 部署
+
+### 快速启动
+
+```bash
+# 开发模式（热重载）
+docker-compose up -d
+
+# 生产构建
+docker build -t chatroom-backend:latest -f Dockerfile .
+docker run -d -p 8080:8080 -e NODE_ENV=production chatroom-backend:latest
+```
+
+### 常用命令
+
+| 操作     | 命令                             |
+| -------- | -------------------------------- |
+| 启动     | `docker-compose up -d`           |
+| 停止     | `docker-compose down`            |
+| 日志     | `docker-compose logs -f`         |
+| 重建     | `docker-compose up --build -d`   |
+| 进入容器 | `docker-compose exec backend sh` |
+
+### 故障排查
+
+| 错误                              | 解决                                                                   |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `bind: address already in use`    | Windows: `netstat -ano \| findstr :8080` 然后 `taskkill /PID <PID> /F` |
+| `Cannot connect to Docker daemon` | 启动 Docker Desktop 后重试                                             |
+| 代码修改未生效                    | `docker-compose down && docker-compose up --build`                     |
+
+---
+
+## 详细文档
+
+| 文档                                                 | 描述                           |
+| ---------------------------------------------------- | ------------------------------ |
+| [创建房间](docs/features/01-room-creation.md)        | HTTP API 创建房间流程          |
+| [加入房间](docs/features/02-join-room.md)            | WebSocket 加入房间协议         |
+| [聊天消息](docs/features/03-chat-messaging.md)       | 实时聊天消息收发               |
+| [连接管理](docs/features/04-connection-lifecycle.md) | WebSocket 连接生命周期         |
+| [错误处理](docs/features/05-error-handling.md)       | 错误码和处理机制               |
+| [数据模型](docs/data-models.md)                      | Room, User, Message 等实体定义 |
+| [架构可视化](docs/architecture-visual.md)            | 三层架构和文件结构             |
+| [API 完整规格](docs/api-specification.md)            | 所有 API 详细说明              |
 
 ---
 
