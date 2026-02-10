@@ -13,11 +13,13 @@ export enum EWSMessageType {
     JoinRoom = 'JOIN_ROOM',
     ChatSend = 'CHAT_SEND',
     AsrTextPush = 'ASR_TEXT_PUSH',
+    EmojiSend = 'EMOJI_SEND',
 
     // Server → Client
     JoinAck = 'JOIN_ACK',
     ChatReceive = 'CHAT_RECEIVE',
     AsrText = 'ASR_TEXT',
+    EmojiReceive = 'EMOJI_RECEIVE',
     Error = 'ERROR',
 }
 

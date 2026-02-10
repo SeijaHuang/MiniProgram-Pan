@@ -42,12 +42,25 @@
         </view>
     </view>
 
-    <!-- 飞行表情层 -->
+    <!-- 飞行表情层：自己发送的表情 -->
     <view class="chat-room__reactions">
         <view
-            wx:for="{{reactions}}"
+            wx:for="{{myReactions}}"
             wx:key="id"
             class="chat-room__reaction chat-room__reaction--lane{{item.lane}}"
+            animation="{{item.animationData}}"
+        >
+            <text class="chat-room__reaction-emoji">{{item.emoji}}</text>
+        </view>
+    </view>
+
+    <!-- 飞行表情层：对方发送的表情 -->
+    <view class="chat-room__reactions">
+        <view
+            wx:for="{{opponentReactions}}"
+            wx:key="id"
+            class="chat-room__reaction chat-room__reaction--lane{{item.lane}}"
+            animation="{{item.animationData}}"
         >
             <text class="chat-room__reaction-emoji">{{item.emoji}}</text>
         </view>
@@ -100,7 +113,9 @@
             wx:key="*this"
             class="chat-room__emoji-btn"
             data-emoji="{{item}}"
+            data-index="{{index}}"
             bindtap="onEmojiTap"
+            animation="{{emojiAnimations[index]}}"
         >
             <text class="chat-room__emoji-text">{{item}}</text>
         </view>

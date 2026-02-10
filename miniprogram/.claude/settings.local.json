@@ -3,7 +3,10 @@
         "allow": [
             "Bash(npm run lint)",
             "Bash(npm run format:*)",
-            "Bash(npm run lint:fix:*)"
+            "Bash(npm run lint:fix:*)",
+            "Bash(npx eslint:*)",
+            "Bash(npx prettier:*)",
+            "Bash(npx tsc:*)"
         ]
     }
 }

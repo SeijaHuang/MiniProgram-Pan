@@ -20,6 +20,7 @@ export * from './chat';
 export * from './error';
 export * from './drum';
 export * from './asr';
+export * from './emoji';
 
 // Union types
 import type { IJoinRoomMessage, IJoinAckMessage } from './join-room';
@@ -27,6 +28,8 @@ import type { IChatSendMessage, IChatReceiveMessage } from './chat';
 import type { IWSErrorMessage } from './error';
 import type { TDrumMessage } from './drum';
 import type { TASRMessage } from './asr';
+import type { IEmojiMessage } from './emoji';
+8;
 
 /**
  * Union type of all WebSocket messages
@@ -38,4 +41,5 @@ export type WSMessage =
     | IChatReceiveMessage
     | IWSErrorMessage
     | TDrumMessage
-    | TASRMessage;
+    | TASRMessage
+    | IEmojiMessage;
