@@ -1,6 +1,6 @@
 /**
  * LLM Judgement Controller
- * Handles HTTP requests for synchronous LLM judgement
+ * Handles HTTP requests for judgment verdict (判决书)
  *
  * ARCHITECTURE: Controller layer
  * - Validates request (Zod)
@@ -12,25 +12,25 @@
 import type { Request, Response } from 'express';
 
 import {
-    CreateJudgementBodySchema,
+    CreateJudgmentBodySchema,
     RoomIdParamSchema,
 } from '../models/schemas/llm-request.schema';
 import { llmJudgementService } from '../services/core/llm-judgement.service';
 import type { IBaseResponse } from '../types/http';
 import { EHttpErrorCode } from '../types/http';
-import type { ILlmJudgementResult } from '../types/llm';
+import type { IJudgmentResponse } from '../types/llm';
 
 export class LlmJudgementController {
     /**
-     * Create LLM judgement (synchronous)
-     * POST /v1/rooms/:roomId/llm/judgement
+     * Create judgment verdict (判决书)
+     * POST /v1/rooms/:roomId/llm/judgment
      *
      * Status codes:
-     * - 200: judgement result returned
+     * - 200: judgment verdict returned
      * - 400: invalid request body / params
      * - 502: LLM call failed
      */
-    static async createJudgement(req: Request, res: Response): Promise<void> {
+    static async createJudgment(req: Request, res: Response): Promise<void> {
         try {
             // Validate path params
             const paramResult = RoomIdParamSchema.safeParse(req.params);
@@ -49,7 +49,7 @@ export class LlmJudgementController {
             }
 
             // Validate body
-            const bodyResult = CreateJudgementBodySchema.safeParse(req.body);
+            const bodyResult = CreateJudgmentBodySchema.safeParse(req.body);
             if (!bodyResult.success) {
                 const message =
                     bodyResult.error.issues[0]?.message ?? '请求参数无效';
@@ -65,23 +65,23 @@ export class LlmJudgementController {
             }
 
             const { roomId } = paramResult.data;
-            const { hostText, participantText } = bodyResult.data;
+            const { player1Speech, player2Speech } = bodyResult.data;
 
             // Call service (synchronous LLM call)
-            const result: ILlmJudgementResult =
-                await llmJudgementService.createJudgement(roomId, {
-                    hostText,
-                    participantText,
+            const result: IJudgmentResponse =
+                await llmJudgementService.createJudgment(roomId, {
+                    player1Speech,
+                    player2Speech,
                 });
 
-            const response: IBaseResponse<ILlmJudgementResult> = {
+            const response: IBaseResponse<IJudgmentResponse> = {
                 success: true,
                 data: result,
             };
             res.status(200).json(response);
         } catch (error: unknown) {
             console.error(
-                '[LlmJudgementController]' + ' createJudgement failed:',
+                '[LlmJudgementController]' + ' createJudgment failed:',
                 error instanceof Error ? error.message : String(error)
             );
 

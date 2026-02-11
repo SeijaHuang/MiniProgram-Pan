@@ -1,5 +1,5 @@
 /**
- * Minimal E2E self-test for the synchronous LLM Judgement API
+ * Minimal E2E self-test for the Judgment Verdict API (判决书)
  *
  * Prerequisites:
  *   1. API server running: npm run dev
@@ -11,7 +11,7 @@
  * Tests:
  *   1. Validation — missing fields returns 400
  *   2. Validation — empty strings return 400
- *   3. Sync judgement — POST returns 200 with result
+ *   3. Judgment verdict — POST returns 200 with result
  *      (only if OPENAI_API_KEY is configured on server)
  */
 
@@ -26,14 +26,23 @@ interface IApiResponse<T> {
     error?: { code: string; message: string };
 }
 
-interface IJudgementResult {
-    verdict: 'host' | 'participant' | 'tie';
-    reasons: string[];
-    suggestions: string[];
-    quotes: Array<{
-        from: 'host' | 'participant';
-        text: string;
-    }>;
+interface IJudgmentResult {
+    caseNumber: string;
+    responsibility: {
+        player1: number;
+        player2: number;
+        thirdParty: {
+            factors: Array<{
+                name: string;
+                percentage: number;
+            }>;
+        };
+    };
+    radarChart: {
+        player1: Record<string, number>;
+        player2: Record<string, number>;
+    };
+    verdict: string;
 }
 
 let passed = 0;
@@ -69,7 +78,7 @@ async function post<T>(
 }
 
 async function main(): Promise<void> {
-    console.log(`\n=== LLM Judgement E2E Test (Sync) ===`);
+    console.log(`\n=== Judgment Verdict E2E Test ===`);
     console.log(`API: ${API_BASE}\n`);
 
     // Setup: create a room so roomId is valid
@@ -93,7 +102,7 @@ async function main(): Promise<void> {
     const roomId = roomRes.json.data.room.roomId;
     console.log(`[Setup] roomId=${roomId}\n`);
 
-    const url = `/v1/rooms/${roomId}/llm/judgement`;
+    const url = `/v1/rooms/${roomId}/llm/judgment`;
 
     // ---------------------------------------------------
     // Test 1: Missing fields → 400
@@ -110,12 +119,12 @@ async function main(): Promise<void> {
     );
 
     // ---------------------------------------------------
-    // Test 2: Empty hostText → 400
+    // Test 2: Empty player1Speech → 400
     // ---------------------------------------------------
-    console.log('\n[Test 2] Empty hostText → 400');
+    console.log('\n[Test 2] Empty player1Speech → 400');
     const t2 = await post(url, {
-        hostText: '',
-        participantText: '有内容',
+        player1Speech: '',
+        player2Speech: '有内容',
     });
     assert(
         t2.status === 400,
@@ -123,15 +132,15 @@ async function main(): Promise<void> {
     );
 
     // ---------------------------------------------------
-    // Test 3: Sync judgement → 200
+    // Test 3: Judgment verdict → 200
     // ---------------------------------------------------
-    console.log('\n[Test 3] Sync judgement → 200');
+    console.log('\n[Test 3] Judgment verdict → 200');
     console.log(
         '  (calls OpenAI — may take up to 60s...)'
     );
-    const t3 = await post<IJudgementResult>(url, {
-        hostText: '我每天加班到很晚，非常辛苦',
-        participantText: '我也很辛苦，而且工资更低',
+    const t3 = await post<IJudgmentResult>(url, {
+        player1Speech: '我每天加班到很晚，非常辛苦',
+        player2Speech: '我也很辛苦，而且工资更低',
     });
 
     if (t3.status === 502) {
@@ -152,37 +161,40 @@ async function main(): Promise<void> {
         const data = t3.json.data;
         if (data) {
             assert(
-                ['host', 'participant', 'tie'].includes(
-                    data.verdict
+                typeof data.caseNumber === 'string',
+                `caseNumber is string (got: ${data.caseNumber})`
+            );
+            assert(
+                typeof data.responsibility.player1 ===
+                    'number',
+                'responsibility.player1 is number'
+            );
+            assert(
+                typeof data.responsibility.player2 ===
+                    'number',
+                'responsibility.player2 is number'
+            );
+            assert(
+                Array.isArray(
+                    data.responsibility.thirdParty.factors
                 ),
-                `verdict is valid (got: ${data.verdict})`
+                'thirdParty.factors is array'
             );
             assert(
-                Array.isArray(data.reasons),
-                'reasons is array'
+                typeof data.radarChart.player1 ===
+                    'object',
+                'radarChart.player1 is object'
             );
             assert(
-                Array.isArray(data.suggestions),
-                'suggestions is array'
+                typeof data.radarChart.player2 ===
+                    'object',
+                'radarChart.player2 is object'
             );
             assert(
-                Array.isArray(data.quotes),
-                'quotes is array'
+                typeof data.verdict === 'string' &&
+                    data.verdict.length > 0,
+                'verdict is non-empty string'
             );
-            if (data.quotes.length > 0) {
-                const q = data.quotes[0];
-                assert(
-                    ['host', 'participant'].includes(
-                        q.from
-                    ),
-                    `quotes[0].from is valid ` +
-                        `(got: ${q.from})`
-                );
-                assert(
-                    typeof q.text === 'string',
-                    'quotes[0].text is string'
-                );
-            }
         }
     }
 

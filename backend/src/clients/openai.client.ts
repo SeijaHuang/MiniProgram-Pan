@@ -1,116 +1,28 @@
 /**
  * OpenAI Client
- * Encapsulates LLM calls for synchronous judgement
+ * Encapsulates LLM calls for judgment verdict (判决书)
  *
  * ARCHITECTURE: Client layer (infrastructure)
  * - Called by LlmJudgementService
  * - Reads config from OPENAI_CONFIG
  * - Timeout + JSON parsing with clear error messages
- * - Does NOT log full hostText/participantText
  */
 
 import OpenAI from 'openai';
 
 import { OPENAI_CONFIG } from '../constants/config';
+import {
+    JUDGMENT_SYSTEM_PROMPT,
+    buildJudgmentUserContent,
+} from '../constants/prompts';
 import type {
-    ILlmJudgementResult,
-    ILlmQuote,
-    TQuoteFrom,
-    TVerdict,
+    IJudgmentResponse,
+    IRadarScores,
+    IThirdPartyFactor,
 } from '../types/llm';
 
 /** Request timeout (ms) — abort if OpenAI takes longer */
 const REQUEST_TIMEOUT_MS = 60_000;
-
-const SYSTEM_PROMPT = `你是一位中立、公正的裁决者。
-用户会给你两段文字：host（主持方）和 participant（参与方）。
-你必须判断哪一方更有道理，并以严格的 JSON 格式输出结果。
-
-输出格式（不要添加任何 Markdown 标记或额外文字）：
-{
-  "verdict": "host" | "participant" | "tie",
-  "reasons": ["原因1", "原因2"],
-  "suggestions": ["建议1"],
-  "quotes": [
-    { "from": "host", "text": "引用原文1" },
-    { "from": "participant", "text": "引用原文2" }
-  ]
-}`;
-
-/**
- * Validate that a parsed object conforms to ILlmJudgementResult
- * Throws if validation fails
- */
-function validateResult(obj: unknown): ILlmJudgementResult {
-    if (typeof obj !== 'object' || obj === null) {
-        throw new Error('LLM 返回值不是 JSON 对象');
-    }
-
-    const record = obj as Record<string, unknown>;
-
-    // verdict
-    const validVerdicts: TVerdict[] = ['host', 'participant', 'tie'];
-    if (
-        typeof record.verdict !== 'string' ||
-        !validVerdicts.includes(record.verdict as TVerdict)
-    ) {
-        throw new Error(
-            `verdict 必须是 host/participant/tie，` +
-                `实际: ${String(record.verdict)}`
-        );
-    }
-
-    // reasons — must be string[]
-    if (
-        !Array.isArray(record.reasons) ||
-        !record.reasons.every((r: unknown) => typeof r === 'string')
-    ) {
-        throw new Error('reasons 必须是字符串数组');
-    }
-
-    // suggestions — must be string[]
-    if (
-        !Array.isArray(record.suggestions) ||
-        !record.suggestions.every((s: unknown) => typeof s === 'string')
-    ) {
-        throw new Error('suggestions 必须是字符串数组');
-    }
-
-    // quotes — must be { from, text }[]
-    if (!Array.isArray(record.quotes)) {
-        throw new Error('quotes 必须是数组');
-    }
-
-    const validFroms: TQuoteFrom[] = ['host', 'participant'];
-    const quotes: ILlmQuote[] = record.quotes.map((q: unknown, i: number) => {
-        if (typeof q !== 'object' || q === null) {
-            throw new Error(`quotes[${i}] 必须是对象`);
-        }
-        const qr = q as Record<string, unknown>;
-        if (
-            typeof qr.from !== 'string' ||
-            !validFroms.includes(qr.from as TQuoteFrom)
-        ) {
-            throw new Error(
-                `quotes[${i}].from 必须是` + ` host 或 participant`
-            );
-        }
-        if (typeof qr.text !== 'string') {
-            throw new Error(`quotes[${i}].text 必须是字符串`);
-        }
-        return {
-            from: qr.from as TQuoteFrom,
-            text: qr.text,
-        };
-    });
-
-    return {
-        verdict: record.verdict as TVerdict,
-        reasons: record.reasons,
-        suggestions: record.suggestions,
-        quotes,
-    };
-}
 
 /**
  * Create a singleton OpenAI client instance
@@ -136,33 +48,152 @@ function getClient(): OpenAI {
     return clientInstance;
 }
 
+/* ========================================================
+ * 清汤大老爷判决书 — Judgment Verdict
+ * ====================================================== */
+
+/** Radar chart dimension keys */
+const RADAR_KEYS: (keyof IRadarScores)[] = [
+    '嘴硬程度',
+    '翻旧账',
+    '逻辑滑坡',
+    '撒娇暴击',
+    '求生欲',
+    '受害者演技',
+];
+
 /**
- * Call OpenAI to produce a judgement result
+ * Validate that a number is in [0, 100]
+ */
+function isScore(v: unknown): v is number {
+    return typeof v === 'number' && v >= 0 && v <= 100;
+}
+
+/**
+ * Validate a radar-scores object
+ */
+function validateRadar(obj: unknown, label: string): IRadarScores {
+    if (typeof obj !== 'object' || obj === null) {
+        throw new Error(`${label} 必须是对象`);
+    }
+    const r = obj as Record<string, unknown>;
+    const scores: Record<string, number> = {};
+    for (const key of RADAR_KEYS) {
+        if (!isScore(r[key])) {
+            throw new Error(`${label}.${key} 必须是 0-100 的数字`);
+        }
+        scores[key] = r[key];
+    }
+    return scores as unknown as IRadarScores;
+}
+
+/**
+ * Validate that parsed JSON conforms to IJudgmentResponse
+ */
+function validateJudgment(obj: unknown): IJudgmentResponse {
+    if (typeof obj !== 'object' || obj === null) {
+        throw new Error('LLM 返回值不是 JSON 对象');
+    }
+    const rec = obj as Record<string, unknown>;
+
+    // caseNumber
+    if (typeof rec.caseNumber !== 'string') {
+        throw new Error('caseNumber 必须是字符串');
+    }
+
+    // responsibility
+    if (typeof rec.responsibility !== 'object' || rec.responsibility === null) {
+        throw new Error('responsibility 必须是对象');
+    }
+    const resp = rec.responsibility as Record<string, unknown>;
+    if (typeof resp.player1 !== 'number') {
+        throw new Error('responsibility.player1 必须是数字');
+    }
+    if (typeof resp.player2 !== 'number') {
+        throw new Error('responsibility.player2 必须是数字');
+    }
+    if (typeof resp.thirdParty !== 'object' || resp.thirdParty === null) {
+        throw new Error('responsibility.thirdParty 必须是对象');
+    }
+    const tp = resp.thirdParty as Record<string, unknown>;
+    if (!Array.isArray(tp.factors)) {
+        throw new Error('responsibility.thirdParty.factors 必须是数组');
+    }
+    const factors: IThirdPartyFactor[] = tp.factors.map(
+        (f: unknown, i: number) => {
+            if (typeof f !== 'object' || f === null) {
+                throw new Error(`factors[${i}] 必须是对象`);
+            }
+            const fr = f as Record<string, unknown>;
+            if (typeof fr.name !== 'string') {
+                throw new Error(`factors[${i}].name 必须是字符串`);
+            }
+            if (typeof fr.percentage !== 'number') {
+                throw new Error(`factors[${i}].percentage 必须是数字`);
+            }
+            return {
+                name: fr.name,
+                percentage: fr.percentage,
+            };
+        }
+    );
+
+    // radarChart
+    if (typeof rec.radarChart !== 'object' || rec.radarChart === null) {
+        throw new Error('radarChart 必须是对象');
+    }
+    const radar = rec.radarChart as Record<string, unknown>;
+    const p1Radar = validateRadar(radar.player1, 'radarChart.player1');
+    const p2Radar = validateRadar(radar.player2, 'radarChart.player2');
+
+    // verdict
+    if (typeof rec.verdict !== 'string') {
+        throw new Error('verdict 必须是字符串');
+    }
+
+    return {
+        caseNumber: rec.caseNumber,
+        responsibility: {
+            player1: resp.player1,
+            player2: resp.player2,
+            thirdParty: { factors },
+        },
+        radarChart: {
+            player1: p1Radar,
+            player2: p2Radar,
+        },
+        verdict: rec.verdict,
+    };
+}
+
+/**
+ * Call OpenAI to produce a judgment verdict (判决书)
  *
- * @param hostText        - Text from the host
- * @param participantText - Text from the participant
- * @returns Parsed and validated ILlmJudgementResult
+ * Uses temperature 0.7 for creative/humorous output
+ *
+ * @param player1Speech - Player 1's speech content
+ * @param player2Speech - Player 2's speech content
+ * @returns Parsed and validated IJudgmentResponse
  * @throws Error with human-readable message on failure
  */
-export async function createJudgement(
-    hostText: string,
-    participantText: string
-): Promise<ILlmJudgementResult> {
+export async function createJudgmentVerdict(
+    player1Speech: string,
+    player2Speech: string
+): Promise<IJudgmentResponse> {
     const client = getClient();
 
-    const userContent = JSON.stringify(
-        { host: hostText, participant: participantText },
-        null,
-        2
-    );
+    const userContent = buildJudgmentUserContent(player1Speech, player2Speech);
 
     const response = await client.chat.completions.create({
         model: OPENAI_CONFIG.MODEL,
         messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
+            {
+                role: 'system',
+                content: JUDGMENT_SYSTEM_PROMPT,
+            },
             { role: 'user', content: userContent },
         ],
-        temperature: 0.3,
+        temperature: 0.7,
         response_format: { type: 'json_object' },
     });
 
@@ -181,10 +212,8 @@ export async function createJudgement(
     try {
         parsed = JSON.parse(cleaned);
     } catch {
-        throw new Error(
-            `OpenAI 返回的不是有效 JSON: ` + `${cleaned.slice(0, 200)}`
-        );
+        throw new Error('OpenAI 返回的不是有效 JSON: ' + cleaned.slice(0, 200));
     }
 
-    return validateResult(parsed);
+    return validateJudgment(parsed);
 }

@@ -1,6 +1,6 @@
 /**
  * LLM Judgement Routes
- * HTTP route definitions for synchronous LLM judgement
+ * HTTP route definitions for judgment verdict (判决书)
  *
  * ARCHITECTURE: Route definition layer
  * - Defines URL paths and HTTP methods
@@ -8,7 +8,7 @@
  * - Does NOT contain logic
  *
  * Routes:
- * - POST /v1/rooms/:roomId/llm/judgement
+ * - POST /v1/rooms/:roomId/llm/judgment
  */
 
 import { Router } from 'express';
@@ -18,12 +18,12 @@ import { LlmJudgementController } from '../controllers/llm-judgement.controller'
 const router = Router();
 
 /**
- * Create judgement (synchronous)
- * POST /v1/rooms/:roomId/llm/judgement
+ * Create judgment verdict (判决书)
+ * POST /v1/rooms/:roomId/llm/judgment
  */
 router.post(
-    '/rooms/:roomId/llm/judgement',
-    LlmJudgementController.createJudgement.bind(LlmJudgementController)
+    '/rooms/:roomId/llm/judgment',
+    LlmJudgementController.createJudgment.bind(LlmJudgementController)
 );
 
 export default router;

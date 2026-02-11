@@ -11,21 +11,6 @@
 import { z } from 'zod';
 
 /**
- * Create Judgement Request Body Schema
- * POST /v1/rooms/:roomId/llm/judgement
- */
-export const CreateJudgementBodySchema = z.object({
-    hostText: z
-        .string()
-        .min(1, '主持人文本不能为空')
-        .max(8000, '主持人文本过长'),
-    participantText: z
-        .string()
-        .min(1, '参与者文本不能为空')
-        .max(8000, '参与者文本过长'),
-});
-
-/**
  * Room ID Path Parameter Schema
  */
 export const RoomIdParamSchema = z.object({
@@ -33,7 +18,22 @@ export const RoomIdParamSchema = z.object({
 });
 
 /**
+ * Create Judgment Verdict Request Body Schema
+ * POST /v1/rooms/:roomId/llm/judgment
+ */
+export const CreateJudgmentBodySchema = z.object({
+    player1Speech: z
+        .string()
+        .min(1, '玩家1陈述不能为空')
+        .max(8000, '玩家1陈述过长'),
+    player2Speech: z
+        .string()
+        .min(1, '玩家2陈述不能为空')
+        .max(8000, '玩家2陈述过长'),
+});
+
+/**
  * Type inference from schemas
  */
-export type TCreateJudgementBody = z.infer<typeof CreateJudgementBodySchema>;
+export type TCreateJudgmentBody = z.infer<typeof CreateJudgmentBodySchema>;
 export type TRoomIdParam = z.infer<typeof RoomIdParamSchema>;
