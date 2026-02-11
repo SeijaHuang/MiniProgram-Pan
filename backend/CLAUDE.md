@@ -13,6 +13,7 @@ npm run dev           # Start dev server (ts-node)
 npm run build         # Compile TypeScript to dist/
 npm start             # Run production build (dist/index.js)
 npm run ws:test       # Test WebSocket connection
+npm run test:llm      # E2E test for LLM judgement API
 npm run lint          # Check code with ESLint
 npm run lint:fix      # Auto-fix ESLint issues
 npm run format        # Format code with Prettier
@@ -24,11 +25,13 @@ npx tsc --noEmit      # Type check without emitting
 
 ## Architecture
 
-Three-layer architecture: Routes → Controllers → Services → (Repositories)
+Three-layer architecture: Routes → Controllers → Services
 
 ### Request Flow
 
-**HTTP**: `routes/` → `controllers/` → `services/core/` → `services/websocket/room-manager.ts`
+**HTTP (Room)**: `routes/` → `controllers/` → `services/core/` → `services/websocket/room-manager.ts`
+
+**HTTP (LLM)**: `routes/llm-judgement.routes.ts` → `controllers/llm-judgement.controller.ts` → `services/core/llm-judgement.service.ts` → `clients/openai.client.ts`
 
 **WebSocket**: `ws.ts` → `controllers/ws-controller.ts` → `services/handlers/` → `services/websocket/`
 
@@ -40,6 +43,9 @@ Three-layer architecture: Routes → Controllers → Services → (Repositories)
 | `src/app.ts` | Express app configuration |
 | `src/ws.ts` | WebSocket server initialization |
 | `src/controllers/ws-controller.ts` | Routes WS messages to handlers |
+| `src/controllers/llm-judgement.controller.ts` | LLM judgement HTTP handler |
+| `src/services/core/llm-judgement.service.ts` | LLM judgement business logic |
+| `src/clients/openai.client.ts` | OpenAI API wrapper |
 | `src/services/websocket/connection-manager.ts` | Tracks WS connections |
 | `src/services/websocket/room-manager.ts` | Room state management |
 | `src/services/websocket/drum-game-manager.ts` | Drum game state |
@@ -112,6 +118,36 @@ CLOSED (cleanup)
 | `INVALID_PAYLOAD` | Malformed message |
 | `INTERNAL_ERROR` | Server error |
 
+## LLM Judgement API (Synchronous)
+
+Single endpoint — calls OpenAI directly and returns the result:
+
+```
+POST /v1/rooms/:roomId/llm/judgement
+```
+
+**Request**:
+```json
+{ "hostText": "...", "participantText": "..." }
+```
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "data": {
+    "verdict": "host" | "participant" | "tie",
+    "reasons": ["..."],
+    "suggestions": ["..."],
+    "quotes": [{ "from": "host", "text": "..." }]
+  }
+}
+```
+
+**Errors**: 400 (validation), 502 (LLM failure)
+
+**Environment**: `OPENAI_API_KEY` (required), `OPENAI_MODEL` (default: gpt-4o), `OPENAI_BASE_URL` (optional)
+
 ## Configuration (src/constants/config.ts)
 
 | Constant | Default | Purpose |
@@ -122,6 +158,8 @@ CLOSED (cleanup)
 | `WAITING_ROOM_CONFIG.COUNTDOWN_MS` | 3000 | Waiting room countdown |
 | `DRUM_CONFIG.COUNTDOWN_MS` | 3000 | Pre-game countdown |
 | `DRUM_CONFIG.GAME_DURATION_MS` | 10000 | Game length |
+| `OPENAI_CONFIG.API_KEY` | (env) | OpenAI API key |
+| `OPENAI_CONFIG.MODEL` | gpt-4o | LLM model |
 
 ## Enums
 
@@ -151,13 +189,21 @@ curl -X POST http://localhost:8080/room/create \
   -H "Content-Type: application/json" \
   -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
 
+# LLM Judgement (synchronous — requires OPENAI_API_KEY)
+curl -X POST http://localhost:8080/v1/rooms/<roomId>/llm/judgement \
+  -H "Content-Type: application/json" \
+  -d '{"hostText":"我每天加班到很晚","participantText":"我工资更低"}'
+
 # WebSocket test
 npm run ws:test
+
+# LLM E2E test
+npm run test:llm
 ```
 
-## Database
+## Storage
 
-MongoDB configuration is stubbed in `src/database/config/mongodb.config.ts` but not yet active. Currently uses in-memory storage via `room-manager.ts`.
+Room state is managed in-memory via `room-manager.ts`. No database is required for the current MVP.
 
 ## Parent Documentation
 

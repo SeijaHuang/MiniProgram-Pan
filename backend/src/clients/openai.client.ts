@@ -1,18 +1,23 @@
 /**
  * OpenAI Client
- * Encapsulates LLM calls for the judgement worker
+ * Encapsulates LLM calls for synchronous judgement
  *
  * ARCHITECTURE: Client layer (infrastructure)
- * - ONLY imported by the Worker process
- * - NEVER imported by HTTP controllers or services
+ * - Called by LlmJudgementService
  * - Reads config from OPENAI_CONFIG
  * - Timeout + JSON parsing with clear error messages
+ * - Does NOT log full hostText/participantText
  */
 
 import OpenAI from 'openai';
 
 import { OPENAI_CONFIG } from '../constants/config';
-import type { ILlmJudgementResult, TVerdict } from '../types/llm';
+import type {
+    ILlmJudgementResult,
+    ILlmQuote,
+    TQuoteFrom,
+    TVerdict,
+} from '../types/llm';
 
 /** Request timeout (ms) — abort if OpenAI takes longer */
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -26,10 +31,10 @@ const SYSTEM_PROMPT = `你是一位中立、公正的裁决者。
   "verdict": "host" | "participant" | "tie",
   "reasons": ["原因1", "原因2"],
   "suggestions": ["建议1"],
-  "quotes": {
-    "host": ["引用1"],
-    "participant": ["引用1"]
-  }
+  "quotes": [
+    { "from": "host", "text": "引用原文1" },
+    { "from": "participant", "text": "引用原文2" }
+  ]
 }`;
 
 /**
@@ -50,7 +55,8 @@ function validateResult(obj: unknown): ILlmJudgementResult {
         !validVerdicts.includes(record.verdict as TVerdict)
     ) {
         throw new Error(
-            `verdict 必须是 host/participant/tie，实际: ${String(record.verdict)}`
+            `verdict 必须是 host/participant/tie，` +
+                `实际: ${String(record.verdict)}`
         );
     }
 
@@ -70,32 +76,39 @@ function validateResult(obj: unknown): ILlmJudgementResult {
         throw new Error('suggestions 必须是字符串数组');
     }
 
-    // quotes
-    if (typeof record.quotes !== 'object' || record.quotes === null) {
-        throw new Error('quotes 必须是对象');
+    // quotes — must be { from, text }[]
+    if (!Array.isArray(record.quotes)) {
+        throw new Error('quotes 必须是数组');
     }
-    const quotes = record.quotes as Record<string, unknown>;
-    if (
-        !Array.isArray(quotes.host) ||
-        !quotes.host.every((q: unknown) => typeof q === 'string')
-    ) {
-        throw new Error('quotes.host 必须是字符串数组');
-    }
-    if (
-        !Array.isArray(quotes.participant) ||
-        !quotes.participant.every((q: unknown) => typeof q === 'string')
-    ) {
-        throw new Error('quotes.participant 必须是字符串数组');
-    }
+
+    const validFroms: TQuoteFrom[] = ['host', 'participant'];
+    const quotes: ILlmQuote[] = record.quotes.map((q: unknown, i: number) => {
+        if (typeof q !== 'object' || q === null) {
+            throw new Error(`quotes[${i}] 必须是对象`);
+        }
+        const qr = q as Record<string, unknown>;
+        if (
+            typeof qr.from !== 'string' ||
+            !validFroms.includes(qr.from as TQuoteFrom)
+        ) {
+            throw new Error(
+                `quotes[${i}].from 必须是` + ` host 或 participant`
+            );
+        }
+        if (typeof qr.text !== 'string') {
+            throw new Error(`quotes[${i}].text 必须是字符串`);
+        }
+        return {
+            from: qr.from as TQuoteFrom,
+            text: qr.text,
+        };
+    });
 
     return {
         verdict: record.verdict as TVerdict,
         reasons: record.reasons,
         suggestions: record.suggestions,
-        quotes: {
-            host: quotes.host,
-            participant: quotes.participant,
-        },
+        quotes,
     };
 }
 
@@ -104,7 +117,7 @@ function validateResult(obj: unknown): ILlmJudgementResult {
  */
 function createClient(): OpenAI {
     if (!OPENAI_CONFIG.API_KEY) {
-        throw new Error('OPENAI_API_KEY 未配置，无法启动 Worker');
+        throw new Error('OPENAI_API_KEY 未配置，无法调用 LLM');
     }
 
     return new OpenAI({
@@ -126,10 +139,10 @@ function getClient(): OpenAI {
 /**
  * Call OpenAI to produce a judgement result
  *
- * @param hostText        - Text from the host (room creator)
- * @param participantText - Text from the participant (joiner)
+ * @param hostText        - Text from the host
+ * @param participantText - Text from the participant
  * @returns Parsed and validated ILlmJudgementResult
- * @throws Error with human-readable message on any failure
+ * @throws Error with human-readable message on failure
  */
 export async function createJudgement(
     hostText: string,
@@ -168,7 +181,9 @@ export async function createJudgement(
     try {
         parsed = JSON.parse(cleaned);
     } catch {
-        throw new Error(`OpenAI 返回的不是有效 JSON: ${cleaned.slice(0, 200)}`);
+        throw new Error(
+            `OpenAI 返回的不是有效 JSON: ` + `${cleaned.slice(0, 200)}`
+        );
     }
 
     return validateResult(parsed);

@@ -1,25 +1,24 @@
 /**
- * Minimal E2E self-test for the LLM Judgement pipeline
+ * Minimal E2E self-test for the synchronous LLM Judgement API
  *
  * Prerequisites:
- *   1. PostgreSQL running with DATABASE_URL configured
- *   2. Migrations applied: npx prisma migrate deploy
- *   3. API server running: npm run dev
- *   4. (Optional) Worker running: npm run worker:llm
+ *   1. API server running: npm run dev
+ *   2. OPENAI_API_KEY configured in .env
  *
  * Usage:
  *   npm run test:llm
  *
  * Tests:
- *   1. Idempotency — same idempotencyKey returns same taskId
- *   2. Task query — GET returns correct status
- *   3. Worker pickup — task transitions queued → running → succeeded/failed
- *      (only if worker is running)
+ *   1. Validation — missing fields returns 400
+ *   2. Validation — empty strings return 400
+ *   3. Sync judgement — POST returns 200 with result
+ *      (only if OPENAI_API_KEY is configured on server)
  */
 
 /* eslint-disable no-console */
 
-const API_BASE = process.env.API_BASE || 'http://localhost:8080';
+const API_BASE =
+    process.env.API_BASE || 'http://localhost:8080';
 
 interface IApiResponse<T> {
     success: boolean;
@@ -27,16 +26,14 @@ interface IApiResponse<T> {
     error?: { code: string; message: string };
 }
 
-interface ICreateData {
-    taskId: string;
-    status: string;
-}
-
-interface IGetData {
-    taskId: string;
-    status: string;
-    resultJson: unknown;
-    errorMessage: string | null;
+interface IJudgementResult {
+    verdict: 'host' | 'participant' | 'tie';
+    reasons: string[];
+    suggestions: string[];
+    quotes: Array<{
+        from: 'host' | 'participant';
+        text: string;
+    }>;
 }
 
 let passed = 0;
@@ -61,165 +58,141 @@ function assert(
 async function post<T>(
     path: string,
     body: Record<string, unknown>
-): Promise<IApiResponse<T>> {
+): Promise<{ status: number; json: IApiResponse<T> }> {
     const res = await fetch(`${API_BASE}${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
     });
-    return (await res.json()) as IApiResponse<T>;
-}
-
-async function get<T>(path: string): Promise<IApiResponse<T>> {
-    const res = await fetch(`${API_BASE}${path}`);
-    return (await res.json()) as IApiResponse<T>;
-}
-
-function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    const json = (await res.json()) as IApiResponse<T>;
+    return { status: res.status, json };
 }
 
 async function main(): Promise<void> {
-    console.log(`\n=== LLM Judgement E2E Test ===`);
+    console.log(`\n=== LLM Judgement E2E Test (Sync) ===`);
     console.log(`API: ${API_BASE}\n`);
 
-    // -------------------------------------------------------
-    // Prepare: create a room so roomId is valid
-    // -------------------------------------------------------
+    // Setup: create a room so roomId is valid
     console.log('[Setup] Creating room...');
     const roomRes = await post<{
         room: { roomId: string; roomCode: string };
     }>('/room/create', {
-        creator: { userId: 'test_host', nickname: 'TestHost' },
+        creator: {
+            userId: 'test_host',
+            nickname: 'TestHost',
+        },
     });
 
-    if (!roomRes.success || !roomRes.data) {
+    if (!roomRes.json.success || !roomRes.json.data) {
         console.error(
             'Cannot create room — is the server running?',
-            roomRes
+            roomRes.json
         );
         process.exit(1);
     }
-    const roomId = roomRes.data.room.roomId;
+    const roomId = roomRes.json.data.room.roomId;
     console.log(`[Setup] roomId=${roomId}\n`);
 
-    const idempotencyKey = `test_${Date.now()}`;
+    const url = `/v1/rooms/${roomId}/llm/judgement`;
 
-    // -------------------------------------------------------
-    // Test 1: Create task
-    // -------------------------------------------------------
-    console.log('[Test 1] Create judgement task');
-    const create1 = await post<ICreateData>(
-        `/v1/rooms/${roomId}/llm/judgement`,
-        {
-            hostText: '我每天加班到很晚，非常辛苦',
-            participantText: '我也很辛苦，而且工资更低',
-            idempotencyKey,
-        }
-    );
-    assert(create1.success === true, 'create returns success');
+    // ---------------------------------------------------
+    // Test 1: Missing fields → 400
+    // ---------------------------------------------------
+    console.log('[Test 1] Missing fields → 400');
+    const t1 = await post(url, {});
     assert(
-        typeof create1.data?.taskId === 'string',
-        'taskId is a string'
+        t1.status === 400,
+        `status is 400 (got: ${t1.status})`
     );
     assert(
-        create1.data?.status === 'queued',
-        `status is queued (got: ${create1.data?.status})`
-    );
-    const taskId = create1.data?.taskId ?? '';
-
-    // -------------------------------------------------------
-    // Test 2: Idempotency
-    // -------------------------------------------------------
-    console.log('\n[Test 2] Idempotency — same key returns same task');
-    const create2 = await post<ICreateData>(
-        `/v1/rooms/${roomId}/llm/judgement`,
-        {
-            hostText: '我每天加班到很晚，非常辛苦',
-            participantText: '我也很辛苦，而且工资更低',
-            idempotencyKey,
-        }
-    );
-    assert(create2.success === true, 'second create returns success');
-    assert(
-        create2.data?.taskId === taskId,
-        `same taskId (${create2.data?.taskId} === ${taskId})`
+        t1.json.success === false,
+        'response.success is false'
     );
 
-    // -------------------------------------------------------
-    // Test 3: GET task
-    // -------------------------------------------------------
-    console.log('\n[Test 3] GET task by ID');
-    const getRes = await get<IGetData>(`/v1/llm/tasks/${taskId}`);
-    assert(getRes.success === true, 'get returns success');
+    // ---------------------------------------------------
+    // Test 2: Empty hostText → 400
+    // ---------------------------------------------------
+    console.log('\n[Test 2] Empty hostText → 400');
+    const t2 = await post(url, {
+        hostText: '',
+        participantText: '有内容',
+    });
     assert(
-        getRes.data?.taskId === taskId,
-        'returned taskId matches'
+        t2.status === 400,
+        `status is 400 (got: ${t2.status})`
     );
 
-    // -------------------------------------------------------
-    // Test 4: GET non-existent task → 404
-    // -------------------------------------------------------
-    console.log('\n[Test 4] GET non-existent task → 404');
-    const fakeId = '00000000-0000-0000-0000-000000000000';
-    const notFound = await get<IGetData>(`/v1/llm/tasks/${fakeId}`);
-    assert(
-        notFound.success === false,
-        'non-existent task returns failure'
-    );
-    assert(
-        notFound.error?.code === 'TASK_NOT_FOUND',
-        `error code is TASK_NOT_FOUND (got: ${notFound.error?.code})`
-    );
-
-    // -------------------------------------------------------
-    // Test 5: Worker pickup (optional — only if worker is running)
-    // -------------------------------------------------------
+    // ---------------------------------------------------
+    // Test 3: Sync judgement → 200
+    // ---------------------------------------------------
+    console.log('\n[Test 3] Sync judgement → 200');
     console.log(
-        '\n[Test 5] Worker pickup (polling up to 30s, skip if no worker)'
+        '  (calls OpenAI — may take up to 60s...)'
     );
-    let finalStatus = getRes.data?.status ?? 'queued';
-    const deadline = Date.now() + 30_000;
-    let workerDetected = false;
+    const t3 = await post<IJudgementResult>(url, {
+        hostText: '我每天加班到很晚，非常辛苦',
+        participantText: '我也很辛苦，而且工资更低',
+    });
 
-    while (
-        Date.now() < deadline &&
-        (finalStatus === 'queued' || finalStatus === 'running')
-    ) {
-        await sleep(1000);
-        const poll = await get<IGetData>(`/v1/llm/tasks/${taskId}`);
-        finalStatus = poll.data?.status ?? finalStatus;
+    if (t3.status === 502) {
+        console.log(
+            '  SKIP: server returned 502 — ' +
+                'OPENAI_API_KEY may not be configured'
+        );
+    } else {
+        assert(
+            t3.status === 200,
+            `status is 200 (got: ${t3.status})`
+        );
+        assert(
+            t3.json.success === true,
+            'response.success is true'
+        );
 
-        if (finalStatus === 'running' && !workerDetected) {
-            console.log('  ... worker picked up task (running)');
-            workerDetected = true;
-        }
-    }
-
-    if (
-        finalStatus === 'succeeded' ||
-        finalStatus === 'failed'
-    ) {
-        assert(true, `task reached terminal state: ${finalStatus}`);
-        if (finalStatus === 'succeeded') {
-            const finalGet = await get<IGetData>(
-                `/v1/llm/tasks/${taskId}`
+        const data = t3.json.data;
+        if (data) {
+            assert(
+                ['host', 'participant', 'tie'].includes(
+                    data.verdict
+                ),
+                `verdict is valid (got: ${data.verdict})`
             );
             assert(
-                finalGet.data?.resultJson !== null,
-                'resultJson is populated'
+                Array.isArray(data.reasons),
+                'reasons is array'
             );
+            assert(
+                Array.isArray(data.suggestions),
+                'suggestions is array'
+            );
+            assert(
+                Array.isArray(data.quotes),
+                'quotes is array'
+            );
+            if (data.quotes.length > 0) {
+                const q = data.quotes[0];
+                assert(
+                    ['host', 'participant'].includes(
+                        q.from
+                    ),
+                    `quotes[0].from is valid ` +
+                        `(got: ${q.from})`
+                );
+                assert(
+                    typeof q.text === 'string',
+                    'quotes[0].text is string'
+                );
+            }
         }
-    } else {
-        console.log(
-            `  SKIP: task still ${finalStatus} — worker may not be running`
-        );
     }
 
-    // -------------------------------------------------------
+    // ---------------------------------------------------
     // Summary
-    // -------------------------------------------------------
-    console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
+    // ---------------------------------------------------
+    console.log(
+        `\n=== Results: ${passed} passed, ` +
+            `${failed} failed ===\n`
+    );
     process.exit(failed > 0 ? 1 : 0);
 }
 

@@ -1,6 +1,6 @@
 /**
  * LLM Judgement Routes
- * HTTP route definitions for LLM judgement operations
+ * HTTP route definitions for synchronous LLM judgement
  *
  * ARCHITECTURE: Route definition layer
  * - Defines URL paths and HTTP methods
@@ -8,8 +8,7 @@
  * - Does NOT contain logic
  *
  * Routes:
- * - POST /v1/rooms/:roomId/llm/judgement - Create judgement task
- * - GET  /v1/llm/tasks/:taskId           - Get task status/result
+ * - POST /v1/rooms/:roomId/llm/judgement
  */
 
 import { Router } from 'express';
@@ -19,23 +18,12 @@ import { LlmJudgementController } from '../controllers/llm-judgement.controller'
 const router = Router();
 
 /**
- * Create judgement task
+ * Create judgement (synchronous)
  * POST /v1/rooms/:roomId/llm/judgement
- *
- * Idempotent: same idempotencyKey returns same taskId
  */
 router.post(
     '/rooms/:roomId/llm/judgement',
-    LlmJudgementController.createJudgementTask.bind(LlmJudgementController)
-);
-
-/**
- * Get task status / result
- * GET /v1/llm/tasks/:taskId
- */
-router.get(
-    '/llm/tasks/:taskId',
-    LlmJudgementController.getTask.bind(LlmJudgementController)
+    LlmJudgementController.createJudgement.bind(LlmJudgementController)
 );
 
 export default router;

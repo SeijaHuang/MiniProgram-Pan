@@ -13,8 +13,7 @@ export enum EHttpErrorCode {
     RoomNotFound = 'ROOM_NOT_FOUND',
     InvalidRequest = 'INVALID_REQUEST',
     InternalError = 'INTERNAL_ERROR',
-    TaskNotFound = 'TASK_NOT_FOUND',
-    TaskCreateFailed = 'TASK_CREATE_FAILED',
+    LlmCallFailed = 'LLM_CALL_FAILED',
 }
 
 /**

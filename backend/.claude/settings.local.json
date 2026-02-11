@@ -9,7 +9,13 @@
       "Bash(npm run lint:fix:*)",
       "Bash(cd:*)",
       "Bash(npx eslint:*)",
-      "Bash(npx prettier:*)"
+      "Bash(npx prettier:*)",
+      "Bash(for f in src/worker/index.ts src/worker/llm-judgement.worker.ts src/repositories/llm-task.repository.ts src/repositories/room-llm-lock.repository.ts src/controllers/llm-controller.ts src/routes/llm-routes.ts src/services/core/llm/llm-task.service.ts)",
+      "Bash(do if [ -f \"$f\" ])",
+      "Bash(then echo \"EXISTS \\(BAD\\): $f\")",
+      "Bash(else echo \"GONE \\(OK\\): $f\")",
+      "Bash(fi)",
+      "Bash(done)"
     ]
   }
 }

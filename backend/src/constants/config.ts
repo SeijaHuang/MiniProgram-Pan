@@ -38,12 +38,3 @@ export const OPENAI_CONFIG = {
     /** Optional base URL for OpenAI-compatible APIs */
     BASE_URL: process.env.OPENAI_BASE_URL,
 } as const;
-
-export const LLM_WORKER_CONFIG = {
-    /** How often the worker polls for new tasks (ms) */
-    POLL_INTERVAL_MS: Number(process.env.LLM_WORKER_POLL_INTERVAL_MS) || 500,
-    /** Lock timeout for room-level task execution (ms) */
-    LOCK_TIMEOUT_MS: Number(process.env.LLM_WORKER_LOCK_TIMEOUT_MS) || 60000,
-    /** Max retries for failed LLM calls */
-    MAX_RETRIES: Number(process.env.LLM_MAX_RETRIES) || 3,
-} as const;

@@ -8,7 +8,6 @@ import http from 'http';
 import app from './app';
 import { initWebSocket } from './ws';
 import { APP_CONFIG } from './constants/config';
-import { disconnectPrisma } from './database/prisma';
 
 const server = http.createServer(app);
 
@@ -22,17 +21,10 @@ server.listen(APP_CONFIG.PORT, () => {
 // Graceful shutdown handler
 function handleShutdown(signal: string): void {
     console.log(`\n${signal} received. Shutting down gracefully...`);
-    disconnectPrisma()
-        .then(() => {
-            server.close(() => {
-                console.log('Server closed');
-                process.exit(0);
-            });
-        })
-        .catch((error: unknown) => {
-            console.error('Error during shutdown:', error);
-            process.exit(1);
-        });
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
 }
 
 process.on('SIGINT', () => handleShutdown('SIGINT'));
