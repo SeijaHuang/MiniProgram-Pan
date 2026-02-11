@@ -8,6 +8,8 @@
  * - Timeout + JSON parsing with clear error messages
  */
 
+import crypto from 'crypto';
+
 import OpenAI from 'openai';
 
 import { OPENAI_CONFIG } from '../constants/config';
@@ -178,24 +180,29 @@ function validateJudgment(obj: unknown): IJudgmentResponse {
  */
 export async function createJudgmentVerdict(
     player1Speech: string,
-    player2Speech: string
+    player2Speech: string,
+    idempotencyKey?: string
 ): Promise<IJudgmentResponse> {
     const client = getClient();
 
     const userContent = buildJudgmentUserContent(player1Speech, player2Speech);
+    const key = idempotencyKey ?? crypto.randomUUID();
 
-    const response = await client.chat.completions.create({
-        model: OPENAI_CONFIG.MODEL,
-        messages: [
-            {
-                role: 'system',
-                content: JUDGMENT_SYSTEM_PROMPT,
-            },
-            { role: 'user', content: userContent },
-        ],
-        temperature: 0.7,
-        response_format: { type: 'json_object' },
-    });
+    const response = await client.chat.completions.create(
+        {
+            model: OPENAI_CONFIG.MODEL,
+            messages: [
+                {
+                    role: 'system',
+                    content: JUDGMENT_SYSTEM_PROMPT,
+                },
+                { role: 'user', content: userContent },
+            ],
+            temperature: 0.7,
+            response_format: { type: 'json_object' },
+        },
+        { idempotencyKey: key }
+    );
 
     const content = response.choices[0]?.message?.content;
     if (!content) {

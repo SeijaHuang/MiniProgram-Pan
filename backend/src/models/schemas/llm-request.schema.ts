@@ -30,6 +30,7 @@ export const CreateJudgmentBodySchema = z.object({
         .string()
         .min(1, '玩家2陈述不能为空')
         .max(8000, '玩家2陈述过长'),
+    idempotencyKey: z.string().max(128).optional(),
 });
 
 /**

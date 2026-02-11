@@ -28,7 +28,8 @@ export class LlmJudgementService {
     ): Promise<IJudgmentResponse> {
         return createJudgmentVerdict(
             payload.player1Speech,
-            payload.player2Speech
+            payload.player2Speech,
+            payload.idempotencyKey
         );
     }
 }

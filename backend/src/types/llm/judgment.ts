@@ -54,4 +54,6 @@ export interface IJudgmentResponse {
 export interface ICreateJudgmentRequest {
     player1Speech: string;
     player2Speech: string;
+    /** 幂等键，防止前端重复调用 OpenAI */
+    idempotencyKey?: string;
 }

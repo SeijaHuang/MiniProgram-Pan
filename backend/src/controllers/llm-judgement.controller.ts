@@ -65,13 +65,15 @@ export class LlmJudgementController {
             }
 
             const { roomId } = paramResult.data;
-            const { player1Speech, player2Speech } = bodyResult.data;
+            const { player1Speech, player2Speech, idempotencyKey } =
+                bodyResult.data;
 
             // Call service (synchronous LLM call)
             const result: IJudgmentResponse =
                 await llmJudgementService.createJudgment(roomId, {
                     player1Speech,
                     player2Speech,
+                    idempotencyKey,
                 });
 
             const response: IBaseResponse<IJudgmentResponse> = {
