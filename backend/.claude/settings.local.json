@@ -2,7 +2,6 @@
   "permissions": {
     "allow": [
       "Bash(npm install)",
-      "Bash(npx prisma generate:*)",
       "Bash(npx tsc:*)",
       "Bash(docker-compose up:*)",
       "Bash(npm run lint)",

@@ -108,7 +108,6 @@
 .chat-room__reaction {
     position: absolute;
     bottom: 400rpx;
-    animation: reaction-fly 3s ease-out forwards;
 }
 
 .chat-room__reaction--lane0 {
@@ -117,7 +116,6 @@
 
 .chat-room__reaction--lane1 {
     left: 50%;
-    transform: translateX(-50%);
 }
 
 .chat-room__reaction--lane2 {
@@ -126,21 +124,6 @@
 
 .chat-room__reaction-emoji {
     font-size: 80rpx;
-}
-
-@keyframes reaction-fly {
-    0% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-    50% {
-        opacity: 1;
-        transform: translateY(-200rpx) scale(1.2);
-    }
-    100% {
-        opacity: 0;
-        transform: translateY(-400rpx) scale(0.8);
-    }
 }
 
 /* ==================== Stage Area ==================== */
@@ -161,6 +144,34 @@
     padding: 32rpx 48rpx;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 16rpx;
+}
+
+/* Speech Text - 实时语音识别文字 */
+.chat-room__speech-text {
+    max-width: 600rpx;
+    padding: 24rpx 32rpx;
+    background: rgba(74, 222, 128, 0.15);
+    border: 2rpx solid rgba(74, 222, 128, 0.3);
+    border-radius: 16rpx;
+    margin-bottom: 20rpx;
+}
+
+.chat-room__speech-text--opponent {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.chat-room__speech-text-content {
+    font-size: 32rpx;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    word-wrap: break-word;
+}
+
+.chat-room__speech-text-placeholder {
+    font-size: 28rpx;
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
 }
 
 /* Recording Wave Animation */
@@ -373,12 +384,10 @@
     align-items: center;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 16rpx;
-    transition: background 0.15s ease-out;
 }
 
 .chat-room__emoji-btn:active {
     background: rgba(255, 255, 255, 0.2);
-    transform: scale(0.95);
 }
 
 .chat-room__emoji-text {

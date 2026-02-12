@@ -38,3 +38,9 @@ export const OPENAI_CONFIG = {
     /** Optional base URL for OpenAI-compatible APIs */
     BASE_URL: process.env.OPENAI_BASE_URL,
 } as const;
+
+export const TENCENT_CONFIG = {
+    SECRET_ID: process.env.TENCENT_SECRET_ID,
+    SECRET_KEY: process.env.TENCENT_SECRET_KEY,
+    REGION: process.env.TENCENT_REGION,
+} as const;

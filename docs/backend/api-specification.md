@@ -137,6 +137,81 @@ curl -X POST http://localhost:8080/room/create \
 
 ---
 
+### 2. 获取腾讯云 STS Token
+
+**Endpoint**: `GET /tencent/credentials`
+
+**描述**: 获取腾讯云临时安全凭证（STS Token），用于客户端直连腾讯云 ASR 服务
+
+#### Request
+
+**Headers**:
+```
+无需特殊 headers
+```
+
+**Query Parameters**: 无
+
+#### Response
+
+**成功响应** (200 OK):
+```typescript
+{
+  "Credentials": {
+    "Token": string,           // 临时安全令牌
+    "TmpSecretId": string,     // 临时 SecretId
+    "TmpSecretKey": string     // 临时 SecretKey
+  },
+  "Expiration": string,        // 过期时间（ISO 8601 格式）
+  "ExpiredTime": number,       // 过期时间戳（秒）
+  "RequestId": string          // 请求ID
+}
+```
+
+**错误响应** (500 Internal Server Error):
+```typescript
+{
+  "success": false,
+  "error": {
+    "code": "STS_GET_FAILED",
+    "message": string  // 具体错误信息
+  }
+}
+```
+
+#### 示例
+
+**cURL**:
+```bash
+curl -X GET http://localhost:8080/tencent/credentials
+```
+
+**成功响应示例**:
+```json
+{
+  "Credentials": {
+    "Token": "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "TmpSecretId": "AKIDxxxxxxxxxxxxxx",
+    "TmpSecretKey": "xxxxxxxxxxxxxxxx"
+  },
+  "Expiration": "2026-02-02T12:00:00Z",
+  "ExpiredTime": 1738497600,
+  "RequestId": "abcd1234-5678-90ef-ghij-klmnopqrstuv"
+}
+```
+
+**使用场景**:
+- 小程序客户端在开始 ASR 会话前，先调用此接口获取临时凭证
+- 使用临时凭证直连腾讯云实时语音识别服务
+- Token 有效期通常为 1-2 小时，过期前需重新获取
+
+**安全说明**:
+- 使用 STS 临时凭证代替永久密钥，提高安全性
+- 临时凭证权限被限制为仅能访问 ASR 服务（`name/asr:*`）
+- 即使凭证泄露，影响范围也被限制且有时效性
+
+---
+
 ## WebSocket API
 
 ### 连接
@@ -162,6 +237,23 @@ curl -X POST http://localhost:8080/room/create \
   "timestamp": number  // 消息时间戳
 }
 ```
+
+### 支持的消息类型
+
+| 消息类型 | 方向 | 功能模块 | 说明 |
+|---------|------|---------|------|
+| `JOIN_ROOM` | Client → Server | 房间管理 | 加入房间 |
+| `JOIN_ACK` | Server → Client | 房间管理 | 确认加入（广播） |
+| `CHAT_SEND` | Client → Server | 聊天 | 发送文本消息 |
+| `CHAT_RECEIVE` | Server → Client | 聊天 | 接收消息（广播） |
+| `ASR_TEXT_PUSH` | Client → Server | 语音识别 | 推送识别文本 |
+| `ASR_TEXT` | Server → Client | 语音识别 | 广播识别文本 |
+| `DRUM_READY` | Server → Client | 震天鼓游戏 | 游戏准备 |
+| `DRUM_START` | Server → Client | 震天鼓游戏 | 游戏开始 |
+| `DRUM_TAP` | Bidirectional | 震天鼓游戏 | 点击事件 |
+| `DRUM_FINISH` | Server → Client | 震天鼓游戏 | 游戏结束 |
+| `DRUM_RESULT` | Server → Client | 震天鼓游戏 | 最终结果 |
+| `ERROR` | Server → Client | 错误处理 | 错误通知 |
 
 ---
 
@@ -325,6 +417,134 @@ curl -X POST http://localhost:8080/room/create \
 
 ---
 
+### 3. ASR 实时语音识别
+
+ASR（Automatic Speech Recognition）功能为 Chat Room 提供实时语音转文字能力。
+
+**架构说明**: 客户端直接连接腾讯云 ASR 服务进行语音识别，然后通过 WebSocket 将识别结果同步给服务器，服务器负责广播给其他参与者。
+
+**前置条件**: 客户端需要先调用 `GET /tencent/credentials` 获取临时凭证。
+
+---
+
+#### 3.1 推送识别文本 (ASR_TEXT_PUSH)
+
+**方向**: Client → Server
+
+**描述**: 发言者将本地 ASR 识别的文本推送到服务器，服务器进行去重和节流后广播给其他参与者
+
+**消息格式**:
+```typescript
+{
+  "type": "ASR_TEXT_PUSH",
+  "data": {
+    "roomId": string,      // 房间ID
+    "speakerId": string,   // 发言者 userId（必须与连接的 userId 一致）
+    "seq": number,         // 序列号（从0开始，单调递增，用于去重）
+    "text": string,        // 识别的文本内容
+    "isFinal": boolean     // false=实时文本（可覆盖），true=最终文本（固化）
+  },
+  "timestamp": number
+}
+```
+
+**验证规则**:
+- 发言者必须是房间参与者
+- `speakerId` 必须与连接的 `userId` 一致
+- `roomId` 必须与连接的 `roomId` 一致
+- 房间状态必须为 `READY`（2人就位）
+- `seq` 必须单调递增（用于去重）
+
+**去重和节流机制**:
+- **去重**: `seq ≤ lastSeq` 的消息会被丢弃
+- **节流**: Partial 消息会被节流到 200ms 间隔
+- **Final 优先**: Final 消息立即广播，清除待处理的 Partial
+- **会话隔离**: Final 后的旧消息会被忽略
+
+**错误代码**:
+- `ROOM_NOT_FOUND`: 房间不存在
+- `NOT_PARTICIPANT`: 用户不是房间参与者
+- `ROOM_NOT_READY`: 房间未就绪（未满2人）
+- `INVALID_PAYLOAD`: 消息格式错误
+
+---
+
+#### 3.2 接收识别文本 (ASR_TEXT)
+
+**方向**: Server → All Participants (广播)
+
+**描述**: 服务器将验证和处理后的识别文本广播给房间内所有参与者
+
+**消息格式**:
+```typescript
+{
+  "type": "ASR_TEXT",
+  "data": {
+    "roomId": string,
+    "speakerId": string,   // 发言者 userId
+    "seq": number,         // 序列号
+    "text": string,        // 识别文本
+    "isFinal": boolean     // false=实时文本（可覆盖），true=最终文本（固化）
+  },
+  "timestamp": number
+}
+```
+
+**文本类型**:
+- **Partial** (`isFinal: false`): 实时识别的中间结果，会不断更新覆盖
+- **Final** (`isFinal: true`): 最终确认的文本，不再变化
+
+**关键行为**:
+- ✅ 广播给房间内所有参与者（包括发言者）
+- ✅ 服务器端节流：Partial 消息最多 200ms 发送一次
+- ✅ Final 消息立即发送，不节流
+- ✅ 新的 Partial 覆盖旧 Partial
+- ✅ Final 出现后，该语句的识别结束
+
+**使用流程**:
+```
+1. 客户端获取 STS Token (GET /tencent/credentials)
+   ↓
+2. 客户端使用临时凭证连接腾讯云 ASR
+   ↓
+3. 客户端录音并实时获取识别结果
+   ↓
+4. 客户端通过 ASR_TEXT_PUSH 推送识别结果到服务器
+   ↓
+5. 服务器验证、去重、节流后广播 ASR_TEXT 给其他参与者
+   ↓
+6. 其他参与者实时看到发言者的语音转文字
+```
+
+---
+
+### 4. 震天鼓游戏 (DRUM)
+
+震天鼓游戏是双人实时竞技小游戏，玩家通过点击鼓面竞争，获胜者获得优先发言权。
+
+**游戏时长**: 10秒（可配置）
+**触发时机**: 房间满员（2人）后自动开始
+
+#### 游戏流程
+
+```
+房间满员 → 等待3秒 → DRUM_READY → DRUM_START → 游戏进行(10秒) → DRUM_FINISH → DRUM_RESULT
+```
+
+#### WebSocket 消息类型
+
+| 消息类型 | 方向 | 说明 |
+|---------|------|------|
+| `DRUM_READY` | Server → Client | 游戏准备，同步服务器时间和玩家信息 |
+| `DRUM_START` | Server → Client | 游戏开始信号 |
+| `DRUM_TAP` | Bidirectional | 点击事件（客户端发送，服务器广播） |
+| `DRUM_FINISH` | Server → Client | 游戏结束信号 |
+| `DRUM_RESULT` | Server → Client | 最终结果和获胜者 |
+
+**详细文档**: 查看 [震天鼓游戏详细文档](features/06-drum-game.md) 了解完整的消息格式和游戏机制。
+
+---
+
 ## 数据模型
 
 ### Room（房间）
@@ -403,19 +623,24 @@ type IMessageContent = {
 |---------|-----------|------|
 | `INVALID_REQUEST` | 400 | 请求参数验证失败 |
 | `ROOM_CREATE_FAILED` | 500 | 房间创建失败 |
+| `STS_GET_FAILED` | 500 | 获取 STS Token 失败 |
 
 ### WebSocket 错误代码
 
-| 错误代码 | 描述 |
-|---------|------|
-| `INVALID_PAYLOAD` | 消息格式错误或缺少必需字段 |
-| `ROOM_NOT_FOUND` | 房间代码不存在 |
-| `ROOM_FULL` | 房间已满（已有2名参与者） |
-| `ROOM_CLOSED` | 房间已关闭 |
-| `ALREADY_JOINED` | 用户已在房间中 |
-| `NOT_PARTICIPANT` | 用户不是房间参与者 |
-| `ROOM_NOT_READY` | 房间未就绪（参与者不足2人） |
-| `INTERNAL_ERROR` | 服务器内部错误 |
+| 错误代码 | 描述 | 适用场景 |
+|---------|------|---------|
+| `INVALID_PAYLOAD` | 消息格式错误或缺少必需字段 | 所有消息类型 |
+| `ROOM_NOT_FOUND` | 房间代码不存在 | JOIN_ROOM, ASR_TEXT_PUSH |
+| `ROOM_FULL` | 房间已满（已有2名参与者） | JOIN_ROOM |
+| `ROOM_CLOSED` | 房间已关闭 | JOIN_ROOM |
+| `ALREADY_JOINED` | 用户已在房间中 | JOIN_ROOM |
+| `NOT_PARTICIPANT` | 用户不是房间参与者 | CHAT_SEND, DRUM_TAP, ASR_TEXT_PUSH |
+| `ROOM_NOT_READY` | 房间未就绪（参与者不足2人） | CHAT_SEND, ASR_TEXT_PUSH |
+| `INTERNAL_ERROR` | 服务器内部错误 | 所有消息类型 |
+
+**注意**: 
+- ASR 相关的错误（如音频格式错误、识别服务连接失败等）发生在客户端与腾讯云 ASR 的连接中，不会通过后端 WebSocket 返回
+- 后端只负责文本同步，因此只会返回房间和权限相关的错误代码
 
 ---
 
@@ -702,4 +927,14 @@ npm run ws:test
 - ❌ 用户注册/登录
 - ❌ 房间持久化（重启后丢失）
 - ❌ 文件/图片消息
+- ❌ ASR 音频存储和文本持久化
+
+---
+
+## 参考文档
+
+- [腾讯云 STS Token 获取](features/08-tencent-sts-token.md)
+- [ASR 实时语音识别详细文档](features/07-asr-real-time-speech.md)
+- [震天鼓游戏](features/06-drum-game.md)
+- [数据模型](data-models.md)
 

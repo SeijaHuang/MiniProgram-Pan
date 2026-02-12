@@ -11,6 +11,7 @@
 import express, { Request, Response } from 'express';
 import roomRoutes from './routes/room-routes';
 import llmJudgementRoutes from './routes/llm-judgement.routes';
+import tencentRoutes from './routes/tencent-routes';
 
 const app = express();
 
@@ -35,5 +36,11 @@ app.use('/room', roomRoutes);
  * POST /v1/rooms/:roomId/llm/judgement
  */
 app.use('/v1', llmJudgementRoutes);
+
+/**
+ * Tencent routes
+ * /tencent/*
+ */
+app.use('/tencent', tencentRoutes);
 
 export default app;

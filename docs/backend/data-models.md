@@ -341,6 +341,107 @@ interface IConnectionData {
 
 ---
 
+### ASR 文本同步状态（内部管理）
+
+**架构说明**: 在客户端直连架构中，后端不管理 ASR 会话实体，只管理文本同步状态。客户端直接连接腾讯云 ASR 进行语音识别，后端负责同步和广播识别结果。
+
+#### IASRSessionState（内部状态）
+
+后端内部维护的会话状态，用于去重和节流：
+
+```typescript
+interface IASRSessionState {
+  lastSeq: number;                      // 最后处理的序列号
+  finalReceived: boolean;               // 是否已收到 Final
+  pendingPartial: IASRTextPushMessage;  // 待发送的 Partial
+  throttleTimer: NodeJS.Timeout | null; // 节流定时器
+}
+```
+
+#### 字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `lastSeq` | number | 最后处理的序列号，用于去重 |
+| `finalReceived` | boolean | 是否已收到 Final 消息 |
+| `pendingPartial` | IASRTextPushMessage? | 待节流发送的 Partial 消息 |
+| `throttleTimer` | NodeJS.Timeout? | 节流定时器（200ms） |
+
+#### 会话管理机制
+
+- **创建**: 收到第一个 `ASR_TEXT_PUSH` 时自动创建
+- **去重**: `seq <= lastSeq` 的消息被丢弃
+- **节流**: Partial 消息节流到 200ms 间隔
+- **重置**: Final 后 100ms 自动重置（准备下一次录音）
+- **清理**: 用户断开连接时清理所有会话
+
+#### 生命周期
+
+```
+1. 收到 ASR_TEXT_PUSH (seq: 0) → 创建会话
+2. 收到 ASR_TEXT_PUSH (seq: 1, 2, ...) → 更新 lastSeq
+3. 收到 ASR_TEXT_PUSH (isFinal: true) → 标记 finalReceived
+4. 100ms 后 → 重置会话（为下次录音准备）
+```
+
+---
+
+### ASR 文本类型
+
+ASR 识别文本分为两种类型，通过 `isFinal` 字段区分。
+
+#### 类型说明
+
+| 类型 | isFinal | 描述 | 用途 | 覆盖规则 |
+|------|---------|------|------|---------|
+| **Partial** | `false` | 实时转写中间结果 | 实时展示，不断更新 | 新的覆盖旧的 |
+| **Final** | `true` | 已确认文本 | 固化展示，用于分析 | 不可覆盖 |
+
+#### 在消息中的体现
+
+```typescript
+// Partial 示例（客户端 → 服务器）
+{
+  "type": "ASR_TEXT_PUSH",
+  "data": {
+    "roomId": "room-123456",
+    "speakerId": "user-alice",
+    "seq": 5,
+    "text": "我觉得你刚才…",
+    "isFinal": false  // ← Partial
+  },
+  "timestamp": 1737849600000
+}
+
+// Final 示例（客户端 → 服务器）
+{
+  "type": "ASR_TEXT_PUSH",
+  "data": {
+    "roomId": "room-123456",
+    "speakerId": "user-alice",
+    "seq": 10,
+    "text": "我觉得你刚才说的不对",
+    "isFinal": true   // ← Final
+  },
+  "timestamp": 1737849601000
+}
+
+// 服务器广播（服务器 → 客户端）
+{
+  "type": "ASR_TEXT",
+  "data": {
+    "roomId": "room-123456",
+    "speakerId": "user-alice",
+    "seq": 10,
+    "text": "我觉得你刚才说的不对",
+    "isFinal": true
+  },
+  "timestamp": 1737849601100
+}
+```
+
+---
+
 ## 数据传输对象（DTO）
 
 ### CreateRoomRequest
@@ -482,6 +583,59 @@ interface IErrorMessage {
 
 ---
 
+### IASRTextPushMessage
+
+推送识别文本消息（客户端 → 服务器）。
+
+客户端从腾讯云 ASR 收到识别结果后，通过此消息推送到服务器。
+
+```typescript
+interface IASRTextPushMessage {
+  type: "ASR_TEXT_PUSH";
+  data: {
+    roomId: string;      // 房间ID
+    speakerId: string;   // 发言者 userId
+    seq: number;         // 序列号（从0开始，单调递增）
+    text: string;        // 识别的文本内容
+    isFinal: boolean;    // false=Partial, true=Final
+  };
+  timestamp: number;
+}
+```
+
+**字段说明**:
+- `seq`: 用于去重，每次新的录音会话从 0 开始
+- `isFinal`: `false` 表示实时文本（会被覆盖），`true` 表示最终文本（固化）
+
+---
+
+### IASRTextMessage
+
+接收识别文本消息（服务器 → 客户端，广播）。
+
+服务器验证和处理后的识别文本，广播给房间内所有参与者。
+
+```typescript
+interface IASRTextMessage {
+  type: "ASR_TEXT";
+  data: {
+    roomId: string;      // 房间ID
+    speakerId: string;   // 发言者 userId
+    seq: number;         // 序列号
+    text: string;        // 识别的文本内容
+    isFinal: boolean;    // false=Partial, true=Final
+  };
+  timestamp: number;
+}
+```
+
+**关键特性**:
+- Partial 消息被节流到 200ms 间隔
+- Final 消息立即广播
+- 广播给房间内所有参与者（包括发言者）
+
+---
+
 ## 数据存储
 
 ### 内存存储结构
@@ -493,6 +647,10 @@ class RoomRepository {
   private roomsById: Map<string, IRoom>;      // roomId → Room
   private roomsByCode: Map<string, string>;   // roomCode → roomId
 }
+
+class AsrTextHandler {
+  private sessionStates: Map<string, IASRSessionState>; // "${roomId}:${speakerId}" → State
+}
 ```
 
 ### 索引策略
@@ -501,6 +659,7 @@ class RoomRepository {
 |------|----|----|------|
 | `roomsById` | roomId | IRoom | 根据 ID 查找房间 |
 | `roomsByCode` | roomCode | roomId | 根据代码查找房间 |
+| `sessionStates` | `${roomId}:${speakerId}` | IASRSessionState | ASR 文本同步状态 |
 
 ### 数据持久化（未来）
 
@@ -616,6 +775,18 @@ IMessage
 ├── content: IMessageContent
 │   └── { type: "TEXT", text: string }
 └── createdAt: number
+
+IAsrSession
+├── sessionId: string
+├── roomId: string
+├── speakerId: string
+├── status: EAsrSessionStatus
+│   ├── ACTIVE
+│   ├── STOPPED
+│   └── ERROR
+├── startedAt: number
+├── lastAudioSeq: number
+└── tencentWsConn?: WebSocket
 ```
 
 ---
@@ -648,3 +819,4 @@ IMessage
 - [加入房间](features/02-join-room.md)
 - [聊天消息](features/03-chat-messaging.md)
 - [错误处理](features/05-error-handling.md)
+- [ASR 实时语音识别](features/07-asr-real-time-speech.md)

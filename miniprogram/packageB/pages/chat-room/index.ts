@@ -2,17 +2,33 @@
  * Chat Room Page - 对簿公堂 / 语音申冤页
  */
 
-import type { IMessage } from '@/models/message';
-import { EMessageType } from '@/models/message';
-import { chatService } from '@/services/chat-service';
-import { EWSErrorCode } from '@/types/websocket-common';
+import { asrService } from '../../../services/asr-service';
+import { stsService } from '../../../services/sts-service';
+import { wsManager } from '../../../services/websocket-manager';
+import type { IEmojiReceiveData } from '../../../types/emoji-websocket';
+import type { ISTSCredentials } from '../../../types/sts-api';
+import { EWSMessageType, EPlayerRole } from '../../../types/websocket-common';
 
-type Phase = 'SPEAKER_A' | 'SPEAKER_B' | 'DONE';
-type Role = 'A' | 'B';
+// 引入腾讯云语音识别插件
+const QCloudAIVoicePlugin = requirePlugin('QCloudAIVoice');
+type AsrManager = ReturnType<
+    typeof QCloudAIVoicePlugin.speechRecognizerManager
+>;
+
+enum EPhase {
+    SpeakerA = 'SPEAKER_A',
+    SpeakerB = 'SPEAKER_B',
+    Done = 'DONE',
+}
+
+enum EReactionSource {
+    My = 'my',
+    Opponent = 'opponent',
+}
 
 interface IDisplayMessage {
     id: number;
-    role: Role;
+    role: EPlayerRole;
     content: string;
     timestamp: number;
 }
@@ -22,6 +38,7 @@ interface IReaction {
     emoji: string;
     lane: number; // 0, 1, 2 三条轨道
     timeoutId: number;
+    animationData: WechatMiniprogram.AnimationExportResult;
 }
 
 interface IChatRoomPageData {
@@ -29,8 +46,8 @@ interface IChatRoomPageData {
     roomCode: string;
 
     // 核心状态机字段
-    phase: Phase;
-    localRole: Role;
+    phase: EPhase;
+    localRole: EPlayerRole;
     remaining: number;
     totalPerTurn: number;
 
@@ -48,16 +65,35 @@ interface IChatRoomPageData {
     messages: IDisplayMessage[];
 
     // 表情系统
-    reactions: IReaction[];
+    myReactions: IReaction[];
+    opponentReactions: IReaction[];
     emojiList: string[];
+    emojiAnimations: WechatMiniprogram.AnimationExportResult[];
+
+    // 语音识别相关（本地）
+    speechTextLive: string; // 实时识别文本（Partial）
+    speechTextFinal: string; // 最终识别文本（Final）
+    isRecognizing: boolean; // 是否识别中
+    recognizeError: string | null; // 识别错误信息
+    hasStartedSpeaking: boolean; // 是否已开始发言（用于保持对话框显示）
+
+    // 对方语音识别相关（通过 WebSocket 同步）
+    opponentTextLive: string; // 对方实时识别文本
+    opponentTextFinal: string; // 对方最终识别文本
+
+    // 麦克风权限状态
+    hasMicPermission: boolean; // 是否已获得麦克风权限
 }
 
 interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     timerId: number | null;
-    recorderManager: WechatMiniprogram.RecorderManager | null;
     reactionIdCounter: number;
-    reactionTimeouts: number[];
+    myReactionTimeouts: number[];
+    opponentReactionTimeouts: number[];
+    rpxToPx: number;
     messageIdCounter: number;
+    asrManager: AsrManager; // 语音识别管理器
+    stsCredentials: ISTSCredentials | null; // STS 临时凭证
 }
 
 const EMOJI_LIST = [
@@ -79,20 +115,30 @@ const EMOJI_LIST = [
 const MAX_REACTIONS = 3;
 const REACTION_DURATION_MIN = 3000;
 const REACTION_DURATION_MAX = 5000;
-const TOTAL_PER_TURN = 20;
-const PHASE_TRANSITION: Record<Phase, Phase> = {
-    SPEAKER_A: 'SPEAKER_B',
-    SPEAKER_B: 'DONE',
-    DONE: 'DONE',
+const TOTAL_PER_TURN = 60;
+const PHASE_TRANSITION: Record<EPhase, EPhase> = {
+    [EPhase.SpeakerA]: EPhase.SpeakerB,
+    [EPhase.SpeakerB]: EPhase.Done,
+    [EPhase.Done]: EPhase.Done,
 };
 const REACTION_LANES = [0, 1, 2];
+
+/**
+ * ASR 语音识别配置
+ * SecretId 和 SecretKey 通过 STS 服务从后端获取临时凭证
+ */
+const ASR_CONFIG = {
+    APP_ID: '1401269739',
+    ENGINE_MODEL_TYPE: '16k_zh', // 16k 中文普通话通用模型
+    VOICE_FORMAT: 1, // 1: PCM, 4: speex(sp)压缩, 6: silk, 8: mp3
+} as const;
 
 Page<IChatRoomPageData, IChatRoomCustomOption>({
     data: {
         roomCode: '',
 
-        phase: 'SPEAKER_A',
-        localRole: 'A',
+        phase: EPhase.SpeakerA,
+        localRole: EPlayerRole.Organizer,
         remaining: TOTAL_PER_TURN,
         totalPerTurn: TOTAL_PER_TURN,
 
@@ -105,20 +151,42 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         messages: [],
 
-        reactions: [],
+        myReactions: [],
+        opponentReactions: [],
         emojiList: EMOJI_LIST,
+        emojiAnimations: [],
+
+        // 语音识别相关（本地）
+        speechTextLive: '',
+        speechTextFinal: '',
+        isRecognizing: false,
+        recognizeError: null,
+        hasStartedSpeaking: false,
+
+        // 对方语音识别相关
+        opponentTextLive: '',
+        opponentTextFinal: '',
+
+        // 麦克风权限状态
+        hasMicPermission: false,
     },
 
     timerId: null,
-    recorderManager: null,
     reactionIdCounter: 0,
-    reactionTimeouts: [],
+    myReactionTimeouts: [],
+    opponentReactionTimeouts: [],
+    rpxToPx: 0.5,
     messageIdCounter: 0,
+    asrManager: null,
+    stsCredentials: null,
 
     onLoad(options): void {
         // 解析页面参数
         const roomCode = options.roomCode ?? '';
-        const localRole: Role = options.role === 'B' ? 'B' : 'A';
+        const localRole: EPlayerRole =
+            options.role === EPlayerRole.Joiner
+                ? EPlayerRole.Joiner
+                : EPlayerRole.Organizer;
 
         // 校验 roomCode
         if (!roomCode) {
@@ -130,33 +198,52 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         }
 
         // 计算初始权限
-        const canSpeak: boolean = this.computeCanSpeak('SPEAKER_A', localRole);
+        const canSpeak: boolean = this.computeCanSpeak(
+            EPhase.SpeakerA,
+            localRole
+        );
         const canReact: boolean = !canSpeak;
+
+        // 计算 rpx → px 换算比例
+        const sysInfo = wx.getSystemInfoSync();
+        this.rpxToPx = sysInfo.windowWidth / 750;
+
+        // 初始化表情按钮动画数据
+        const emojiAnimations: WechatMiniprogram.AnimationExportResult[] =
+            EMOJI_LIST.map(() => {
+                const a = wx.createAnimation({ duration: 0 });
+                a.step();
+                return a.export();
+            });
 
         this.setData({
             roomCode,
             localRole,
             totalPerTurn: TOTAL_PER_TURN,
             remaining: TOTAL_PER_TURN,
-            phase: 'SPEAKER_A',
+            phase: EPhase.SpeakerA,
             canSpeak,
             canReact,
             countdownClass: this.getCountdownClass(TOTAL_PER_TURN),
+            emojiAnimations,
         });
 
-        // 初始化聊天服务
-        this.initChatService();
+        // 初始化 ASR WebSocket 服务
+        this.initASRService();
 
-        // 初始化录音管理器
-        this.initRecorderManager();
+        // 初始化语音识别管理器
+        this.initAsrManager();
 
-        // 启动倒计时
-        this.startTimer();
+        // 权限检查移到用户按下麦克风时进行
     },
 
     onShow(): void {
-        // 如果定时器不存在且不是 DONE 状态，重新启动
-        if (!this.timerId && this.data.phase !== 'DONE') {
+        // 如果定时器不存在且不是 DONE 状态且已获得麦克风权限，重新启动
+        if (
+            !this.timerId &&
+            this.data.phase !== EPhase.Done &&
+            this.data.hasMicPermission
+        ) {
             this.startTimer();
         }
     },
@@ -179,29 +266,35 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             this.timerId = null;
         }
 
-        // 停止录音
-        if (this.recorderManager && this.data.isRecording) {
-            this.recorderManager.stop();
+        // 停止语音识别
+        if (this.asrManager && this.data.isRecording) {
+            this.asrManager.stop();
         }
 
+        // 清理 ASR WebSocket 服务
+        asrService.cleanup();
+
         // 清理所有表情 timeout
-        if (this.reactionTimeouts.length) {
-            this.reactionTimeouts.forEach(id => {
+        [...this.myReactionTimeouts, ...this.opponentReactionTimeouts].forEach(
+            id => {
                 clearTimeout(id);
-            });
-            this.reactionTimeouts = [];
-        }
+            }
+        );
+        this.myReactionTimeouts = [];
+        this.opponentReactionTimeouts = [];
     },
 
     /**
      * 计算 canSpeak 权限
+     * SPEAKER_A 阶段：Organizer（赢家）先说
+     * SPEAKER_B 阶段：Joiner（输家）后说
      */
-    computeCanSpeak(phase: Phase, localRole: Role): boolean {
-        if (phase === 'SPEAKER_A') {
-            return localRole === 'A';
+    computeCanSpeak(phase: EPhase, localRole: EPlayerRole): boolean {
+        if (phase === EPhase.SpeakerA) {
+            return localRole === EPlayerRole.Organizer;
         }
-        if (phase === 'SPEAKER_B') {
-            return localRole === 'B';
+        if (phase === EPhase.SpeakerB) {
+            return localRole === EPlayerRole.Joiner;
         }
         return false;
     },
@@ -220,66 +313,333 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
-     * 初始化聊天服务
+     * 初始化 ASR WebSocket 服务
+     * 处理 ASR 文本的 WebSocket 同步
      */
-    initChatService(): void {
-        chatService.initialize(
-            (message: IMessage) => {
-                this.handleMessageReceived(message);
+    initASRService(): void {
+        const { roomCode } = this.data;
+        const userId: string | null = wx.getStorageSync('userId');
+
+        if (!roomCode || !userId) {
+            console.warn(
+                '[ChatRoom] Cannot init ASR service: missing roomCode or userId'
+            );
+            return;
+        }
+
+        asrService.initialize({
+            roomId: roomCode,
+            speakerId: userId,
+            onASRTextReceive: (
+                _speakerId: string,
+                text: string,
+                isFinal: boolean,
+                _seq: number
+            ) => {
+                this.handleOpponentASRText(text, isFinal);
             },
-            (code: EWSErrorCode, errorMessage: string) => {
-                console.error('[ChatRoom] Chat error:', code, errorMessage);
-                void wx.showToast({ title: errorMessage, icon: 'error' });
-            }
-        );
+            onError: (errorMessage: string) => {
+                console.error('[ChatRoom] ASR service error:', errorMessage);
+            },
+            onUnhandledMessage: (data: string) => {
+                this.handleUnhandledWsMessage(data);
+            },
+        });
+
+        console.log('[ChatRoom] ASR service initialized');
     },
 
     /**
-     * 处理接收到的消息
+     * 处理对方的 ASR 文本
+     * @param text 识别文本
+     * @param isFinal 是否为最终结果
      */
-    handleMessageReceived(message: IMessage): void {
-        const { localRole } = this.data;
-        const displayMessage: IDisplayMessage = {
-            id: this.messageIdCounter++,
-            role:
-                message.sender.userId === wx.getStorageSync('userId')
-                    ? localRole
-                    : localRole === 'A'
-                      ? 'B'
-                      : 'A',
-            content:
-                message.type === EMessageType.Text &&
-                message.content.type === EMessageType.Text
-                    ? message.content.text
-                    : '[语音消息]',
-            timestamp: message.createdAt,
+    handleOpponentASRText(text: string, isFinal: boolean): void {
+        if (isFinal) {
+            // 最终结果：固化文本
+            this.setData({
+                opponentTextFinal: text,
+                opponentTextLive: text,
+            });
+            console.log('[ChatRoom] Opponent final text:', text);
+        } else {
+            // 部分结果：只更新 live
+            this.setData({
+                opponentTextLive: text,
+            });
+            console.log('[ChatRoom] Opponent partial text:', text);
+        }
+    },
+
+    /**
+     * 初始化语音识别管理器
+     * 获取 QCloudAIVoice 插件的语音识别管理器实例并注册回调
+     * 注意：配置参数（secretId、secretKey 等）在调用 start() 时传入
+     */
+    initAsrManager(): void {
+        try {
+            // 获取语音识别管理器实例
+            this.asrManager = QCloudAIVoicePlugin.speechRecognizerManager();
+
+            // 注册回调函数
+            this.initAsrCallbacks();
+
+            console.log('[ChatRoom] ASR manager initialized');
+        } catch (err) {
+            console.error('[ChatRoom] Failed to initialize ASR manager:', err);
+            this.setData({
+                recognizeError: '语音识别初始化失败',
+            });
+            void wx.showToast({
+                title: '语音识别初始化失败',
+                icon: 'error',
+            });
+        }
+    },
+
+    /**
+     * 初始化语音识别回调函数
+     * 注册 QCloudAIVoice 插件提供的所有回调方法
+     * 包括：开始识别、一句话开始/结束、识别结果变化、识别完成、错误、录音结束
+     */
+    initAsrCallbacks(): void {
+        // 空值检查：确保 asrManager 已初始化
+        if (!this.asrManager) {
+            console.error('[ASR] Cannot init callbacks: asrManager is null');
+            return;
+        }
+
+        const manager = this.asrManager;
+
+        // 1. 开始识别
+        manager.OnRecognitionStart = (res: unknown) => {
+            console.log('[ASR] 开始识别', res);
+            this.setData({
+                isRecognizing: true,
+                recognizeError: null,
+            });
         };
 
+        // 3. 识别变化时（发送 partial，节流后）
+        manager.OnRecognitionResultChange = (res: unknown) => {
+            console.log('[ASR] 识别变化时', res);
+            const result = res as {
+                result?: { voice_text_str?: string };
+            } | null;
+            if (result?.result?.voice_text_str) {
+                const text = result.result.voice_text_str;
+                console.log('[ASR] 实时识别文字:', text);
+
+                // 更新本地 UI
+                this.setData({
+                    speechTextLive: text,
+                });
+
+                // 发送 partial 到对方（节流）
+                asrService.sendPartial(text);
+            }
+        };
+
+        // 4. 一句话结束（发送 final，立即）
+        // 注意：不在此处更新 speechTextFinal，由 OnRecognitionComplete 统一处理累积
+        manager.OnSentenceEnd = (res: unknown) => {
+            console.log('[ASR] 一句话结束', res);
+            const result = res as {
+                result?: { voice_text_str?: string };
+            } | null;
+            if (result?.result?.voice_text_str) {
+                const text = result.result.voice_text_str;
+                console.log('[ASR] 一句话识别文字:', text);
+
+                // 发送 final 到对方（立即）- 一句话结束也是 final
+                asrService.sendFinal(text);
+            }
+        };
+
+        // 5. 识别结束（发送 final，立即）
+        manager.OnRecognitionComplete = (res: unknown) => {
+            console.log('[ASR] 识别结束', res);
+            const result = res as {
+                result?: { voice_text_str?: string };
+            } | null;
+            if (result?.result?.voice_text_str) {
+                const text = result.result.voice_text_str;
+                console.log('[ASR] 最终识别文字:', text);
+
+                // 追加到已有的最终文字后面（多次录音累积）
+                // 如果文本已经以标点符号结尾，则不再添加句号
+                const existingFinal = this.data.speechTextFinal;
+                const textWithPunctuation = this.addPeriodIfNeeded(text);
+                const newFinal = existingFinal
+                    ? existingFinal + textWithPunctuation
+                    : textWithPunctuation;
+                console.log(
+                    '[ASR] 累积文字 - 已有:',
+                    existingFinal,
+                    '新增:',
+                    textWithPunctuation,
+                    '合并后:',
+                    newFinal
+                );
+
+                // 更新本地 UI
+                this.setData({
+                    speechTextFinal: newFinal,
+                    speechTextLive: '',
+                    isRecognizing: false,
+                });
+
+                // 发送 final 到对方（立即）
+                asrService.sendFinal(text);
+            } else {
+                // 没有返回最终文字时，将实时文字保留到 speechTextFinal
+                const existingFinal = this.data.speechTextFinal;
+                const liveText = this.data.speechTextLive;
+                if (liveText) {
+                    const liveTextWithPunctuation =
+                        this.addPeriodIfNeeded(liveText);
+                    const newFinal = existingFinal
+                        ? existingFinal + liveTextWithPunctuation
+                        : liveTextWithPunctuation;
+                    this.setData({
+                        speechTextFinal: newFinal,
+                        speechTextLive: '',
+                        isRecognizing: false,
+                    });
+                } else {
+                    this.setData({
+                        isRecognizing: false,
+                    });
+                }
+            }
+        };
+
+        // 6. 识别错误
+        manager.OnError = (res: unknown) => {
+            console.log('[ASR] 识别失败', res);
+            this.handleRecognizeError('语音识别失败');
+        };
+
+        // 7. 录音结束（最长10分钟）时回调
+        manager.OnRecorderStop = (res: unknown) => {
+            console.log('[ASR] 录音结束', res);
+        };
+
+        console.log('[ASR] All callbacks registered');
+    },
+
+    /**
+     * 处理语音识别错误
+     * 更新错误状态、重置识别状态并显示 Toast 提示
+     * @param errorMessage 错误信息字符串
+     */
+    handleRecognizeError(errorMessage: string): void {
+        // 1. 记录错误日志
+        console.error('[ASR] 识别错误', errorMessage);
+
+        // 2. 更新状态
         this.setData({
-            messages: [...this.data.messages, displayMessage],
+            recognizeError: errorMessage,
+            isRecognizing: false,
+            speechTextLive: '',
+        });
+
+        // 3. 显示 Toast 提示
+        void wx.showToast({
+            title: '语音识别失败',
+            icon: 'error',
+            duration: 2000,
         });
     },
 
     /**
-     * 初始化录音管理器
+     * 检查麦克风权限
+     * 用户按下麦克风时调用，权限通过后启动倒计时并开始录音
      */
-    initRecorderManager(): void {
-        this.recorderManager = wx.getRecorderManager();
-
-        this.recorderManager.onStart(() => {
-            this.setData({ isRecording: true });
+    checkMicrophonePermission(): void {
+        wx.getSetting({
+            success: res => {
+                const recordAuth = res.authSetting['scope.record'];
+                if (recordAuth === true) {
+                    // 已有权限，启动倒计时并开始录音
+                    this.onMicPermissionGranted();
+                } else if (recordAuth === false) {
+                    // 用户之前拒绝过，显示弹窗引导去设置
+                    this.showMicPermissionDeniedModal();
+                } else {
+                    // 未请求过，请求权限
+                    this.requestMicrophonePermission();
+                }
+            },
+            fail: () => {
+                // 获取设置失败，尝试请求权限
+                this.requestMicrophonePermission();
+            },
         });
+    },
 
-        this.recorderManager.onStop(() => {
-            this.setData({ isRecording: false });
-            // TODO: 后续对接 WebSocket，发送录音文件
+    /**
+     * 请求麦克风权限
+     */
+    requestMicrophonePermission(): void {
+        wx.authorize({
+            scope: 'scope.record',
+            success: () => {
+                // 授权成功，启动倒计时并开始录音
+                this.onMicPermissionGranted();
+            },
+            fail: () => {
+                // 授权失败，显示弹窗
+                this.showMicPermissionDeniedModal();
+            },
         });
+    },
 
-        this.recorderManager.onError(err => {
-            console.error('[ChatRoom] Recording error', err);
-            this.setData({ isRecording: false });
-            void wx.showToast({ title: '录音出错', icon: 'error' });
+    /**
+     * 显示麦克风权限被拒绝的弹窗
+     */
+    showMicPermissionDeniedModal(): void {
+        void wx.showModal({
+            title: '需要录音权限',
+            content: '小主，没有麦麦怎么伸冤',
+            confirmText: '去设置',
+            cancelText: '取消',
+            success: res => {
+                if (res.confirm) {
+                    void wx.openSetting({
+                        success: settingRes => {
+                            if (
+                                settingRes.authSetting['scope.record'] === true
+                            ) {
+                                // 用户在设置中开启了权限，启动倒计时并开始录音
+                                this.onMicPermissionGranted();
+                            } else {
+                                // 用户仍未开启权限，再次显示弹窗
+                                this.showMicPermissionDeniedModal();
+                            }
+                        },
+                    });
+                }
+                // 如果用户点取消，不启动定时器，页面停留在未开始状态
+            },
         });
+    },
+
+    /**
+     * 麦克风权限获得后的回调
+     * 设置权限状态、启动倒计时并开始录音
+     */
+    onMicPermissionGranted(): void {
+        this.setData({ hasMicPermission: true });
+
+        // 启动倒计时
+        if (!this.timerId) {
+            this.startTimer();
+        }
+
+        // 震动反馈并开始录音
+        void wx.vibrateShort({ type: 'light' });
+        this.startRecording();
     },
 
     /**
@@ -325,14 +685,14 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     switchPhase(): void {
         const { phase, localRole, totalPerTurn } = this.data;
 
-        // 强制停止录音
-        if (this.recorderManager && this.data.isRecording) {
-            this.recorderManager.stop();
+        // 强制停止语音识别
+        if (this.asrManager && this.data.isRecording) {
+            this.asrManager.stop();
         }
 
-        const nextPhase: Phase = PHASE_TRANSITION[phase];
+        const nextPhase: EPhase = PHASE_TRANSITION[phase];
 
-        if (nextPhase === 'DONE') {
+        if (nextPhase === EPhase.Done) {
             // 清理定时器
             if (this.timerId) {
                 clearInterval(this.timerId);
@@ -340,10 +700,16 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             }
 
             this.setData({
-                phase: 'DONE',
+                phase: EPhase.Done,
                 canSpeak: false,
                 canReact: false,
                 remaining: 0,
+                // 清空 ASR 文本
+                speechTextLive: '',
+                speechTextFinal: '',
+                opponentTextLive: '',
+                opponentTextFinal: '',
+                hasStartedSpeaking: false,
             });
             return;
 
@@ -360,20 +726,40 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 canReact,
                 countdownClass: this.getCountdownClass(totalPerTurn),
                 isRecording: false,
+                // 清空 ASR 文本
+                speechTextLive: '',
+                speechTextFinal: '',
+                opponentTextLive: '',
+                opponentTextFinal: '',
+                hasStartedSpeaking: false,
             });
+
+            // 重置 ASR 服务序列号
+            asrService.resetSequence();
         }
     },
 
     /**
      * 麦克风按下
+     * 首次按下时检查权限，权限通过后启动倒计时并开始录音
      */
     onMicTouchStart(): void {
         if (!this.data.canSpeak) {
             return;
         }
 
-        void wx.vibrateShort({ type: 'light' });
-        this.startRecording();
+        // 如果已有权限，直接开始录音
+        if (this.data.hasMicPermission) {
+            // 首次按下麦克风时启动倒计时
+            if (!this.timerId) {
+                this.startTimer();
+            }
+            void wx.vibrateShort({ type: 'light' });
+            this.startRecording();
+        } else {
+            // 没有权限，先检查并请求权限
+            this.checkMicrophonePermission();
+        }
     },
 
     /**
@@ -391,58 +777,94 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
-     * 开始录音
+     * 开始录音和语音识别
+     * 使用 QCloudAIVoice 插件的 start 方法，同时启动录音和识别
+     * 凭证通过 STS 服务从后端获取
      */
     startRecording(): void {
-        if (!this.recorderManager || !this.data.canSpeak) {
+        // 检查权限和 ASR 管理器
+        if (!this.data.canSpeak) {
             return;
         }
 
-        wx.authorize({
-            scope: 'scope.record',
-            success: () => {
-                this.recorderManager?.start({
-                    duration: 60000,
-                    sampleRate: 16000,
-                    numberOfChannels: 1,
-                    encodeBitRate: 48000,
-                    format: 'mp3',
-                });
-            },
-            fail: () => {
-                void wx.showModal({
-                    title: '需要录音权限',
-                    content: '请在设置中开启录音权限',
-                    confirmText: '去设置',
-                    success: res => {
-                        if (res.confirm) {
-                            void wx.openSetting();
-                        }
-                    },
-                });
-            },
+        if (!this.asrManager) {
+            console.error('[ASR] asrManager is not initialized');
+            void wx.showToast({
+                title: '语音识别未初始化',
+                icon: 'error',
+            });
+            return;
+        }
+
+        // 清空实时识别状态（保留已累积的 speechTextFinal）
+        // 设置 hasStartedSpeaking 确保对话框不会消失
+        this.setData({
+            speechTextLive: '',
+            recognizeError: null,
+            isRecognizing: false,
+            hasStartedSpeaking: true,
         });
+
+        // 重置 ASR 服务序列号（新的录音会话）
+        asrService.resetSequence();
+
+        // 权限已在 onMicTouchStart 中检查过，直接启动 ASR
+        this.startAsrWithCredentials();
     },
 
     /**
-     * 停止录音
+     * 获取 STS 凭证并启动 ASR
+     * 使用 stsService 获取临时凭证，然后启动语音识别
      */
-    stopRecording(): void {
-        if (this.recorderManager && this.data.isRecording) {
-            this.recorderManager.stop();
+    async startAsrWithCredentials(): Promise<void> {
+        try {
+            // 获取临时凭证
+            const credentials = await stsService.getCredentials();
+            this.stsCredentials = credentials;
 
-            // TODO: 后续实现语音上传和识别
-            // 当前仅支持文字消息
-            void wx.showToast({
-                title: '语音功能开发中',
-                icon: 'none',
-                duration: 1500,
-            });
+            console.log('[ASR] Got STS credentials');
+
+            // 使用临时凭证启动 ASR
+            if (this.asrManager) {
+                this.asrManager.start({
+                    secretkey: credentials.TmpSecretKey,
+                    secretid: credentials.TmpSecretId,
+                    token: credentials.Token,
+                    appid: ASR_CONFIG.APP_ID,
+                    engine_model_type: ASR_CONFIG.ENGINE_MODEL_TYPE,
+                    voice_format: ASR_CONFIG.VOICE_FORMAT,
+                });
+
+                // 设置录音状态
+                // 注意：isRecognizing 会在 OnRecognitionStart 回调中设置
+                this.setData({ isRecording: true });
+                console.log('[ASR] Recording started with STS credentials');
+            }
+        } catch (error) {
+            console.error('[ASR] Failed to get STS credentials:', error);
+            this.handleRecognizeError('获取凭证失败');
         }
     },
 
     /**
-     * 发送表情
+     * 停止录音和语音识别
+     * 使用 QCloudAIVoice 插件的 stop 方法，同时停止录音和识别
+     */
+    stopRecording(): void {
+        if (this.asrManager && this.data.isRecording) {
+            // 使用 ASR 插件的 stop 方法（同时停止录音和识别）
+            this.asrManager.stop();
+
+            console.log('[ASR] 已调用 stop 方法');
+
+            // 设置录音状态为 false
+            // 注意：isRecognizing 会在 OnRecognitionComplete 回调中设置为 false
+            this.setData({ isRecording: false });
+        }
+    },
+
+    /**
+     * 发送表情（自己点击表情时）
      */
     onEmojiTap(e: WechatMiniprogram.TouchEvent): void {
         if (!this.data.canReact) {
@@ -454,20 +876,129 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        // 同屏最多 3 个表情
-        if (this.data.reactions.length >= MAX_REACTIONS) {
+        // 自己的表情同屏最多 3 个
+        if (this.data.myReactions.length >= MAX_REACTIONS) {
             return;
         }
 
         void wx.vibrateShort({ type: 'light' });
 
+        // 表情按钮弹跳动画
+        const index = e.currentTarget.dataset.index as number;
+        this.animateEmojiButton(index);
+
+        // 通过 WebSocket 发送表情给对方
+        this.sendEmojiViaWs(emoji);
+
+        // 本地显示自己的表情
+        this.addReaction(EReactionSource.My, emoji);
+    },
+
+    /**
+     * 表情按钮弹跳动画
+     */
+    animateEmojiButton(index: number): void {
+        const anim = wx.createAnimation({
+            duration: 100,
+            timingFunction: 'ease-out',
+        });
+
+        // 放大弹跳
+        anim.scale(1.4).step({ duration: 100 });
+        // 回弹复位
+        anim.scale(1.0).step({ duration: 150 });
+
+        this.setData({
+            [`emojiAnimations[${index}]`]: anim.export(),
+        });
+    },
+
+    /**
+     * 通过 WebSocket 发送表情
+     */
+    sendEmojiViaWs(emoji: string): void {
+        if (!wsManager.isConnected()) {
+            console.error('[ChatRoom] WebSocket not connected');
+            return;
+        }
+
+        const roomId: string = this.data.roomCode;
+        const senderId: string = wx.getStorageSync('userId') ?? '';
+
+        if (!roomId || !senderId) {
+            return;
+        }
+
+        wsManager.send({
+            type: EWSMessageType.EmojiSend,
+            data: { roomId, senderId, emoji },
+            timestamp: Date.now(),
+        });
+
+        console.log('[ChatRoom] Sent emoji:', emoji);
+    },
+
+    /**
+     * 处理未被 ASR 服务处理的 WebSocket 消息
+     */
+    handleUnhandledWsMessage(data: string): void {
+        try {
+            const message = JSON.parse(data) as {
+                type: EWSMessageType;
+                data: IEmojiReceiveData;
+            };
+
+            if (message.type === EWSMessageType.EmojiReceive) {
+                this.handleEmojiReceive(message.data.emoji);
+            }
+        } catch (error) {
+            console.error(
+                '[ChatRoom] Failed to parse unhandled message:',
+                error
+            );
+        }
+    },
+
+    /**
+     * 处理收到对方的表情
+     */
+    handleEmojiReceive(emoji: string): void {
+        // 对方表情同屏最多 3 个
+        if (this.data.opponentReactions.length >= MAX_REACTIONS) {
+            return;
+        }
+
+        console.log('[ChatRoom] Received emoji from opponent:', emoji);
+
+        this.addReaction(EReactionSource.Opponent, emoji);
+    },
+
+    /**
+     * 添加表情反应（自己或对方）
+     * 两步动画：先添加元素（空动画）→ 等 DOM 渲染后再设置飞行动画
+     * 必须分两步，因为 wx.createAnimation 只在 animation 属性「变化」时才触发
+     */
+    addReaction(source: EReactionSource, emoji: string): void {
+        const reactions =
+            source === EReactionSource.My
+                ? this.data.myReactions
+                : this.data.opponentReactions;
+        const timeouts =
+            source === EReactionSource.My
+                ? this.myReactionTimeouts
+                : this.opponentReactionTimeouts;
+        const dataKey =
+            source === EReactionSource.My ? 'myReactions' : 'opponentReactions';
+
         // 分配轨道
-        const usedLanes = this.data.reactions.map(r => r.lane);
+        const usedLanes = reactions.map((r: IReaction) => r.lane);
         const availableLanes = REACTION_LANES.filter(
             lane => !usedLanes.includes(lane)
         );
 
-        if (!availableLanes.length) return;
+        if (!availableLanes.length) {
+            return;
+        }
 
         const lane =
             availableLanes[Math.floor(Math.random() * availableLanes.length)];
@@ -480,75 +1011,114 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             Math.random() * (REACTION_DURATION_MAX - REACTION_DURATION_MIN);
 
         const timeoutId = setTimeout(() => {
-            this.removeReaction(id);
+            this.removeReaction(source, id);
         }, duration) as unknown as number;
 
-        this.reactionTimeouts.push(timeoutId);
+        timeouts.push(timeoutId);
+
+        // 第一步：空动画，仅用于创建 DOM 元素
+        const initAnim = wx.createAnimation({ duration: 0 });
+        initAnim.step();
 
         const newReaction: IReaction = {
             id,
             emoji,
             lane,
             timeoutId,
+            animationData: initAnim.export(),
         };
 
-        this.setData({
-            reactions: [...this.data.reactions, newReaction],
+        // 第二步：先 setData 创建元素，回调中延迟触发飞行动画
+        this.setData({ [dataKey]: [...reactions, newReaction] }, () => {
+            setTimeout(() => {
+                this.startReactionAnimation(dataKey, id);
+            }, 50);
+        });
+    },
+
+    /**
+     * 启动表情飞行动画（使用 wx.createAnimation）
+     * 三阶段：弹跳放大 → 上浮回弹 → 继续上升淡出
+     */
+    startReactionAnimation(
+        dataKey: 'myReactions' | 'opponentReactions',
+        reactionId: number
+    ): void {
+        const reactions = this.data[dataKey];
+        const idx = reactions.findIndex((r: IReaction) => r.id === reactionId);
+        if (idx === -1) {
+            return;
+        }
+
+        const flyMid = Math.round(-150 * this.rpxToPx);
+        const flyEnd = Math.round(-400 * this.rpxToPx);
+
+        const animation = wx.createAnimation({
+            duration: 200,
+            timingFunction: 'ease-out',
         });
 
-        // TODO: 后续对接 WebSocket，发送表情给对方
+        // 第一阶段：弹跳放大
+        animation.scale(1.4).step({ duration: 200 });
+        // 第二阶段：上浮 + 回弹到正常大小
+        animation
+            .translateY(flyMid)
+            .scale(1.0)
+            .step({ duration: 1200, timingFunction: 'ease-out' });
+        // 第三阶段：继续上升 + 缩小 + 淡出
+        animation
+            .translateY(flyEnd)
+            .scale(0.6)
+            .opacity(0)
+            .step({ duration: 1000, timingFunction: 'ease-in' });
+
+        this.setData({
+            [`${dataKey}[${idx}].animationData`]: animation.export(),
+        });
     },
 
     /**
      * 移除表情
      */
-    removeReaction(id: number): void {
-        const reactions = this.data.reactions.filter(r => r.id !== id);
-        this.setData({ reactions });
+    removeReaction(source: EReactionSource, id: number): void {
+        const dataKey =
+            source === EReactionSource.My ? 'myReactions' : 'opponentReactions';
+        const timeouts =
+            source === EReactionSource.My
+                ? this.myReactionTimeouts
+                : this.opponentReactionTimeouts;
+
+        const reactions = this.data[dataKey];
+        const reaction = reactions.find((r: IReaction) => r.id === id);
+
+        const filtered = reactions.filter((r: IReaction) => r.id !== id);
+        this.setData({ [dataKey]: filtered });
 
         // 从 timeout 列表中移除
-        const reaction = this.data.reactions.find(r => r.id === id);
         if (reaction) {
-            const idx = this.reactionTimeouts.indexOf(reaction.timeoutId);
+            const idx = timeouts.indexOf(reaction.timeoutId);
             if (idx > -1) {
-                clearTimeout(id);
-                this.reactionTimeouts.splice(idx, 1);
+                clearTimeout(reaction.timeoutId);
+                timeouts.splice(idx, 1);
             }
         }
     },
 
     /**
-     * 格式化时间
+     * 判断文本是否以标点符号结尾，如果没有则添加句号
+     * @param text 输入文本
+     * @returns 处理后的文本
      */
-    formatTime(seconds: number): string {
-        const mins: number = Math.floor(seconds / 60);
-        const secs: number = seconds % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    },
-
-    /**
-     * 添加消息到对话列表
-     * @param role 发送者角色
-     * @param content 语音转文字内容
-     */
-    addMessage(role: Role, content: string): void {
-        const id: number = ++this.messageIdCounter;
-        const timestamp: number = Date.now();
-
-        const newMessage: IDisplayMessage = {
-            id,
-            role,
-            content,
-            timestamp,
-        };
-
-        this.setData({
-            messages: [...this.data.messages, newMessage],
-        });
-
-        // 发送到服务器
-        if (role === this.data.localRole) {
-            chatService.sendTextMessage(content);
+    addPeriodIfNeeded(text: string): string {
+        if (!text) {
+            return text;
         }
+        // 中英文标点符号
+        const punctuationMarks = '。！？；：，、…—·.!?,;:';
+        const lastChar = text.charAt(text.length - 1);
+        if (punctuationMarks.includes(lastChar)) {
+            return text;
+        }
+        return text + '。';
     },
 });

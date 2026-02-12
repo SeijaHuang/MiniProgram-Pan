@@ -1,21 +1,30 @@
-// Load environment variables FIRST before any other imports
-import { loadEnv, validateEnv } from './utils/env-loader';
-loadEnv();
-validateEnv();
-
 // Now import modules that depend on environment variables
 import http from 'http';
-import app from './app';
-import { initWebSocket } from './ws';
-import { APP_CONFIG } from './constants/config';
 
-const server = http.createServer(app);
+import { loadEnv, validateEnv } from './utils/env-loader';
+let server: http.Server;
+// Load environment variables
+async function bootstrap() {
+    loadEnv();
+    validateEnv();
 
-initWebSocket(server);
+    // 动态 import：确保 env 已经就位
+    const { default: app } = await import('./app');
+    const { initWebSocket } = await import('./ws');
+    const { APP_CONFIG } = await import('./constants/config');
 
-server.listen(APP_CONFIG.PORT, () => {
-    console.log(`Server listening on port ${APP_CONFIG.PORT}`);
-    console.log(`Environment: ${APP_CONFIG.NODE_ENV}`);
+    server = http.createServer(app);
+    initWebSocket(server);
+
+    server.listen(APP_CONFIG.PORT, () => {
+        console.log(`Server listening on port ${APP_CONFIG.PORT}`);
+        console.log(`Environment: ${APP_CONFIG.NODE_ENV}`);
+    });
+}
+
+bootstrap().catch(e => {
+    console.error('Bootstrap failed:', e);
+    process.exit(1);
 });
 
 // Graceful shutdown handler

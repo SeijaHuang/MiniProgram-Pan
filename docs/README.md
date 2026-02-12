@@ -6,22 +6,27 @@
 
 ```
 docs/
-├── README.md              # 本索引文件
-├── backend/               # 后端文档
-│   ├── architecture.md    # 整体架构
-│   ├── api.md             # HTTP API
-│   ├── websocket.md       # WebSocket 协议
-│   ├── models.md          # 数据模型
-│   ├── services.md        # 服务层
-│   ├── configuration.md   # 配置管理
-│   └── middleware.md      # 中间件
-└── miniprogram/           # 小程序前端文档
-    ├── welcome.md         # 欢迎页
-    ├── waiting-room.md    # 等待页
-    ├── drum-room.md       # 震天鼓抢麦页
-    ├── chat-room.md       # 对簿公堂页
-    ├── components.md      # 组件文档
-    └── services.md        # 服务层说明
+├── README.md                   # 本索引文件
+├── backend/                    # 后端文档
+│   ├── api-specification.md    # API 规格说明
+│   ├── data-models.md          # 数据模型
+│   ├── architecture-visual.md  # 架构可视化
+│   ├── product-requirements.md # 产品需求
+│   └── features/               # 功能模块文档
+│       ├── 01-room-creation.md          # 房间创建
+│       ├── 02-join-room.md              # 加入房间
+│       ├── 03-chat-messaging.md         # 聊天消息
+│       ├── 04-connection-lifecycle.md   # 连接生命周期
+│       ├── 05-error-handling.md         # 错误处理
+│       ├── 06-drum-game.md              # 震天鼓游戏
+│       └── 07-asr-real-time-speech.md   # ASR 实时语音识别
+└── miniprogram/                # 小程序前端文档
+    ├── welcome.md              # 欢迎页
+    ├── waiting-room.md         # 等待页
+    ├── drum-room.md            # 震天鼓抢麦页
+    ├── chat-room.md            # 对簿公堂页
+    ├── components.md           # 组件文档
+    └── services.md             # 服务层说明
 ```
 
 ---
@@ -117,84 +122,122 @@ docs/
 
 ## 后端文档（backend/）
 
-### 架构文档
+### 核心文档
 
-- **文件**: `backend/architecture.md`
-- **功能**: 后端整体架构设计和组织结构
+#### API 规格说明
+
+- **文件**: `backend/api-specification.md`
+- **功能**: 完整的 HTTP 和 WebSocket API 规范
 - **核心内容**:
-    - 目录结构说明
-    - 三层架构模式 (Routes → Controllers → Services → Repositories)
-    - 单例模式 (RoomManager, ConnectionManager)
+    - HTTP REST API（房间创建）
+    - WebSocket 实时通信协议
+    - 消息类型和格式（JOIN_ROOM, CHAT_SEND, ASR_START 等）
+    - 错误代码参考
+    - 完整流程示例
+
+#### 数据模型文档
+
+- **文件**: `backend/data-models.md`
+- **功能**: 后端数据模型定义
+- **核心内容**:
+    - 核心实体（IRoom, IUser, IMessage, IAsrSession）
+    - 枚举类型（ERoomStatus, EMessageType, EAsrSessionStatus）
+    - 数据传输对象（DTO）
+    - WebSocket 消息类型
+    - 数据存储和验证
+
+#### 架构可视化
+
+- **文件**: `backend/architecture-visual.md`
+- **功能**: 后端整体架构设计和可视化
+- **核心内容**:
+    - 三层架构模式（Controller → Service → Repository）
+    - 单例模式（RoomManager, ConnectionManager）
     - 处理器模式
     - 技术栈和依赖
 
-### HTTP API 文档
+#### 产品需求
 
-- **文件**: `backend/api.md`
-- **功能**: HTTP API 接口规范
+- **文件**: `backend/product-requirements.md`
+- **功能**: 后端产品需求文档
 - **核心内容**:
-    - 基础信息 (Base URL, Content-Type)
-    - 响应格式 (成功/错误)
-    - API 端点 (`GET /health`, `POST /room/create`)
-    - 错误码说明
-    - 使用示例 (cURL, JavaScript, 微信小程序)
+    - 业务需求
+    - 功能范围
+    - 技术约束
+    - 优先级划分
 
-### WebSocket 协议文档
+### 功能模块文档（features/）
 
-- **文件**: `backend/websocket.md`
-- **功能**: WebSocket 通信协议规范
+#### 01. 房间创建
+
+- **文件**: `backend/features/01-room-creation.md`
+- **功能**: HTTP 创建房间接口
 - **核心内容**:
-    - 连接信息
-    - 消息格式和类型
-    - 客户端消息 (`JOIN_ROOM`, `CHAT_SEND`)
-    - 服务器消息 (`JOIN_ACK`, `CHAT_RECEIVE`, `ERROR`)
-    - 错误码说明
-    - 连接生命周期
-    - 房间状态流转
+    - POST /room/create API
+    - 房间代码生成逻辑
+    - 请求/响应格式
+    - 错误处理
 
-### 数据模型文档
+#### 02. 加入房间
 
-- **文件**: `backend/models.md`
-- **功能**: 后端数据模型定义
+- **文件**: `backend/features/02-join-room.md`
+- **功能**: WebSocket 加入房间流程
 - **核心内容**:
-    - 领域实体 (IRoom, IUser, IMessage, IParticipant)
-    - 枚举类型 (ERoomStatus, EMessageType)
-    - 请求/响应 DTO
-    - Zod 验证模式
-    - ID 生成规则
+    - JOIN_ROOM 消息处理
+    - JOIN_ACK 广播机制
+    - 房间状态转换
+    - 用户验证
 
-### 服务层文档
+#### 03. 聊天消息
 
-- **文件**: `backend/services.md`
-- **功能**: 后端服务层组织和职责
+- **文件**: `backend/features/03-chat-messaging.md`
+- **功能**: 实时聊天消息
 - **核心内容**:
-    - 服务架构
-    - 核心服务 (RoomService, RoomCrudService)
-    - 业务处理器 (JoinRoomHandler, ChatSendHandler)
-    - WebSocket 服务 (RoomManager, ConnectionManager)
-    - 服务交互流程
+    - CHAT_SEND 消息处理
+    - CHAT_RECEIVE 广播
+    - 消息 ID 生成
+    - 时间戳管理
 
-### 配置文档
+#### 04. 连接生命周期
 
-- **文件**: `backend/configuration.md`
-- **功能**: 后端配置管理
+- **文件**: `backend/features/04-connection-lifecycle.md`
+- **功能**: WebSocket 连接管理
 - **核心内容**:
-    - 环境变量配置
-    - 常量配置
-    - 数据库配置 (占位)
-    - Docker 配置
-    - 使用说明
+    - 连接建立和认证
+    - 心跳机制
+    - 断线重连
+    - 资源清理
 
-### 中间件文档
+#### 05. 错误处理
 
-- **文件**: `backend/middleware.md`
-- **功能**: 后端中间件实现
+- **文件**: `backend/features/05-error-handling.md`
+- **功能**: 统一错误处理机制
 - **核心内容**:
-    - 错误处理中间件 (AppError, errorHandler)
-    - 请求日志中间件
-    - 验证中间件 (Zod 验证工厂)
-    - 中间件执行顺序
-    - 自定义中间件指南
+    - 错误代码体系
+    - 错误响应格式
+    - 异常场景处理
+    - 日志记录
+
+#### 06. 震天鼓游戏
+
+- **文件**: `backend/features/06-drum-game.md`
+- **功能**: 双人抢麦游戏
+- **核心内容**:
+    - DRUM_READY/START/TAP/FINISH/RESULT 消息
+    - 游戏状态机
+    - 计分逻辑
+    - 时间同步
+
+#### 07. ASR 实时语音识别
+
+- **文件**: `backend/features/07-asr-real-time-speech.md`
+- **功能**: 实时语音转文字
+- **核心内容**:
+    - ASR_START/AUDIO/STOP/TEXT 消息
+    - 腾讯云 ASR 集成
+    - 会话管理和幂等性
+    - Partial/Final 文本处理
+    - 音频分片传输
 
 ---
 

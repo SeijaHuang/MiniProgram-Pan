@@ -18,11 +18,7 @@
         "strictPropertyInitialization": true,
         "lib": ["ES2020"],
         "typeRoots": ["./typings"],
-        "skipLibCheck": true,
-        "baseUrl": ".",
-        "paths": {
-            "@/*": ["miniprogram/*"]
-        }
+        "skipLibCheck": true
     },
     "include": ["./**/*.ts"],
     "exclude": ["node_modules"]

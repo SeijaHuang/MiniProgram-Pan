@@ -14,6 +14,7 @@ export enum EHttpErrorCode {
     InvalidRequest = 'INVALID_REQUEST',
     InternalError = 'INTERNAL_ERROR',
     LlmCallFailed = 'LLM_CALL_FAILED',
+    STSGetFailed = 'STS_GET_FAILED',
 }
 
 /**
