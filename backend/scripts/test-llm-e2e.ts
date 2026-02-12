@@ -17,8 +17,7 @@
 
 /* eslint-disable no-console */
 
-const API_BASE =
-    process.env.API_BASE || 'http://localhost:8080';
+const API_BASE = process.env.API_BASE || 'http://localhost:8080';
 
 interface IApiResponse<T> {
     success: boolean;
@@ -48,18 +47,12 @@ interface IJudgmentResult {
 let passed = 0;
 let failed = 0;
 
-function assert(
-    condition: boolean,
-    label: string,
-    detail?: string
-): void {
+function assert(condition: boolean, label: string, detail?: string): void {
     if (condition) {
         console.log(`  PASS: ${label}`);
         passed++;
     } else {
-        console.error(
-            `  FAIL: ${label}${detail ? ` — ${detail}` : ''}`
-        );
+        console.error(`  FAIL: ${label}${detail ? ` — ${detail}` : ''}`);
         failed++;
     }
 }
@@ -109,14 +102,8 @@ async function main(): Promise<void> {
     // ---------------------------------------------------
     console.log('[Test 1] Missing fields → 400');
     const t1 = await post(url, {});
-    assert(
-        t1.status === 400,
-        `status is 400 (got: ${t1.status})`
-    );
-    assert(
-        t1.json.success === false,
-        'response.success is false'
-    );
+    assert(t1.status === 400, `status is 400 (got: ${t1.status})`);
+    assert(t1.json.success === false, 'response.success is false');
 
     // ---------------------------------------------------
     // Test 2: Empty player1Speech → 400
@@ -126,18 +113,13 @@ async function main(): Promise<void> {
         player1Speech: '',
         player2Speech: '有内容',
     });
-    assert(
-        t2.status === 400,
-        `status is 400 (got: ${t2.status})`
-    );
+    assert(t2.status === 400, `status is 400 (got: ${t2.status})`);
 
     // ---------------------------------------------------
     // Test 3: Judgment verdict → 200
     // ---------------------------------------------------
     console.log('\n[Test 3] Judgment verdict → 200');
-    console.log(
-        '  (calls OpenAI — may take up to 60s...)'
-    );
+    console.log('  (calls OpenAI — may take up to 60s...)');
     const t3 = await post<IJudgmentResult>(url, {
         player1Speech: '我每天加班到很晚，非常辛苦',
         player2Speech: '我也很辛苦，而且工资更低',
@@ -149,14 +131,8 @@ async function main(): Promise<void> {
                 'OPENAI_API_KEY may not be configured'
         );
     } else {
-        assert(
-            t3.status === 200,
-            `status is 200 (got: ${t3.status})`
-        );
-        assert(
-            t3.json.success === true,
-            'response.success is true'
-        );
+        assert(t3.status === 200, `status is 200 (got: ${t3.status})`);
+        assert(t3.json.success === true, 'response.success is true');
 
         const data = t3.json.data;
         if (data) {
@@ -165,34 +141,27 @@ async function main(): Promise<void> {
                 `caseNumber is string (got: ${data.caseNumber})`
             );
             assert(
-                typeof data.responsibility.player1 ===
-                    'number',
+                typeof data.responsibility.player1 === 'number',
                 'responsibility.player1 is number'
             );
             assert(
-                typeof data.responsibility.player2 ===
-                    'number',
+                typeof data.responsibility.player2 === 'number',
                 'responsibility.player2 is number'
             );
             assert(
-                Array.isArray(
-                    data.responsibility.thirdParty.factors
-                ),
+                Array.isArray(data.responsibility.thirdParty.factors),
                 'thirdParty.factors is array'
             );
             assert(
-                typeof data.radarChart.player1 ===
-                    'object',
+                typeof data.radarChart.player1 === 'object',
                 'radarChart.player1 is object'
             );
             assert(
-                typeof data.radarChart.player2 ===
-                    'object',
+                typeof data.radarChart.player2 === 'object',
                 'radarChart.player2 is object'
             );
             assert(
-                typeof data.verdict === 'string' &&
-                    data.verdict.length > 0,
+                typeof data.verdict === 'string' && data.verdict.length > 0,
                 'verdict is non-empty string'
             );
         }
@@ -201,10 +170,7 @@ async function main(): Promise<void> {
     // ---------------------------------------------------
     // Summary
     // ---------------------------------------------------
-    console.log(
-        `\n=== Results: ${passed} passed, ` +
-            `${failed} failed ===\n`
-    );
+    console.log(`\n=== Results: ${passed} passed, ` + `${failed} failed ===\n`);
     process.exit(failed > 0 ? 1 : 0);
 }
 
