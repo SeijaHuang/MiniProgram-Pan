@@ -35,7 +35,9 @@ Three-layer architecture: Routes → Controllers → Services
 
 ### Request Flow
 
-**HTTP**: `routes/` → `controllers/` → `services/core/` → `services/websocket/room-manager.ts`
+**HTTP (Room)**: `routes/` → `controllers/` → `services/core/` → `services/websocket/room-manager.ts`
+
+**HTTP (LLM)**: `routes/llm-judgement.routes.ts` → `controllers/llm-judgement.controller.ts` → `services/core/llm-judgement.service.ts` → `clients/openai.client.ts`
 
 **WebSocket**: `ws.ts` assigns connectionId → `WebSocketController.handleMessage()` switches on `message.type` → calls handler in `services/handlers/` → handler uses managers in `services/websocket/` → controller broadcasts response via `connectionManager`
 
@@ -117,7 +119,7 @@ All messages: `{ type: EWSMessageType, data: T, timestamp: number }`
 ## Room State Machine
 
 ```
-POST /room/create → WAITING (1 participant)
+POST /v1/rooms → WAITING (1 participant)
                         ↓ (JOIN_ROOM from 2nd user)
                      READY (2 participants) → drum game after countdown
                         ↓
@@ -166,8 +168,9 @@ Note: `.env.example` contains additional unused variables (OpenAI, LLM Worker) �
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
-| POST | `/room/create` | Create room (body: `{ creator: { userId, nickname } }`) |
-| GET | `/tencent/credentials` | Tencent Cloud STS token for client ASR |
+| POST | `/v1/rooms` | Create room (body: `{ creator: { userId, nickname } }`) |
+| POST | `/v1/rooms/:roomId/judgments` | LLM judgment verdict |
+| GET | `/v1/tencent/credentials` | Tencent Cloud STS token for client ASR |
 
 ## Error Codes (EWSErrorCode)
 
@@ -181,3 +184,94 @@ Note: `.env.example` contains additional unused variables (OpenAI, LLM Worker) �
 | `ROOM_NOT_READY` | Only 1 person in room |
 | `INVALID_PAYLOAD` | Malformed message / Zod validation failure |
 | `INTERNAL_ERROR` | Server error |
+
+## LLM Judgement API (Synchronous)
+
+Single endpoint — calls OpenAI directly and returns the result:
+
+```
+POST /v1/rooms/:roomId/judgments
+```
+
+**Request**:
+```json
+{ "hostText": "...", "participantText": "..." }
+```
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "data": {
+    "verdict": "host" | "participant" | "tie",
+    "reasons": ["..."],
+    "suggestions": ["..."],
+    "quotes": [{ "from": "host", "text": "..." }]
+  }
+}
+```
+
+**Errors**: 400 (validation), 502 (LLM failure)
+
+**Environment**: `OPENAI_API_KEY` (required), `OPENAI_MODEL` (default: gpt-4o), `OPENAI_BASE_URL` (optional)
+
+## Configuration (src/constants/config.ts)
+
+| Constant | Default | Purpose |
+|----------|---------|---------|
+| `APP_CONFIG.PORT` | 8080 | HTTP/WS port |
+| `WS_CONFIG.PATH` | /ws | WebSocket endpoint |
+| `ROOM_CONFIG.MAX_PARTICIPANTS` | 2 | Max users per room |
+| `WAITING_ROOM_CONFIG.COUNTDOWN_MS` | 3000 | Waiting room countdown |
+| `DRUM_CONFIG.COUNTDOWN_MS` | 3000 | Pre-game countdown |
+| `DRUM_CONFIG.GAME_DURATION_MS` | 10000 | Game length |
+| `OPENAI_CONFIG.API_KEY` | (env) | OpenAI API key |
+| `OPENAI_CONFIG.MODEL` | gpt-4o | LLM model |
+
+## Enums
+
+**`EPlayerRole`** (drum game context):
+- `Organizer` - Player who created the room
+- `Joiner` - Player who joined the room
+
+## Docker
+
+```bash
+# Development (with hot reload)
+docker-compose up -d
+
+# Production
+docker build -t chatroom-backend:latest -f Dockerfile .
+docker run -d -p 8080:8080 -e NODE_ENV=production chatroom-backend:latest
+```
+
+## Testing API
+
+```bash
+# Health check
+curl http://localhost:8080/health
+
+# Create room
+curl -X POST http://localhost:8080/v1/rooms \
+  -H "Content-Type: application/json" \
+  -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
+
+# LLM Judgement (synchronous — requires OPENAI_API_KEY)
+curl -X POST http://localhost:8080/v1/rooms/<roomId>/judgments \
+  -H "Content-Type: application/json" \
+  -d '{"hostText":"我每天加班到很晚","participantText":"我工资更低"}'
+
+# WebSocket test
+npm run ws:test
+
+# LLM E2E test
+npm run test:llm
+```
+
+## Storage
+
+Room state is managed in-memory via `room-manager.ts`. No database is required for the current MVP.
+
+## Parent Documentation
+
+See `../CLAUDE.md` for full project context including frontend patterns and cross-cutting concerns.

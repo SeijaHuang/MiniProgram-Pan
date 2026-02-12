@@ -1,15 +1,19 @@
 # 后端文档中心
 
-双人聊天室后端服务完整文档与使用指南。
+双人聊天室后端服务 + 异步 LLM 判决系统。
 
 ## 技术栈
 
-- **Runtime**: Node.js 18+
-- **Language**: TypeScript 5+
-- **HTTP Framework**: Express
-- **WebSocket**: ws library
-- **Validation**: Zod
-- **Architecture**: Controller → Service → Repository
+| 类别         | 技术                                           |
+| ------------ | ---------------------------------------------- |
+| Runtime      | Node.js 18+                                    |
+| Language     | TypeScript 5+ (strict, no `any`)               |
+| HTTP         | Express 5                                      |
+| WebSocket    | ws library                                     |
+| Database     | In-memory (room-manager.ts)                    |
+| Validation   | Zod                                            |
+| LLM          | OpenAI API (gpt-4o)                            |
+| Architecture | Routes → Controllers → Services → Repositories |
 
 ## 特性
 
@@ -39,14 +43,14 @@
 
 | 文档 | 描述 | 路径 |
 |------|------|------|
-| 🏠 [创建房间](docs/features/01-room-creation.md) | HTTP API 创建房间流程 | `POST /room/create` |
+| 🏠 [创建房间](docs/features/01-room-creation.md) | HTTP API 创建房间流程 | `POST /v1/rooms` |
 | 🔌 [加入房间](docs/features/02-join-room.md) | WebSocket 加入房间协议 | `JOIN_ROOM` 消息 |
 | 💬 [聊天消息](docs/features/03-chat-messaging.md) | 实时聊天消息收发 | `CHAT_SEND/RECEIVE` |
 | 🔗 [连接管理](docs/features/04-connection-lifecycle.md) | WebSocket 连接生命周期 | 连接/断开处理 |
 | ⚠️ [错误处理](docs/features/05-error-handling.md) | 统一错误码和处理机制 | 错误响应规范 |
 | 🥁 [震天鼓游戏](docs/features/06-drum-game.md) | 击鼓游戏机制 | `DRUM_TAP` 消息 |
 | 🎤 [ASR 语音识别](docs/features/07-asr-real-time-speech.md) | 实时语音转文字 | `ASR_*` 消息 |
-| 🔑 [腾讯云 STS Token](docs/features/08-tencent-sts-token.md) | 获取临时安全凭证 | `GET /tencent/credentials` |
+| 🔑 [腾讯云 STS Token](docs/features/08-tencent-sts-token.md) | 获取临时安全凭证 | `GET /v1/tencent/credentials` |
 
 ### 核心概念文档
 
@@ -75,7 +79,6 @@ npm install
 ```env
 # 基础配置
 PORT=8080
-WS_PATH=/ws
 NODE_ENV=development
 
 # 腾讯云配置（用于 ASR 语音识别服务）
@@ -86,199 +89,71 @@ TENCENT_REGION=ap-guangzhou
 
 **注意**: 如果需要使用 ASR（语音识别）功能，必须配置腾讯云相关环境变量。
 
-### 3. 启动服务器
+**注意**: 如果需要使用 ASR（语音识别）功能，必须配置腾讯云相关环境变量。
+
+### 3. 启动服务
+
+需要同时运行两个进程：
 
 ```bash
-# 开发模式 (推荐)
+# 终端 1：API 服务器
 npm run dev
 
-# 生产模式
-npm run build && npm start
+# 终端 2：LLM Worker（判决任务处理）
+npm run worker:llm
 ```
 
 服务器: `http://localhost:8080`
 WebSocket: `ws://localhost:8080/ws`
 
-### 4. 验证服务器运行
-
-**测试 HTTP API：**
+### 4. 验证
 
 ```bash
-curl -X POST http://localhost:8080/room/create \
+# 健康检查（含数据库连通性）
+curl http://localhost:8080/health
+
+# 创建房间
+curl -X POST http://localhost:8080/v1/rooms \
   -H "Content-Type: application/json" \
   -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
-```
 
-**测试 WebSocket：**
-
-使用提供的测试脚本：
-
-```bash
+# WebSocket 测试
 npm run ws:test
 ```
 
 **测试腾讯云 STS Token：**
 
 ```bash
-curl http://localhost:8080/tencent/credentials
+curl http://localhost:8080/v1/tencent/credentials
 ```
 
 ---
 
-## 🐳 Docker 部署
-
-### 前置要求
-
-- 安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- 确保 Docker Desktop 正在运行
-
-### Docker 镜像说明
-
-**Dockerfile.dev - 开发环境**
-- 包含所有依赖（含devDependencies）
-- 支持热重载
-- 挂载源代码目录
-- 使用`ts-node`直接运行TypeScript
-
-**Dockerfile - 生产环境**
-- 多阶段构建，优化镜像大小
-- 只包含生产依赖
-- TypeScript编译为JavaScript
-- 使用编译后的`dist`目录运行
-
-### 快速启动
-
-#### Windows 用户
-
-双击运行 `start-docker.bat` 或在 PowerShell 中执行：
-
-```powershell
-.\start-docker.bat
-```
-
-#### Mac/Linux 用户
+## 开发命令
 
 ```bash
-chmod +x start-docker.sh
-./start-docker.sh
+# --- API 服务器 ---
+npm run dev              # 开发模式（ts-node，热重载）
+npm run build            # 编译 TypeScript
+npm start                # 运行编译产物 dist/index.js
+
+# --- LLM Worker ---
+npm run worker:llm       # 开发模式（ts-node）
+npm run worker:llm:prod  # 生产模式（需先 npm run build）
+
+# --- 代码质量 ---
+npm run lint             # ESLint 检查
+npm run lint:fix         # ESLint 自动修复
+npm run format           # Prettier 格式化
+npm run format:check     # Prettier 检查
+npx tsc --noEmit         # TypeScript 类型检查
+
+# --- 测试 ---
+npm run ws:test          # WebSocket 连接测试
+npm run test:llm         # LLM 模块 E2E 自测
 ```
 
-#### 使用 docker-compose 命令
-
-```bash
-# 构建并启动（开发模式，支持热重载）
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
-
-# 重新构建
-docker-compose up --build -d
-```
-
-### Docker 常用命令
-
-| 操作 | 命令 |
-|------|------|
-| 启动服务 | `docker-compose up -d` |
-| 停止服务 | `docker-compose down` |
-| 查看日志 | `docker-compose logs -f` |
-| 实时日志 | `docker-compose logs -f backend` |
-| 重启服务 | `docker-compose restart` |
-| 重新构建 | `docker-compose up --build` |
-| 进入容器 | `docker-compose exec backend sh` |
-| 查看状态 | `docker-compose ps` |
-
-### 环境变量配置
-
-在 `docker-compose.yml` 中配置：
-
-```yaml
-environment:
-  - PORT=8080              # HTTP服务器端口
-  - NODE_ENV=development   # 环境：development/production
-  - WS_PATH=/ws           # WebSocket路径
-  - LOG_LEVEL=debug       # 日志级别
-```
-
-### 生产部署
-
-**方法1: 使用生产Dockerfile**
-
-```bash
-# 构建镜像
-docker build -t chatroom-backend:latest -f Dockerfile .
-
-# 运行容器
-docker run -d \
-  -p 8080:8080 \
-  -e NODE_ENV=production \
-  -e PORT=8080 \
-  --name chatroom-backend \
-  --restart unless-stopped \
-  chatroom-backend:latest
-```
-
-**方法2: Docker Compose生产配置**
-
-修改 `docker-compose.yml` 中的 `dockerfile: Dockerfile`，然后：
-
-```bash
-docker-compose -f docker-compose.yml up -d
-```
-
-### 故障排查
-
-#### 问题1: 端口被占用
-
-**错误**: `bind: address already in use`
-
-**解决** (Windows):
-```powershell
-# 查找占用端口的进程
-netstat -ano | findstr :8080
-
-# 终止进程
-taskkill /PID <PID> /F
-```
-
-**解决** (Mac/Linux):
-```bash
-# 查找并终止占用端口的进程
-lsof -ti:8080 | xargs kill -9
-```
-
-#### 问题2: Docker Desktop 未启动
-
-**错误**: `Cannot connect to the Docker daemon`
-
-**解决**: 启动 Docker Desktop，等待完全启动后重试
-
-#### 问题3: 代码修改未生效
-
-```bash
-# 重启容器
-docker-compose restart
-
-# 或完全重建
-docker-compose down
-docker-compose up --build
-```
-
-### 验证部署
-
-```bash
-# 测试 HTTP API
-curl -X POST http://localhost:8080/room/create \
-  -H "Content-Type: application/json" \
-  -d '{"creator":{"userId":"test","nickname":"Test"}}'
-
-# 测试 WebSocket
-npm run ws:test
-```
+---
 
 ## 项目结构
 
@@ -312,21 +187,36 @@ backend/src/
 
 ### HTTP API
 
-#### POST /room/create
+#### POST /v1/rooms
 
 创建新房间。
 
 **请求**:
+
 ```json
 {
-  "creator": {
-    "userId": "user_alice",
-    "nickname": "Alice"
-  }
+    "hostText": "我每天加班到很晚，非常辛苦",
+    "participantText": "我也很辛苦，而且工资更低",
+    "idempotencyKey": "room123_round1"
 }
 ```
 
-**响应** (201):
+**响应** (200):
+
+```json
+{
+    "success": true,
+    "data": {
+        "taskId": "550e8400-e29b-41d4-a716-446655440000",
+        "status": "queued"
+    }
+}
+```
+
+#### GET /v1/llm/tasks/:taskId
+
+**响应** (200 - succeeded):
+
 ```json
 {
   "success": true,
@@ -341,7 +231,7 @@ backend/src/
 }
 ```
 
-#### GET /tencent/credentials
+#### GET /v1/tencent/credentials
 
 获取腾讯云临时安全凭证（用于 ASR 服务）。
 
@@ -383,8 +273,8 @@ CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 ```
 
 **协议**:
-- HTTP: 创建房间 `POST /room/create`
-- HTTP: 获取腾讯云 STS Token `GET /tencent/credentials`
+- HTTP: 创建房间 `POST /v1/rooms`
+- HTTP: 获取腾讯云 STS Token `GET /v1/tencent/credentials`
 - WebSocket: 加入房间、实时聊天、语音识别、震天鼓游戏 `ws://localhost:8080/ws`
 
 ### WebSocket 消息类型
@@ -784,7 +674,7 @@ Routes (路由) → Controllers (控制器) → Services (服务) → Repositori
 
 ### 工作流程
 
-1. **客户端获取临时凭证**: `GET /tencent/credentials`
+1. **客户端获取临时凭证**: `GET /v1/tencent/credentials`
 2. **客户端直连腾讯云 ASR**: 使用临时凭证进行语音识别
 3. **客户端推送识别结果**: 通过 `ASR_TEXT_PUSH` 发送给后端
 4. **后端处理和广播**: 去重、节流后通过 `ASR_TEXT` 广播给其他参与者

@@ -4,7 +4,7 @@
 
 创建房间是用户开启聊天会话的第一步，通过 HTTP POST 请求创建一个新的双人聊天室。
 
-**API Endpoint**: `POST /room/create`
+**API Endpoint**: `POST /v1/rooms`
 
 ---
 
@@ -22,7 +22,7 @@
 
 1. **客户端发起请求**
    - 提供创建者用户信息（userId + nickname）
-   - 发送 POST 请求到 `/room/create`
+   - 发送 POST 请求到 `/v1/rooms`
 
 2. **服务器验证输入**
    - 验证 `creator.userId` 和 `creator.nickname` 非空
@@ -51,7 +51,7 @@
 ### Request
 
 **Method**: `POST`  
-**URL**: `http://localhost:8080/room/create`  
+**URL**: `http://localhost:8080/v1/rooms`  
 **Content-Type**: `application/json`
 
 **Body**:
@@ -222,7 +222,7 @@ interface IUser {
 ```typescript
 async function createRoom(creator: IUser): Promise<IRoom> {
   try {
-    const response = await fetch('http://localhost:8080/room/create', {
+    const response = await fetch('http://localhost:8080/v1/rooms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ creator })
@@ -330,7 +330,7 @@ export class RoomService {
 
 ```bash
 # 测试用例 1: 正常创建
-curl -X POST http://localhost:8080/room/create \
+curl -X POST http://localhost:8080/v1/rooms \
   -H "Content-Type: application/json" \
   -d '{
     "creator": {
@@ -346,7 +346,7 @@ curl -X POST http://localhost:8080/room/create \
 
 ```bash
 # 测试用例 2: 缺少 userId
-curl -X POST http://localhost:8080/room/create \
+curl -X POST http://localhost:8080/v1/rooms \
   -H "Content-Type: application/json" \
   -d '{
     "creator": {
@@ -357,7 +357,7 @@ curl -X POST http://localhost:8080/room/create \
 # 期望结果: 400 Bad Request, INVALID_REQUEST
 
 # 测试用例 3: 缺少 creator
-curl -X POST http://localhost:8080/room/create \
+curl -X POST http://localhost:8080/v1/rooms \
   -H "Content-Type: application/json" \
   -d '{}'
 

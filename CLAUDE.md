@@ -255,11 +255,12 @@ Husky + lint-staged runs ESLint + Prettier on `.ts`, `.js`, `.json`, `.md`. Comm
 
 ## HTTP Endpoints
 
-| Method | Path                   | Description                                       |
-| ------ | ---------------------- | ------------------------------------------------- |
-| GET    | `/health`              | Health check                                      |
-| POST   | `/room/create`         | Create a new room (returns `roomId` + `roomCode`) |
-| GET    | `/tencent/credentials` | Get Tencent Cloud STS token for client-side ASR   |
+| Method | Path                          | Description                                       |
+| ------ | ----------------------------- | ------------------------------------------------- |
+| GET    | `/health`                     | Health check                                      |
+| POST   | `/v1/rooms`                   | Create a new room (returns `roomId` + `roomCode`) |
+| POST   | `/v1/rooms/:roomId/judgments` | LLM judgment verdict                              |
+| GET    | `/v1/tencent/credentials`     | Get Tencent Cloud STS token for client-side ASR   |
 
 ## Backend Environment Variables
 

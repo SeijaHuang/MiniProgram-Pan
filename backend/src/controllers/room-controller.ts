@@ -19,7 +19,7 @@ import type { ICreateRoomDto } from '../models/dto/request/create-room.dto';
 export class RoomController {
     /**
      * Create a new room
-     * POST /room/create
+     * POST /v1/rooms
      */
     static createRoom(
         req: Request<unknown, unknown, ICreateRoomDto>,

@@ -2,7 +2,7 @@
  * STS Service
  * 获取腾讯云临时凭证（用于 ASR 语音识别）
  *
- * 通过后端 /tencent/credentials 接口获取临时的 SecretId、SecretKey 和 Token
+ * 通过后端 /v1/tencent/credentials 接口获取临时的 SecretId、SecretKey 和 Token
  * 这些凭证有时效性，默认 7200 秒（2小时）后过期
  */
 
@@ -116,7 +116,7 @@ class STSService {
     }> {
         return new Promise((resolve, reject) => {
             wx.request({
-                url: `${BACKEND_CONFIG.HTTP_BASE_URL}/tencent/credentials`,
+                url: `${BACKEND_CONFIG.HTTP_BASE_URL}/v1/tencent/credentials`,
                 method: 'GET',
                 header: {
                     'content-type': 'application/json',

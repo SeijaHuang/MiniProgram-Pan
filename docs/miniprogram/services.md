@@ -45,7 +45,7 @@
 
 **核心方法**:
 
-- `createRoom(): Promise<IRoom>`：调用 `POST /room/create`，
+- `createRoom(): Promise<IRoom>`：调用 `POST /v1/rooms`，
   返回创建成功的房间信息
 
 ## Room WebSocket Service

@@ -8,7 +8,7 @@ import type { IRoom } from '../../models/entities/room';
 
 /**
  * Create Room Request
- * POST /room/create
+ * POST /v1/rooms
  */
 export interface ICreateRoomRequest {
     creator: IUser;
@@ -16,7 +16,7 @@ export interface ICreateRoomRequest {
 
 /**
  * Create Room Response Data
- * POST /room/create
+ * POST /v1/rooms
  */
 export interface ICreateRoomResponseData {
     room: IRoom;

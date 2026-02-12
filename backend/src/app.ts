@@ -8,8 +8,9 @@
  * - Does NOT contain business logic or route handlers
  */
 
-import express from 'express';
+import express, { Request, Response } from 'express';
 import roomRoutes from './routes/room-routes';
+import llmJudgementRoutes from './routes/llm-judgement.routes';
 import tencentRoutes from './routes/tencent-routes';
 
 const app = express();
@@ -20,20 +21,26 @@ app.use(express.json());
 /**
  * Health check endpoint
  */
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
     res.json({ ok: true });
 });
 
 /**
  * Room routes
- * /room/*
+ * POST /v1/rooms
  */
-app.use('/room', roomRoutes);
+app.use('/v1/rooms', roomRoutes);
+
+/**
+ * LLM Judgement routes
+ * POST /v1/rooms/:roomId/judgments
+ */
+app.use('/v1/rooms', llmJudgementRoutes);
 
 /**
  * Tencent routes
- * /tencent/*
+ * GET /v1/tencent/credentials
  */
-app.use('/tencent', tencentRoutes);
+app.use('/v1/tencent', tencentRoutes);
 
 export default app;

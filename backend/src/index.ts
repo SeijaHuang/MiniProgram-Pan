@@ -1,6 +1,8 @@
+// Now import modules that depend on environment variables
 import http from 'http';
-import { loadEnv, validateEnv } from './utils/env-loader';
 
+import { loadEnv, validateEnv } from './utils/env-loader';
+let server: http.Server;
 // Load environment variables
 async function bootstrap() {
     loadEnv();
@@ -11,7 +13,7 @@ async function bootstrap() {
     const { initWebSocket } = await import('./ws');
     const { APP_CONFIG } = await import('./constants/config');
 
-    const server = http.createServer(app);
+    server = http.createServer(app);
     initWebSocket(server);
 
     server.listen(APP_CONFIG.PORT, () => {
@@ -24,3 +26,15 @@ bootstrap().catch(e => {
     console.error('Bootstrap failed:', e);
     process.exit(1);
 });
+
+// Graceful shutdown handler
+function handleShutdown(signal: string): void {
+    console.log(`\n${signal} received. Shutting down gracefully...`);
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+}
+
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));

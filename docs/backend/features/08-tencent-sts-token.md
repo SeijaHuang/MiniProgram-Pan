@@ -13,7 +13,7 @@
 ```
 1. 小程序客户端需要开始 ASR 会话
    ↓
-2. 客户端请求后端 GET /tencent/credentials
+2. 客户端请求后端 GET /v1/tencent/credentials
    ↓
 3. 后端使用永久密钥调用腾讯云 STS 服务
    ↓
@@ -33,7 +33,7 @@
 ### Endpoint
 
 ```
-GET /tencent/credentials
+GET /v1/tencent/credentials
 ```
 
 ### Request
@@ -254,7 +254,7 @@ app.use('/tencent', tencentRoutes);
 async function getTencentCredentials(): Promise<TencentCredentials> {
     try {
         const response = await wx.request({
-            url: 'http://localhost:8080/tencent/credentials',
+            url: 'http://localhost:8080/v1/tencent/credentials',
             method: 'GET',
         });
 
@@ -294,7 +294,7 @@ async function initASRService(): Promise<void> {
 
 ```bash
 # 获取 STS Token
-curl -X GET http://localhost:8080/tencent/credentials
+curl -X GET http://localhost:8080/v1/tencent/credentials
 
 # 预期成功响应
 {
@@ -338,7 +338,7 @@ console.error('[TencentController] Get STS token failed:', error);
 
 ### 建议的监控指标
 
-1. **请求成功率**: 监控 `/tencent/credentials` 的 200 vs 500 响应比例
+1. **请求成功率**: 监控 `/v1/tencent/credentials` 的 200 vs 500 响应比例
 2. **响应时间**: 腾讯云 STS API 调用的延迟
 3. **错误率趋势**: 检测密钥过期或权限问题
 4. **Token 使用频率**: 评估客户端的凭证刷新策略是否合理
@@ -393,7 +393,7 @@ class TokenCache {
    - 等等
 
 3. **Token 刷新机制**
-   - 提供 `/tencent/credentials/refresh` 接口
+   - 提供 `/v1/tencent/credentials/refresh` 接口
    - 在 Token 即将过期时主动刷新
 
 4. **用户级别的凭证隔离**

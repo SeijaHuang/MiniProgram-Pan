@@ -10,8 +10,10 @@ import type { IBaseResponse } from '../../models/dto/response/base.response.dto'
  */
 export enum EHttpErrorCode {
     RoomCreateFailed = 'ROOM_CREATE_FAILED',
+    RoomNotFound = 'ROOM_NOT_FOUND',
     InvalidRequest = 'INVALID_REQUEST',
     InternalError = 'INTERNAL_ERROR',
+    LlmCallFailed = 'LLM_CALL_FAILED',
     STSGetFailed = 'STS_GET_FAILED',
 }
 

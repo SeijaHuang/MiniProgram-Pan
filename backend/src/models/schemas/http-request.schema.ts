@@ -13,7 +13,7 @@ import { UserSchema } from './ws-message.schema';
 
 /**
  * Create Room Request Schema
- * POST /room/create
+ * POST /v1/rooms
  */
 export const CreateRoomRequestSchema = z.object({
     creator: UserSchema,
