@@ -8,7 +8,7 @@
  * - Does NOT contain logic
  *
  * Routes:
- * - POST /v1/rooms/:roomId/llm/judgment
+ * - POST /v1/rooms/:roomId/judgments
  */
 
 import { Router } from 'express';
@@ -19,10 +19,10 @@ const router = Router();
 
 /**
  * Create judgment verdict (判决书)
- * POST /v1/rooms/:roomId/llm/judgment
+ * POST /v1/rooms/:roomId/judgments
  */
 router.post(
-    '/rooms/:roomId/llm/judgment',
+    '/:roomId/judgments',
     LlmJudgementController.createJudgment.bind(LlmJudgementController)
 );
 

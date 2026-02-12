@@ -119,7 +119,7 @@ All messages: `{ type: EWSMessageType, data: T, timestamp: number }`
 ## Room State Machine
 
 ```
-POST /room/create → WAITING (1 participant)
+POST /v1/rooms → WAITING (1 participant)
                         ↓ (JOIN_ROOM from 2nd user)
                      READY (2 participants) → drum game after countdown
                         ↓
@@ -168,8 +168,9 @@ Note: `.env.example` contains additional unused variables (OpenAI, LLM Worker) �
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
-| POST | `/room/create` | Create room (body: `{ creator: { userId, nickname } }`) |
-| GET | `/tencent/credentials` | Tencent Cloud STS token for client ASR |
+| POST | `/v1/rooms` | Create room (body: `{ creator: { userId, nickname } }`) |
+| POST | `/v1/rooms/:roomId/judgments` | LLM judgment verdict |
+| GET | `/v1/tencent/credentials` | Tencent Cloud STS token for client ASR |
 
 ## Error Codes (EWSErrorCode)
 
@@ -189,7 +190,7 @@ Note: `.env.example` contains additional unused variables (OpenAI, LLM Worker) �
 Single endpoint — calls OpenAI directly and returns the result:
 
 ```
-POST /v1/rooms/:roomId/llm/judgement
+POST /v1/rooms/:roomId/judgments
 ```
 
 **Request**:
@@ -251,12 +252,12 @@ docker run -d -p 8080:8080 -e NODE_ENV=production chatroom-backend:latest
 curl http://localhost:8080/health
 
 # Create room
-curl -X POST http://localhost:8080/room/create \
+curl -X POST http://localhost:8080/v1/rooms \
   -H "Content-Type: application/json" \
   -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
 
 # LLM Judgement (synchronous — requires OPENAI_API_KEY)
-curl -X POST http://localhost:8080/v1/rooms/<roomId>/llm/judgement \
+curl -X POST http://localhost:8080/v1/rooms/<roomId>/judgments \
   -H "Content-Type: application/json" \
   -d '{"hostText":"我每天加班到很晚","participantText":"我工资更低"}'
 

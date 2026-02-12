@@ -43,14 +43,14 @@
 
 | 文档 | 描述 | 路径 |
 |------|------|------|
-| 🏠 [创建房间](docs/features/01-room-creation.md) | HTTP API 创建房间流程 | `POST /room/create` |
+| 🏠 [创建房间](docs/features/01-room-creation.md) | HTTP API 创建房间流程 | `POST /v1/rooms` |
 | 🔌 [加入房间](docs/features/02-join-room.md) | WebSocket 加入房间协议 | `JOIN_ROOM` 消息 |
 | 💬 [聊天消息](docs/features/03-chat-messaging.md) | 实时聊天消息收发 | `CHAT_SEND/RECEIVE` |
 | 🔗 [连接管理](docs/features/04-connection-lifecycle.md) | WebSocket 连接生命周期 | 连接/断开处理 |
 | ⚠️ [错误处理](docs/features/05-error-handling.md) | 统一错误码和处理机制 | 错误响应规范 |
 | 🥁 [震天鼓游戏](docs/features/06-drum-game.md) | 击鼓游戏机制 | `DRUM_TAP` 消息 |
 | 🎤 [ASR 语音识别](docs/features/07-asr-real-time-speech.md) | 实时语音转文字 | `ASR_*` 消息 |
-| 🔑 [腾讯云 STS Token](docs/features/08-tencent-sts-token.md) | 获取临时安全凭证 | `GET /tencent/credentials` |
+| 🔑 [腾讯云 STS Token](docs/features/08-tencent-sts-token.md) | 获取临时安全凭证 | `GET /v1/tencent/credentials` |
 
 ### 核心概念文档
 
@@ -113,7 +113,7 @@ WebSocket: `ws://localhost:8080/ws`
 curl http://localhost:8080/health
 
 # 创建房间
-curl -X POST http://localhost:8080/room/create \
+curl -X POST http://localhost:8080/v1/rooms \
   -H "Content-Type: application/json" \
   -d '{"creator":{"userId":"test_user","nickname":"Test"}}'
 
@@ -124,7 +124,7 @@ npm run ws:test
 **测试腾讯云 STS Token：**
 
 ```bash
-curl http://localhost:8080/tencent/credentials
+curl http://localhost:8080/v1/tencent/credentials
 ```
 
 ---
@@ -187,7 +187,7 @@ backend/src/
 
 ### HTTP API
 
-#### POST /room/create
+#### POST /v1/rooms
 
 创建新房间。
 
@@ -231,7 +231,7 @@ backend/src/
 }
 ```
 
-#### GET /tencent/credentials
+#### GET /v1/tencent/credentials
 
 获取腾讯云临时安全凭证（用于 ASR 服务）。
 
@@ -273,8 +273,8 @@ CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 ```
 
 **协议**:
-- HTTP: 创建房间 `POST /room/create`
-- HTTP: 获取腾讯云 STS Token `GET /tencent/credentials`
+- HTTP: 创建房间 `POST /v1/rooms`
+- HTTP: 获取腾讯云 STS Token `GET /v1/tencent/credentials`
 - WebSocket: 加入房间、实时聊天、语音识别、震天鼓游戏 `ws://localhost:8080/ws`
 
 ### WebSocket 消息类型
@@ -674,7 +674,7 @@ Routes (路由) → Controllers (控制器) → Services (服务) → Repositori
 
 ### 工作流程
 
-1. **客户端获取临时凭证**: `GET /tencent/credentials`
+1. **客户端获取临时凭证**: `GET /v1/tencent/credentials`
 2. **客户端直连腾讯云 ASR**: 使用临时凭证进行语音识别
 3. **客户端推送识别结果**: 通过 `ASR_TEXT_PUSH` 发送给后端
 4. **后端处理和广播**: 去重、节流后通过 `ASR_TEXT` 广播给其他参与者

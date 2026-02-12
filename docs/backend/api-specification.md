@@ -38,7 +38,7 @@
 
 ### 1. 创建房间
 
-**Endpoint**: `POST /room/create`
+**Endpoint**: `POST /v1/rooms`
 
 **描述**: 创建一个新的双人聊天室
 
@@ -108,7 +108,7 @@ Content-Type: application/json
 
 **cURL**:
 ```bash
-curl -X POST http://localhost:8080/room/create \
+curl -X POST http://localhost:8080/v1/rooms \
   -H "Content-Type: application/json" \
   -d '{
     "creator": {
@@ -139,7 +139,7 @@ curl -X POST http://localhost:8080/room/create \
 
 ### 2. 获取腾讯云 STS Token
 
-**Endpoint**: `GET /tencent/credentials`
+**Endpoint**: `GET /v1/tencent/credentials`
 
 **描述**: 获取腾讯云临时安全凭证（STS Token），用于客户端直连腾讯云 ASR 服务
 
@@ -183,7 +183,7 @@ curl -X POST http://localhost:8080/room/create \
 
 **cURL**:
 ```bash
-curl -X GET http://localhost:8080/tencent/credentials
+curl -X GET http://localhost:8080/v1/tencent/credentials
 ```
 
 **成功响应示例**:
@@ -423,7 +423,7 @@ ASR（Automatic Speech Recognition）功能为 Chat Room 提供实时语音转�
 
 **架构说明**: 客户端直接连接腾讯云 ASR 服务进行语音识别，然后通过 WebSocket 将识别结果同步给服务器，服务器负责广播给其他参与者。
 
-**前置条件**: 客户端需要先调用 `GET /tencent/credentials` 获取临时凭证。
+**前置条件**: 客户端需要先调用 `GET /v1/tencent/credentials` 获取临时凭证。
 
 ---
 
@@ -503,7 +503,7 @@ ASR（Automatic Speech Recognition）功能为 Chat Room 提供实时语音转�
 
 **使用流程**:
 ```
-1. 客户端获取 STS Token (GET /tencent/credentials)
+1. 客户端获取 STS Token (GET /v1/tencent/credentials)
    ↓
 2. 客户端使用临时凭证连接腾讯云 ASR
    ↓
@@ -652,7 +652,7 @@ type IMessageContent = {
 
 **HTTP Request**:
 ```bash
-POST /room/create
+POST /v1/rooms
 {
   "creator": {
     "userId": "user_alice",

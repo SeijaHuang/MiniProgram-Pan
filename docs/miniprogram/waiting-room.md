@@ -327,7 +327,7 @@ Waiting Room 使用以下服务层：
 - **WebSocket 管理器**: `miniprogram/services/websocket-manager.ts`
     - 职责：维护 WebSocket 连接、心跳、重连
 - **房间服务（HTTP）**: `miniprogram/services/room-service.ts`
-    - 职责：创建房间（POST /room/create）
+    - 职责：创建房间（POST /v1/rooms）
 - **房间 WebSocket 服务**: `miniprogram/services/room-websocket-service.ts`
     - 职责：发送 JOIN_ROOM、接收 JOIN_ACK
 

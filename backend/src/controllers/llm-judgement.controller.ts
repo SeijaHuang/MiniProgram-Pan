@@ -23,7 +23,7 @@ import type { IJudgmentResponse } from '../types/llm';
 export class LlmJudgementController {
     /**
      * Create judgment verdict (判决书)
-     * POST /v1/rooms/:roomId/llm/judgment
+     * POST /v1/rooms/:roomId/judgments
      *
      * Status codes:
      * - 200: judgment verdict returned

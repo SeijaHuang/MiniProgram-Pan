@@ -87,7 +87,7 @@ IDLE → RECOGNIZING → SYNCING → IDLE
 ├─────────────────────────────────────────────────────────────────┤
 │  用户进入 Chat Room                                               │
 │       ↓                                                          │
-│  前端调用 GET /tencent/credentials 获取临时凭证                   │
+│  前端调用 GET /v1/tencent/credentials 获取临时凭证                   │
 │       ↓                                                          │
 │  前端使用临时凭证连接腾讯云 ASR WebSocket                         │
 │       ↓                                                          │
@@ -316,7 +316,7 @@ interface IASRSessionState {
 
 ```typescript
 async function getSTSCredentials() {
-    const response = await fetch('http://localhost:8080/tencent/credentials');
+    const response = await fetch('http://localhost:8080/v1/tencent/credentials');
     const data = await response.json();
     return {
         token: data.Credentials.Token,

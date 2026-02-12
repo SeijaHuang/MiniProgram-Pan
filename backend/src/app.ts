@@ -27,20 +27,20 @@ app.get('/health', (_req: Request, res: Response) => {
 
 /**
  * Room routes
- * /room/*
+ * POST /v1/rooms
  */
-app.use('/room', roomRoutes);
+app.use('/v1/rooms', roomRoutes);
 
 /**
- * LLM Judgement routes (v1 API)
- * POST /v1/rooms/:roomId/llm/judgement
+ * LLM Judgement routes
+ * POST /v1/rooms/:roomId/judgments
  */
-app.use('/v1', llmJudgementRoutes);
+app.use('/v1/rooms', llmJudgementRoutes);
 
 /**
  * Tencent routes
- * /tencent/*
+ * GET /v1/tencent/credentials
  */
-app.use('/tencent', tencentRoutes);
+app.use('/v1/tencent', tencentRoutes);
 
 export default app;

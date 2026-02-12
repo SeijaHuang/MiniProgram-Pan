@@ -19,7 +19,7 @@ export const RoomIdParamSchema = z.object({
 
 /**
  * Create Judgment Verdict Request Body Schema
- * POST /v1/rooms/:roomId/llm/judgment
+ * POST /v1/rooms/:roomId/judgments
  */
 export const CreateJudgmentBodySchema = z.object({
     player1Speech: z

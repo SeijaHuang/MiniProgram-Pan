@@ -19,7 +19,7 @@ class RoomService {
     }): Promise<IRoom> {
         return new Promise<IRoom>((resolve, reject) => {
             wx.request({
-                url: `${BACKEND_CONFIG.HTTP_BASE_URL}/room/create`,
+                url: `${BACKEND_CONFIG.HTTP_BASE_URL}/v1/rooms`,
                 method: 'POST',
                 header: {
                     'content-type': 'application/json',

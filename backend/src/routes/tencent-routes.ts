@@ -5,7 +5,7 @@ const router = Router();
 
 /**
  * Get STS token endpoint
- * GET /tencent/credentials
+ * GET /v1/tencent/credentials
  */
 router.get(
     '/credentials',

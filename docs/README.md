@@ -173,7 +173,7 @@ docs/
 - **文件**: `backend/features/01-room-creation.md`
 - **功能**: HTTP 创建房间接口
 - **核心内容**:
-    - POST /room/create API
+    - POST /v1/rooms API
     - 房间代码生成逻辑
     - 请求/响应格式
     - 错误处理

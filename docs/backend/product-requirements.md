@@ -240,7 +240,7 @@ interface IParticipant {
 - 两个索引：roomId → Room, roomCode → roomId
 
 **生命周期**:
-- 创建: HTTP POST /room/create
+- 创建: HTTP POST /v1/rooms
 - 激活: WebSocket JOIN_ROOM
 - 就绪: 第二个用户加入
 - 清理: 连接断开或服务器重启
@@ -327,7 +327,7 @@ interface IConnectionData {
 
 | Endpoint | 方法 | 功能 | 详细文档 |
 |----------|------|------|----------|
-| `/room/create` | POST | 创建房间 | [01-room-creation.md](./features/01-room-creation.md) |
+| `/v1/rooms` | POST | 创建房间 | [01-room-creation.md](./features/01-room-creation.md) |
 
 ### 4.2 WebSocket 消息类型
 
