@@ -67,11 +67,11 @@ npx tsc --noEmit       # Type check without emitting
 
 Uses subpackage loading for optimized bundle sizes:
 
-| Package  | Root              | Pages                      | Purpose                              |
-| -------- | ----------------- | -------------------------- | ------------------------------------ |
-| Main     | `pages/`          | welcome/, verdict-waiting/ | Entry page + AI verdict loading page |
-| packageA | `packageA/pages/` | waiting-room/, drum-room/  | Room creation and game               |
-| packageB | `packageB/pages/` | chat-room/                 | Voice chat with ASR                  |
+| Package  | Root              | Pages                        | Purpose                                  |
+| -------- | ----------------- | ---------------------------- | ---------------------------------------- |
+| Main     | `pages/`          | welcome/                     | Entry page (always loaded)               |
+| packageA | `packageA/pages/` | waiting-room/, drum-room/    | Room creation and game                   |
+| packageB | `packageB/pages/` | chat-room/, verdict-waiting/ | Voice chat with ASR + AI verdict loading |
 
 ### Frontend Components (miniprogram/components/)
 

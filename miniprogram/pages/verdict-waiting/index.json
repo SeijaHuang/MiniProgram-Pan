@@ -1,8 +1,0 @@
-{
-    "navigationStyle": "custom",
-    "disableScroll": true,
-    "usingComponents": {
-        "styled-button": "../../components/styled-button/index",
-        "avatar": "../../components/avatar/index"
-    }
-}

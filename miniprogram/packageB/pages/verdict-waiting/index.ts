@@ -10,12 +10,12 @@ import {
     MAX_VISIBLE_TEXTS,
     ANALYSIS_TIMEOUT_MS,
     DOTS_INTERVAL_MS,
-} from '../../constants/verdict-waiting';
+} from '../../../constants/verdict-waiting';
 import type {
     IVerdictWaitingData,
     ILoadingText,
     IParticle,
-} from '../../types/verdict-waiting';
+} from '../../../types/verdict-waiting';
 
 import {
     createAnimationManager,
