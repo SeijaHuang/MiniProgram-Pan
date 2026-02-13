@@ -25,6 +25,7 @@ docs/
     ├── waiting-room.md         # 等待页
     ├── drum-room.md            # 震天鼓抢麦页
     ├── chat-room.md            # 对簿公堂页
+    ├── verdict.md              # 判决书页（AI 判决结果）
     ├── components.md           # 组件文档
     └── services.md             # 服务层说明
 ```
@@ -87,6 +88,22 @@ docs/
     - 表情互动系统（仅监听方可操作，弹幕/飞行物形式）
     - 状态流转管理（waiting → speaker_turn → listener_turn → completed）
     - WebSocket 实时状态同步
+
+#### Verdict（清汤大老爷判决书）
+
+- **文件**: `miniprogram/verdict.md`
+- **页面路径**: `packageB/pages/verdict/verdict`
+- **功能**: AI 判决结果可视化核心产出页面，以长滚动卡片形式展示判决结果各维度
+- **核心特性**:
+    - 标题区（红色背景 + 鸭子图标 + 案件编号）
+    - 责任分布（三列布局：双方百分比 + 第三方因素）
+    - 六维战力雷达图（Canvas 2D 绘制）
+    - 大老爷赠言（打字机效果）
+    - 惩罚令牌（盖章动画 + 震动反馈）
+    - 密折弹窗（半屏弹窗，仅显示当前用户私密反馈）
+    - 保存判决书图片（离屏 Canvas 生成 + 保存到相册）
+    - 赛后互动（赢家惩戒 / 输家求饶 / 平局退堂，WebSocket 双向通信）
+    - 完整入场动画序列（3.5s 依次展开）
 
 ### 组件文档
 

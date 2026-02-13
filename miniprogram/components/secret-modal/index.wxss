@@ -1,0 +1,132 @@
+/* components/secret-modal/index.wxss */
+
+.secret-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+}
+
+.secret-modal__overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.secret-modal__panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 65vh;
+    background-color: #fffef7;
+    border-radius: 32rpx 32rpx 0 0;
+    padding: 0 32rpx 48rpx;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateY(100%);
+}
+
+.secret-modal__drag-bar {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 20rpx 0;
+}
+
+.secret-modal__drag-line {
+    width: 80rpx;
+    height: 8rpx;
+    border-radius: 4rpx;
+    background-color: #d9d9d9;
+}
+
+.secret-modal__title {
+    margin-bottom: 32rpx;
+}
+
+.secret-modal__title-text {
+    font-size: 36rpx;
+    font-weight: bold;
+    color: #8b4513;
+}
+
+.secret-modal__card {
+    width: 100%;
+    border-radius: 16rpx;
+    padding: 32rpx;
+    margin-bottom: 24rpx;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+}
+
+.secret-modal__card--title {
+    background-color: #fffde0;
+    border: 2rpx solid #ffe58f;
+}
+
+.secret-modal__card--advice {
+    background-color: #f6ffed;
+    border: 2rpx solid #b7eb8f;
+}
+
+.secret-modal__card-label {
+    font-size: 24rpx;
+    color: #999999;
+}
+
+.secret-modal__card-value {
+    font-size: 44rpx;
+    font-weight: bold;
+    color: #d4380d;
+}
+
+.secret-modal__card-detail {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12rpx;
+}
+
+.secret-modal__card-dim {
+    font-size: 24rpx;
+    color: #666666;
+}
+
+.secret-modal__card-score {
+    font-size: 24rpx;
+    color: #d4380d;
+    font-weight: bold;
+}
+
+.secret-modal__card-advice {
+    font-size: 32rpx;
+    color: #389e0d;
+    line-height: 1.6;
+}
+
+.secret-modal__close {
+    margin-top: 32rpx;
+    width: 400rpx;
+    height: 80rpx;
+    border-radius: 40rpx;
+    background-color: #d4380d;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.secret-modal__close-text {
+    font-size: 32rpx;
+    color: #ffffff;
+    font-weight: bold;
+}

@@ -1,0 +1,63 @@
+<!--components/secret-modal/index.wxml-->
+<view
+    class="secret-modal"
+    wx:if="{{ visible }}"
+>
+    <!-- Overlay -->
+    <view
+        class="secret-modal__overlay"
+        bind:tap="onOverlayTap"
+    ></view>
+
+    <!-- Content panel -->
+    <view
+        class="secret-modal__panel"
+        animation="{{ panelAnimation }}"
+    >
+        <!-- Drag indicator -->
+        <view class="secret-modal__drag-bar">
+            <view class="secret-modal__drag-line"></view>
+        </view>
+
+        <!-- Title -->
+        <view class="secret-modal__title">
+            <text class="secret-modal__title-text">
+                密折 · 仅你可见
+            </text>
+        </view>
+
+        <!-- Nickname card -->
+        <view class="secret-modal__card secret-modal__card--title">
+            <text class="secret-modal__card-label">你的封号</text>
+            <text class="secret-modal__card-value">
+                {{ title }}
+            </text>
+            <view class="secret-modal__card-detail">
+                <text class="secret-modal__card-dim">
+                    最高维度: {{ topDimension }}
+                </text>
+                <text class="secret-modal__card-score">
+                    {{ topScore }}分
+                </text>
+            </view>
+        </view>
+
+        <!-- Advice card -->
+        <view class="secret-modal__card secret-modal__card--advice">
+            <text class="secret-modal__card-label">锦囊妙计</text>
+            <text class="secret-modal__card-advice">
+                {{ advice }}
+            </text>
+        </view>
+
+        <!-- Close button -->
+        <view
+            class="secret-modal__close"
+            bind:tap="onCloseTap"
+        >
+            <text class="secret-modal__close-text">
+                知道了
+            </text>
+        </view>
+    </view>
+</view>

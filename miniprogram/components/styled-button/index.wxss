@@ -90,10 +90,10 @@
     z-index: 2;
 }
 
-/* 有 icon 时，垂直排列 */
+/* 有 icon 时，水平排列 */
 .styled-button__content--with-icon {
-    flex-direction: column;
-    gap: 5rpx;
+    flex-direction: row;
+    gap: 12rpx;
 }
 
 .styled-button__icon {

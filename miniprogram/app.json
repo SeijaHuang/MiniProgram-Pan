@@ -1,5 +1,5 @@
 {
-    "pages": ["pages/welcome/index"],
+    "pages": ["pages/verdict/index", "pages/welcome/index"],
     "window": {
         "navigationBarTextStyle": "black",
         "navigationBarTitleText": "Weixin",

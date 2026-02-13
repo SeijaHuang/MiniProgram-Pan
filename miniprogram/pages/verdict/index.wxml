@@ -1,0 +1,227 @@
+<!--packageB/pages/verdict/index.wxml-->
+<scroll-view
+    scroll-y
+    class="verdict-page"
+>
+    <!-- Loading -->
+    <view wx:if="{{ loading }}" class="verdict-page__loading">
+        <text class="verdict-page__loading-text">
+            加载判决书中...
+        </text>
+    </view>
+
+    <block wx:if="{{ !loading && verdict }}">
+        <!-- 区域1: 标题区 -->
+        <view
+            class="verdict-header"
+            animation="{{ headerAnimation }}"
+        >
+            <text class="verdict-header__icon-emoji">
+                ⚖️
+            </text>
+            <text class="verdict-header__title">
+                清汤大老爷判决书
+            </text>
+            <text class="verdict-header__case-no">
+                案件编号: NO.{{ verdict.caseNumber }}
+            </text>
+        </view>
+
+        <!-- 区域2: 责任分布 -->
+        <view
+            class="verdict-section"
+            animation="{{ section2Animation }}"
+        >
+            <text class="verdict-section__title">
+                责任分布
+            </text>
+            <view class="responsibility">
+                <!-- Host card -->
+                <view class="responsibility__card responsibility__card--host">
+                    <text class="responsibility__label">
+                        玩家1责任
+                    </text>
+                    <text class="responsibility__percent">
+                        {{ hostPercentDisplay }}%
+                    </text>
+                </view>
+                <!-- Guest card -->
+                <view class="responsibility__card responsibility__card--guest">
+                    <text class="responsibility__label">
+                        玩家2责任
+                    </text>
+                    <text class="responsibility__percent">
+                        {{ guestPercentDisplay }}%
+                    </text>
+                </view>
+                <!-- Third party card -->
+                <view class="responsibility__card responsibility__card--third">
+                    <text class="responsibility__label">
+                        第三方因素
+                    </text>
+                    <view
+                        wx:for="{{ verdict.responsibility.thirdParty }}"
+                        wx:key="reason"
+                        class="responsibility__factor"
+                    >
+                        <text class="responsibility__factor-emoji">
+                            {{ item.emoji }}
+                        </text>
+                        <text class="responsibility__factor-name">
+                            {{ item.reason }}
+                        </text>
+                        <text class="responsibility__factor-pct">
+                            {{ item.percentage }}%
+                        </text>
+                    </view>
+                </view>
+            </view>
+        </view>
+
+        <!-- 区域3: 六维战力图 -->
+        <view
+            class="verdict-section"
+            animation="{{ section3Animation }}"
+        >
+            <text class="verdict-section__title">
+                双方六维战力图
+            </text>
+            <radar-chart
+                id="radarChart"
+                hostScores="{{ verdict.battleStats.host }}"
+                guestScores="{{ verdict.battleStats.guest }}"
+                size="{{ 500 }}"
+            ></radar-chart>
+        </view>
+
+        <!-- 区域4: 大老爷赠言 -->
+        <view
+            class="verdict-section"
+            animation="{{ section4Animation }}"
+        >
+            <text class="verdict-section__title">
+                大老爷赠言
+            </text>
+            <view class="verdict-quote">
+                <view class="verdict-quote__border"></view>
+                <text class="verdict-quote__text">
+                    "{{ summaryDisplayText }}"
+                </text>
+            </view>
+        </view>
+
+        <!-- 区域5: 惩罚令牌 -->
+        <view
+            class="verdict-section"
+            animation="{{ section5Animation }}"
+        >
+            <text class="verdict-section__title">
+                惩罚令牌
+            </text>
+            <view class="punishment-card">
+                <text class="punishment-card__task">
+                    {{ verdict.punishmentTask.task }}
+                </text>
+                <text class="punishment-card__deadline">
+                    {{ verdict.punishmentTask.deadline }}
+                </text>
+            </view>
+        </view>
+
+        <!-- 区域6+7: 密折 & 保存按钮 -->
+        <view
+            class="verdict-section verdict-section--center verdict-actions"
+            animation="{{ section6Animation }}"
+        >
+            <styled-button
+                class="verdict-actions__btn"
+                icon="🔮"
+                text="查看我的密折"
+                color="red"
+                bind:tap="onSecretModalOpen"
+            ></styled-button>
+            <styled-button
+                class="verdict-actions__btn"
+                icon="📸"
+                text="{{ saving ? '保存中...' : '保存判决书' }}"
+                color="yellow"
+                disabled="{{ saving }}"
+                bind:tap="onSaveVerdict"
+            ></styled-button>
+        </view>
+
+        <!-- 区域8: 赛后互动 -->
+        <view
+            class="verdict-section"
+            animation="{{ section8Animation }}"
+        >
+            <view class="post-game">
+                <!-- Winner: execute punishment -->
+                <view
+                    wx:if="{{ isWinner }}"
+                    class="post-game__action"
+                >
+                    <styled-button
+                        icon="⚡"
+                        text="执行惩戒"
+                        color="red"
+                        disabled="{{ actionCooldown }}"
+                        bind:tap="onExecutePunishment"
+                    ></styled-button>
+                    <text class="post-game__remaining">
+                        剩余 {{ actionRemainingCount }} 次
+                    </text>
+                </view>
+
+                <!-- Loser: beg for mercy -->
+                <view
+                    wx:if="{{ !isWinner && !isDraw }}"
+                    class="post-game__action"
+                >
+                    <styled-button
+                        icon="🙏"
+                        text="跪地求饶"
+                        color="blue"
+                        disabled="{{ actionCooldown }}"
+                        bind:tap="onBegForMercy"
+                    ></styled-button>
+                    <text class="post-game__remaining">
+                        剩余 {{ actionRemainingCount }} 次
+                    </text>
+                </view>
+
+                <!-- Leave together -->
+                <view class="post-game__leave">
+                    <styled-button
+                        text="{{ leaveWaiting ? '等待对方确认...' : '共同退堂' }}"
+                        color="grey"
+                        disabled="{{ leaveWaiting }}"
+                        bind:tap="onLeaveTogether"
+                    ></styled-button>
+                </view>
+            </view>
+        </view>
+    </block>
+
+    <!-- Secret modal -->
+    <secret-modal
+        visible="{{ showSecretModal }}"
+        title="{{ mySecretReport.title }}"
+        advice="{{ mySecretReport.advice }}"
+        topDimension="{{ myTopDimension }}"
+        topScore="{{ myTopScore }}"
+        bind:close="onSecretModalClose"
+    ></secret-modal>
+
+    <!-- Post-game effect overlay -->
+    <post-game-effect
+        effect="{{ currentEffect }}"
+    ></post-game-effect>
+
+    <!-- Hidden canvas for image generation -->
+    <canvas
+        type="2d"
+        id="verdictCanvas"
+        class="verdict-page__offscreen-canvas"
+    ></canvas>
+</scroll-view>

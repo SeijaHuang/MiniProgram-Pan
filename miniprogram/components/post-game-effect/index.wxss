@@ -1,0 +1,50 @@
+/* components/post-game-effect/index.wxss */
+
+.post-game-effect {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+}
+
+/* Stamp "卒" */
+.post-game-effect__stamp {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transform: scale(3);
+}
+
+.post-game-effect__stamp-text {
+    font-size: 200rpx;
+    font-weight: bold;
+    color: #d4380d;
+    text-shadow: 0 8rpx 16rpx rgba(0, 0, 0, 0.3);
+}
+
+/* Beg emoji */
+.post-game-effect__beg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16rpx;
+    opacity: 0;
+    transform: translateY(200rpx);
+}
+
+.post-game-effect__beg-emoji {
+    font-size: 160rpx;
+}
+
+.post-game-effect__beg-text {
+    font-size: 40rpx;
+    color: #ff69b4;
+    font-weight: bold;
+}
