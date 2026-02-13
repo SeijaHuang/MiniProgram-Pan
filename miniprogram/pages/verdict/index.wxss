@@ -5,9 +5,8 @@
    ======================================== */
 
 .verdict-page {
-    min-height: 100vh;
-    background-color: #fffef7;
-    padding-bottom: 80rpx;
+    background-color: #d4380d;
+    padding-bottom: 30rpx;
     border-left: 8rpx solid #d4380d;
     border-right: 8rpx solid #d4380d;
     box-sizing: border-box;
@@ -69,17 +68,22 @@
    Section Common
    ======================================== */
 
+.verdict-section-wrapper {
+    padding: 32rpx;
+    border-radius: 32rpx;
+    border: 2rpx solid #fffef7;
+    display: flex;
+    flex-direction: column;
+    gap: 32rpx;
+    background-color: #fffef7;
+}
+
 .verdict-section {
-    margin: 0 32rpx 24rpx;
     padding: 32rpx;
     background-color: #ffffff;
     border-radius: 16rpx;
     border: 2rpx solid #e8e8e8;
     opacity: 0;
-}
-
-.verdict-section:first-of-type {
-    margin-top: 24rpx;
 }
 
 .verdict-section--center {

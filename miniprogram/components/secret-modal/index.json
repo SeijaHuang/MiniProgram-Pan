@@ -1,5 +1,7 @@
 {
     "component": true,
-    "usingComponents": {},
+    "usingComponents": {
+        "styled-button": "../styled-button/index"
+    },
     "styleIsolation": "apply-shared"
 }

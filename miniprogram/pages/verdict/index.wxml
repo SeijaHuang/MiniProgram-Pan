@@ -28,6 +28,7 @@
         </view>
 
         <!-- 区域2: 责任分布 -->
+         <view class="verdict-section-wrapper">
         <view
             class="verdict-section"
             animation="{{ section2Animation }}"
@@ -199,6 +200,7 @@
                         bind:tap="onLeaveTogether"
                     ></styled-button>
                 </view>
+                </view>
             </view>
         </view>
     </block>
@@ -218,10 +220,11 @@
         effect="{{ currentEffect }}"
     ></post-game-effect>
 
-    <!-- Hidden canvas for image generation -->
-    <canvas
-        type="2d"
-        id="verdictCanvas"
-        class="verdict-page__offscreen-canvas"
-    ></canvas>
 </scroll-view>
+
+<!-- Hidden canvas for image generation (must be outside scroll-view for position: fixed to work) -->
+<canvas
+    type="2d"
+    id="verdictCanvas"
+    class="verdict-page__offscreen-canvas"
+></canvas>

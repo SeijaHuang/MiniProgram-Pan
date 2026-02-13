@@ -115,18 +115,6 @@
 }
 
 .secret-modal__close {
-    margin-top: 32rpx;
-    width: 400rpx;
-    height: 80rpx;
-    border-radius: 40rpx;
-    background-color: #d4380d;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.secret-modal__close-text {
-    font-size: 32rpx;
-    color: #ffffff;
-    font-weight: bold;
+    margin-top: 5rpx;
+    width: 80%;
 }

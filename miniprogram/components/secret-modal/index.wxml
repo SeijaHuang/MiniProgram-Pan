@@ -51,13 +51,12 @@
         </view>
 
         <!-- Close button -->
-        <view
-            class="secret-modal__close"
-            bind:tap="onCloseTap"
-        >
-            <text class="secret-modal__close-text">
-                知道了
-            </text>
+        <view class="secret-modal__close">
+            <styled-button
+                text="知道了"
+                color="red"
+                bind:tap="onCloseTap"
+            />
         </view>
     </view>
 </view>
