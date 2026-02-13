@@ -85,7 +85,7 @@
                     >
                         <text class="card__gear-emoji">⚙️</text>
                     </view>
-                    <text class="card__text">{{ item.text }}</text>
+                    <text class="card__text">{{ item.text }}{{ dots }}</text>
                 </view>
             </block>
 

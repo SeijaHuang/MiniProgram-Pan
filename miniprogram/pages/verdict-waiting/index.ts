@@ -213,9 +213,10 @@ Page({
         if (!this.data.isAnalyzing) return;
 
         const idx: number = this._currentTextIndex % this._textPool.length;
+        const rawText: string = this._textPool[idx];
         const newItem: ILoadingText = {
             id: this._nextTextId,
-            text: this._textPool[idx],
+            text: rawText.replace(/\.{2,}$/, ''),
         };
 
         // Fade-in animation: CSS sets opacity:0, animation
