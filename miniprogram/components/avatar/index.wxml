@@ -1,0 +1,21 @@
+<!--components/avatar/index.wxml-->
+<view
+    class="avatar {{ isInitial ? 'avatar--initial' : '' }}"
+    animation="{{ animationData }}"
+>
+    <!-- Top decoration badge -->
+    <view class="avatar__badge" wx:if="{{ badge }}">
+        <text class="avatar__badge-icon">{{ badge }}</text>
+    </view>
+    <!-- Circular avatar container -->
+    <view
+        class="avatar__container"
+        style="width: {{ size }}rpx; height: {{ size }}rpx;"
+    >
+        <image
+            class="avatar__image"
+            src="{{ src }}"
+            mode="aspectFill"
+        ></image>
+    </view>
+</view>

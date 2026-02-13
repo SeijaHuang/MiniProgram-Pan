@@ -1,0 +1,56 @@
+/* components/avatar/index.wxss */
+
+/* ========================================
+   Avatar Component
+   入场效果：缩放 + 淡入
+   idle 效果：呼吸动画
+   ======================================== */
+.avatar {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* 头像初始状态：缩小 + 透明 */
+.avatar--initial {
+    opacity: 0;
+    transform: scale(0.6);
+}
+
+/* Top decoration badge */
+.avatar__badge {
+    position: absolute;
+    top: -45rpx;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60rpx;
+    height: 60rpx;
+    z-index: 10;
+}
+
+.avatar__badge-icon {
+    width: 100%;
+    height: 100%;
+    font-size: 60rpx;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Circular avatar container */
+.avatar__container {
+    border-radius: 50%;
+    background-color: #ffffff;
+    border: 8rpx solid #1a1a1a;
+    box-shadow: 0 16rpx 32rpx rgba(0, 0, 0, 0.25);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.avatar__image {
+    width: 100%;
+    height: 100%;
+}
