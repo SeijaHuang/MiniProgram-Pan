@@ -1,0 +1,135 @@
+<!-- packageB/pages/verdict-waiting/index.wxml -->
+<view class="page">
+
+    <!-- Particle background layer -->
+    <view class="page__particles">
+        <view
+            wx:for="{{ particles }}"
+            wx:key="id"
+            class="page__particle"
+            animation="{{ particleAnimations[index] }}"
+            style="left: {{ item.left }}%; width: {{ item.size }}px; height: {{ item.size }}px; opacity: {{ item.opacity }};"
+        />
+    </view>
+
+    <!-- Main content (bound to screen shake animation) -->
+    <view
+        class="page__content"
+        animation="{{ shakeAnimation }}"
+    >
+
+        <!-- Back button -->
+        <view class="nav-back" bindtap="onTapBack">
+            <text class="nav-back__icon">←</text>
+        </view>
+
+        <!-- Title -->
+        <view class="title" animation="{{ titleAnimation }}">
+            <text class="title__text">
+                清汤大老爷断案中{{ dots }}
+            </text>
+        </view>
+
+        <!-- Judge duck -->
+        <view class="duck">
+            <view
+                class="duck__float"
+                animation="{{ duckFloatAnimation }}"
+            >
+                <view
+                    class="duck__wobble"
+                    animation="{{ duckWobbleAnimation }}"
+                >
+                    <text class="duck__emoji">🦆👑</text>
+                </view>
+            </view>
+        </view>
+
+        <!-- Dog collision area -->
+        <view class="dogs">
+            <view
+                class="dogs__left"
+                animation="{{ dogLeftAnimation }}"
+            >
+                <text class="dogs__emoji">🐕</text>
+            </view>
+
+            <view
+                class="dogs__collision"
+                animation="{{ collisionAnimation }}"
+            >
+                <text class="dogs__collision-emoji">💥</text>
+            </view>
+
+            <view
+                class="dogs__right"
+                animation="{{ dogRightAnimation }}"
+            >
+                <text class="dogs__emoji">🐕</text>
+            </view>
+        </view>
+
+        <!-- Text card -->
+        <view class="card" animation="{{ cardAnimation }}">
+            <!-- Loading texts -->
+            <block wx:if="{{ !showFinalText }}">
+                <view
+                    wx:for="{{ visibleTexts }}"
+                    wx:key="id"
+                    class="card__line"
+                    animation="{{ textAnimations[index] }}"
+                >
+                    <view
+                        class="card__gear"
+                        animation="{{ gearAnimation }}"
+                    >
+                        <text class="card__gear-emoji">⚙️</text>
+                    </view>
+                    <text class="card__text">{{ item.text }}</text>
+                </view>
+            </block>
+
+            <!-- Final text -->
+            <block wx:if="{{ showFinalText }}">
+                <view class="card__line card__line--final">
+                    <text class="card__text card__text--final">
+                        🔔 判决已出！准备宣判...
+                    </text>
+                </view>
+            </block>
+        </view>
+
+    </view>
+
+    <!-- Timeout overlay -->
+    <view class="timeout" wx:if="{{ showTimeout }}">
+        <view class="timeout__content">
+            <text class="timeout__duck-emoji">😴🦆</text>
+
+            <text class="timeout__title">判官今天很忙</text>
+            <text class="timeout__subtitle">
+                可能在处理银河系其他情侣的案件...
+            </text>
+
+            <view
+                class="timeout__btn timeout__btn--primary"
+                bindtap="onTapRetry"
+            >
+                <text class="timeout__btn-text">
+                    🔄 重新发起审判
+                </text>
+            </view>
+            <view
+                class="timeout__btn timeout__btn--secondary"
+                bindtap="onTapHome"
+            >
+                <text
+                    class="timeout__btn-text timeout__btn-text--light"
+                >
+                    🏠 返回首页
+                </text>
+            </view>
+        </view>
+    </view>
+
+</view>
