@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Two-player real-time interactive WeChat Mini Program ("申冤" app) with a Node.js backend. Users create/join rooms, compete in a drum-tapping game to decide speaking order, then take turns voicing grievances with real-time ASR transcription.
 
-**User Flow**: Welcome → Waiting Room → Drum Room (10s tap competition) → Chat Room (turn-based voice chat with ASR)
+**User Flow**: Welcome → Waiting Room → Drum Room (10s tap competition) → Chat Room (turn-based voice chat with ASR) → Verdict Waiting (AI analysis loading) → Verdict
 
 **Tech Stack**:
 
@@ -67,11 +67,24 @@ npx tsc --noEmit       # Type check without emitting
 
 Uses subpackage loading for optimized bundle sizes:
 
-| Package  | Root              | Pages                     | Purpose                    |
-| -------- | ----------------- | ------------------------- | -------------------------- |
-| Main     | `pages/`          | welcome/                  | Entry page (always loaded) |
-| packageA | `packageA/pages/` | waiting-room/, drum-room/ | Room creation and game     |
-| packageB | `packageB/pages/` | chat-room/                | Voice chat with ASR        |
+| Package  | Root              | Pages                      | Purpose                              |
+| -------- | ----------------- | -------------------------- | ------------------------------------ |
+| Main     | `pages/`          | welcome/, verdict-waiting/ | Entry page + AI verdict loading page |
+| packageA | `packageA/pages/` | waiting-room/, drum-room/  | Room creation and game               |
+| packageB | `packageB/pages/` | chat-room/                 | Voice chat with ASR                  |
+
+### Frontend Components (miniprogram/components/)
+
+Reusable components registered via page `index.json` `usingComponents`:
+
+| Component       | Path                        | Purpose                                                    |
+| --------------- | --------------------------- | ---------------------------------------------------------- |
+| `styled-button` | `components/styled-button/` | Themed button with shine effect and color variants         |
+| `styled-title`  | `components/styled-title/`  | Animated title with entrance animation                     |
+| `countdown`     | `components/countdown/`     | Countdown timer display                                    |
+| `avatar`        | `components/avatar/`        | Circular avatar with badge, entrance animation + breathing |
+
+**Avatar component properties**: `src` (image URL), `badge` (emoji, default '👑'), `size` (rpx, default 220), `playEntrance` (boolean), `entranceDelay` (ms), `breathing` (boolean). Uses `wx.createAnimation()` for entrance (scale + fade-in) and breathing (periodic scale oscillation).
 
 ### Frontend Services (all singletons)
 

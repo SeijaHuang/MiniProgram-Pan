@@ -26,63 +26,6 @@
 }
 
 /* ========================================
-   阶段 2：头像
-   入场效果：缩放 + 淡入
-   idle 效果：轻微上下浮动
-   ======================================== */
-.welcome-page__avatar-wrapper {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-/* 头像初始状态：缩小 + 透明 */
-.welcome-page__avatar-wrapper--initial {
-    opacity: 0;
-    transform: scale(0.6);
-}
-
-/* Top decoration badge */
-.welcome-page__avatar-badge {
-    position: absolute;
-    top: -45rpx;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60rpx;
-    height: 60rpx;
-    z-index: 10;
-}
-
-.welcome-page__badge-icon {
-    width: 100%;
-    height: 100%;
-    font-size: 60rpx;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-/* Circular avatar container */
-.welcome-page__avatar-container {
-    width: 220rpx;
-    height: 220rpx;
-    border-radius: 50%;
-    background-color: #ffffff;
-    border: 8rpx solid #1a1a1a;
-    box-shadow: 0 16rpx 32rpx rgba(0, 0, 0, 0.25);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-}
-
-.welcome-page__avatar-image {
-    width: 100%;
-    height: 100%;
-}
-
-/* ========================================
    阶段 3：副标题 + Slogan
    入场效果：上滑 + 淡入
    ======================================== */

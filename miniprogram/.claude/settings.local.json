@@ -6,7 +6,9 @@
             "Bash(npm run lint:fix:*)",
             "Bash(npx eslint:*)",
             "Bash(npx prettier:*)",
-            "Bash(npx tsc:*)"
+            "Bash(npx tsc:*)",
+            "Bash(dir:*)",
+            "Bash(git stash:*)"
         ]
     }
 }

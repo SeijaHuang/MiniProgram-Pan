@@ -68,7 +68,6 @@ Page({
         showFinalText: false,
         titleAnimation: null,
         duckFloatAnimation: null,
-        duckWobbleAnimation: null,
         dogLeftAnimation: null,
         dogRightAnimation: null,
         collisionAnimation: null,
@@ -126,6 +125,7 @@ Page({
         // Start all animations
         this._animManager = createAnimationManager();
         this._animManager.startAll((d: Record<string, unknown>): void => {
+            if (!this.data.isAnalyzing) return;
             this.setData(d);
         });
 
@@ -292,12 +292,40 @@ Page({
             clearTimeout(this._timeoutTimer);
             this._timeoutTimer = null;
         }
-        this._particleTimers.forEach((t: number): void => {
+        (this._particleTimers ?? []).forEach((t: number): void => {
             clearInterval(t);
             clearTimeout(t);
         });
         this._particleTimers = [];
         this._animManager?.stopAll();
+
+        // Reset all animations to neutral so nothing keeps
+        // moving behind the overlay
+        const reset: WechatMiniprogram.Animation = wx.createAnimation({
+            duration: 0,
+        });
+        reset.translateX(0).step();
+        const neutralTranslate: WechatMiniprogram.AnimationExportResult =
+            reset.export();
+
+        const resetIdentity: WechatMiniprogram.Animation = wx.createAnimation({
+            duration: 0,
+        });
+        resetIdentity.translateX(0).scaleX(1).scaleY(1).step();
+        const neutralIdentity: WechatMiniprogram.AnimationExportResult =
+            resetIdentity.export();
+
+        const resetCollision: WechatMiniprogram.Animation = wx.createAnimation({
+            duration: 0,
+        });
+        resetCollision.scale(0).opacity(0).step();
+
+        this.setData({
+            shakeAnimation: neutralTranslate,
+            dogLeftAnimation: neutralIdentity,
+            dogRightAnimation: neutralIdentity,
+            collisionAnimation: resetCollision.export(),
+        });
     },
 
     _cleanup(): void {
@@ -311,6 +339,7 @@ Page({
     _resumeAll(): void {
         this._animManager = createAnimationManager();
         this._animManager.startAll((d: Record<string, unknown>): void => {
+            if (!this.data.isAnalyzing) return;
             this.setData(d);
         });
         this._startParticleAnimations();

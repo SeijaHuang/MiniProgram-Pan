@@ -10,23 +10,12 @@
         ></styled-title>
 
         <!-- 阶段 2：头像 - 缩放入场 + 呼吸动画 -->
-        <view
-            class="welcome-page__avatar-wrapper {{ isEntranceReady ? 'welcome-page__avatar-wrapper--initial' : '' }}"
-            animation="{{ avatarAnimation }}"
-        >
-            <!-- Top decoration (crown/badge placeholder) -->
-            <view class="welcome-page__avatar-badge">
-                <text class="welcome-page__badge-icon">👑</text>
-            </view>
-            <!-- Circular avatar container -->
-            <view class="welcome-page__avatar-container">
-                <image
-                    class="welcome-page__avatar-image"
-                    src="https://images.unsplash.com/photo-1611991687319-5dabaabde43a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5ZWxsb3clMjBkdWNrJTIwY2FydG9vbnxlbnwxfHx8fDE3NjgyMDQ3MTV8MA&ixlib=rb-4.1.0&q=80&w=1080"
-                    mode="aspectFill"
-                ></image>
-            </view>
-        </view>
+        <avatar
+            src="https://images.unsplash.com/photo-1611991687319-5dabaabde43a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5ZWxsb3clMjBkdWNrJTIwY2FydG9vbnxlbnwxfHx8fDE3NjgyMDQ3MTV8MA&ixlib=rb-4.1.0&q=80&w=1080"
+            badge="👑"
+            playEntrance="{{ isEntranceReady }}"
+            entranceDelay="{{ 400 }}"
+        ></avatar>
 
         <!-- 阶段 3：副标题 + Slogan - 上滑入场 -->
         <view

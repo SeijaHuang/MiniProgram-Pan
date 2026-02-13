@@ -103,29 +103,6 @@ function createDuckFloatAnimation(setData: SetDataFn): number {
     return timer;
 }
 
-// ---- Duck wobble animation ----
-
-function createDuckWobbleAnimation(setData: SetDataFn): number {
-    let phase: number = 0;
-    const angles: number[] = [0, -5, 0, 5];
-
-    const runCycle = (): void => {
-        const anim: WechatMiniprogram.Animation = wx.createAnimation({
-            duration: 1000,
-            timingFunction: 'ease-in-out',
-        });
-
-        const angle: number | undefined = angles[phase % angles.length];
-        anim.rotate(angle ?? 0).step();
-        phase++;
-        setData({ duckWobbleAnimation: anim.export() });
-    };
-
-    runCycle();
-    const timer: number = setInterval(runCycle, 1000) as unknown as number;
-    return timer;
-}
-
 // ---- Dog collision animation (core) ----
 
 /**
@@ -138,11 +115,18 @@ function createDuckWobbleAnimation(setData: SetDataFn): number {
  *   1200-1800ms 回弹归位
  *   1800-2400ms 停顿喘息
  */
+interface IDogCollisionResult {
+    intervalTimer: number;
+    /** Pending collision-hit setTimeout IDs (cleared on stop) */
+    hitTimers: number[];
+}
+
 function createDogCollisionAnimation(
     setData: SetDataFn,
     onCollisionHit: () => void
-): number {
+): IDogCollisionResult {
     const CYCLE: number = 2400;
+    const hitTimers: number[] = [];
 
     const runCycle = (): void => {
         // Left dog
@@ -196,15 +180,19 @@ function createDogCollisionAnimation(
             dogRightAnimation: rightAnim.export(),
         });
 
-        // Collision hit callback at 840ms
-        setTimeout((): void => {
+        // Collision hit callback at 840ms (tracked for cleanup)
+        const hitTimer: number = setTimeout((): void => {
             onCollisionHit();
-        }, 840);
+        }, 840) as unknown as number;
+        hitTimers.push(hitTimer);
     };
 
     runCycle();
-    const timer: number = setInterval(runCycle, CYCLE) as unknown as number;
-    return timer;
+    const intervalTimer: number = setInterval(
+        runCycle,
+        CYCLE
+    ) as unknown as number;
+    return { intervalTimer, hitTimers };
 }
 
 // ---- Collision effect (star scale) ----
@@ -276,24 +264,33 @@ function playCardEntrance(setData: SetDataFn): void {
 
 export function createAnimationManager(): IAnimationManager {
     const timers: number[] = [];
+    let collisionHitTimers: number[] = [];
+    let stopped: boolean = false;
 
     return {
         startAll(setData: SetDataFn): void {
+            stopped = false;
+
             // Title breath
             timers.push(createTitleBreathAnimation(setData));
 
-            // Duck float + wobble
+            // Duck float
             timers.push(createDuckFloatAnimation(setData));
-            timers.push(createDuckWobbleAnimation(setData));
 
             // Dog collision
-            timers.push(
-                createDogCollisionAnimation(setData, (): void => {
+            const collision: IDogCollisionResult = createDogCollisionAnimation(
+                setData,
+                (): void => {
+                    if (stopped) return;
                     playCollisionEffect(setData);
                     playScreenShake(setData);
-                    void wx.vibrateShort({ type: 'light' });
-                })
+                    void wx.vibrateShort({
+                        type: 'light',
+                    });
+                }
             );
+            timers.push(collision.intervalTimer);
+            collisionHitTimers = collision.hitTimers;
 
             // Gear rotation
             timers.push(createGearRotationAnimation(setData));
@@ -303,11 +300,19 @@ export function createAnimationManager(): IAnimationManager {
         },
 
         stopAll(): void {
+            stopped = true;
+
             timers.forEach((t: number): void => {
                 clearInterval(t);
                 clearTimeout(t);
             });
             timers.length = 0;
+
+            // Clear pending collision-hit timeouts
+            collisionHitTimers.forEach((t: number): void => {
+                clearTimeout(t);
+            });
+            collisionHitTimers = [];
         },
     };
 }

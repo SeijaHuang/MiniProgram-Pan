@@ -43,7 +43,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: 180rpx;
+    padding-top: 100rpx;
     padding-bottom: 0;
     box-sizing: border-box;
 }
@@ -70,7 +70,7 @@
 
 /* ===== Title ===== */
 .title {
-    margin-bottom: 30rpx;
+    margin-bottom: 50rpx;
 }
 
 .title__text {
@@ -85,20 +85,10 @@
     margin-bottom: 20rpx;
 }
 
-.duck__float,
-.duck__wobble {
+.duck__float {
     display: flex;
     align-items: center;
     justify-content: center;
-}
-
-.duck__image {
-    width: 200rpx;
-    height: 240rpx;
-}
-
-.duck__emoji {
-    font-size: 120rpx;
 }
 
 /* ===== Dog collision area ===== */
@@ -217,7 +207,7 @@
     flex-direction: column;
     align-items: center;
     padding: 60rpx 40rpx;
-    background: rgba(255, 240, 255, 0.95);
+    background: rgba(255, 240, 255, 1);
     border-radius: 32rpx;
     border: 3px solid #2d2d2d;
     box-shadow: 4rpx 4rpx 0 #2d2d2d;

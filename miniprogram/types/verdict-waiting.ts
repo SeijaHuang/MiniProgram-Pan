@@ -59,8 +59,6 @@ export interface IVerdictWaitingData {
     titleAnimation: WechatMiniprogram.AnimationExportResult | null;
     /** 大老爷浮动动画 */
     duckFloatAnimation: WechatMiniprogram.AnimationExportResult | null;
-    /** 大老爷摇摆动画 */
-    duckWobbleAnimation: WechatMiniprogram.AnimationExportResult | null;
     /** 左侧狗 */
     dogLeftAnimation: WechatMiniprogram.AnimationExportResult | null;
     /** 右侧狗 */

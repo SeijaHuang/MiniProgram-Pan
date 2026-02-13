@@ -1,18 +1,12 @@
 // pages/welcome/index.ts
-
-type AnimationResult = WechatMiniprogram.AnimationExportResult;
-
 interface WelcomePageData {
     // 入场动画状态
     titleAnimation: AnimationResult;
-    avatarAnimation: AnimationResult;
     taglineAnimation: AnimationResult;
     ctaAnimation: AnimationResult;
     footerAnimation: AnimationResult;
     // 控制初始隐藏状态
     isEntranceReady: boolean;
-    // 头像入场完成后移除 --initial 类
-    avatarEntranceComplete: boolean;
 }
 
 // 动画时序配置（毫秒）
@@ -20,9 +14,6 @@ const TIMING = {
     // 阶段 1：主标题
     TITLE_DELAY: 100,
     TITLE_DURATION: 1000,
-    // 阶段 2：头像
-    AVATAR_DELAY: 400,
-    AVATAR_DURATION: 600,
     // 阶段 3：副标题 + slogan
     TAGLINE_DELAY: 900,
     TAGLINE_DURATION: 500,
@@ -32,23 +23,17 @@ const TIMING = {
     // 阶段 5：底部导航
     FOOTER_DELAY: 1600,
     FOOTER_DURATION: 400,
-    // 呼吸动画开始时间（头像入场完成后）
-    BREATHING_START: 1200,
 } as const;
 
 Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
     data: {
         titleAnimation: {} as AnimationResult,
-        avatarAnimation: {} as AnimationResult,
         taglineAnimation: {} as AnimationResult,
         ctaAnimation: {} as AnimationResult,
         footerAnimation: {} as AnimationResult,
         isEntranceReady: false,
-        avatarEntranceComplete: false,
     },
 
-    breathingTimer: null as number | null,
-    isScaledUp: false,
     hasPlayedEntrance: false,
 
     onLoad(): void {
@@ -57,21 +42,6 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
             this.hasPlayedEntrance = true;
             this.playEntranceAnimation();
         }
-    },
-
-    onShow(): void {
-        // 如果入场动画已完成，恢复呼吸动画
-        if (this.avatarEntranceComplete && !this.breathingTimer) {
-            this.startBreathingAnimation();
-        }
-    },
-
-    onHide(): void {
-        this.stopBreathingAnimation();
-    },
-
-    onUnload(): void {
-        this.stopBreathingAnimation();
     },
 
     /**
@@ -87,10 +57,7 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
             this.animateTitle();
         }, TIMING.TITLE_DELAY);
 
-        // 阶段 2：头像入场（缩放 + 淡入）
-        setTimeout(() => {
-            this.animateAvatar();
-        }, TIMING.AVATAR_DELAY);
+        // 阶段 2：头像入场由 avatar 组件自行处理
 
         // 阶段 3：副标题 + slogan 入场（上滑 + 淡入）
         setTimeout(() => {
@@ -106,11 +73,6 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
         setTimeout(() => {
             this.animateFooter();
         }, TIMING.FOOTER_DELAY);
-
-        // 入场完成后开启呼吸动画
-        setTimeout(() => {
-            this.startBreathingAnimation();
-        }, TIMING.BREATHING_START);
     },
 
     /**
@@ -133,23 +95,6 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
         animation.scale(1, 1).step({ duration: TIMING.TITLE_DURATION * 0.3 });
 
         this.setData({ titleAnimation: animation.export() });
-    },
-
-    /**
-     * 阶段 2：头像动画
-     * 效果：从 scale(0.6) + opacity(0) 平滑过渡到正常
-     */
-    animateAvatar(): void {
-        const animation = wx.createAnimation({
-            duration: TIMING.AVATAR_DURATION,
-            timingFunction: 'ease-out',
-        });
-
-        animation.scale(1, 1).opacity(1).step();
-
-        this.setData({ avatarAnimation: animation.export() }, () => {
-            this.setData({ avatarEntranceComplete: true });
-        });
     },
 
     /**
@@ -201,42 +146,6 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
         animation.opacity(1).step();
 
         this.setData({ footerAnimation: animation.export() });
-    },
-
-    /**
-     * 呼吸动画：头像放大缩小
-     * 在入场动画完成后持续播放
-     */
-    startBreathingAnimation(): void {
-        // 从当前状态（scale 1.0）开始，先放大到 1.05
-        this.isScaledUp = true;
-        this.animateBreathing(1.3);
-
-        // 每 1500ms 切换一次缩放状态
-        this.breathingTimer = setInterval(() => {
-            this.isScaledUp = !this.isScaledUp;
-            const targetScale = this.isScaledUp ? 1.3 : 1.0;
-            this.animateBreathing(targetScale);
-        }, 1500);
-    },
-
-    stopBreathingAnimation(): void {
-        if (this.breathingTimer !== null) {
-            clearInterval(this.breathingTimer as number);
-            this.breathingTimer = null;
-        }
-    },
-
-    animateBreathing(scale: number): void {
-        const animation = wx.createAnimation({
-            duration: 1500,
-            timingFunction: 'ease-in-out',
-        });
-
-        animation.scale(scale, scale).step();
-        this.setData({
-            avatarAnimation: animation.export(),
-        });
     },
 
     handleStartJudge(): void {
