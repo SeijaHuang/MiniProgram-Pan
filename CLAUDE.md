@@ -67,22 +67,25 @@ npx tsc --noEmit       # Type check without emitting
 
 Uses subpackage loading for optimized bundle sizes:
 
-| Package  | Root              | Pages                        | Purpose                                  |
-| -------- | ----------------- | ---------------------------- | ---------------------------------------- |
-| Main     | `pages/`          | welcome/                     | Entry page (always loaded)               |
-| packageA | `packageA/pages/` | waiting-room/, drum-room/    | Room creation and game                   |
-| packageB | `packageB/pages/` | chat-room/, verdict-waiting/ | Voice chat with ASR + AI verdict loading |
+| Package  | Root              | Pages                                  | Purpose                                         |
+| -------- | ----------------- | -------------------------------------- | ----------------------------------------------- |
+| Main     | `pages/`          | welcome/                               | Entry page (always loaded)                      |
+| packageA | `packageA/pages/` | waiting-room/, drum-room/              | Room creation and game                          |
+| packageB | `packageB/pages/` | chat-room/, verdict-waiting/, verdict/ | Voice chat, ASR, AI verdict loading and results |
 
 ### Frontend Components (miniprogram/components/)
 
 Reusable components registered via page `index.json` `usingComponents`:
 
-| Component       | Path                        | Purpose                                                    |
-| --------------- | --------------------------- | ---------------------------------------------------------- |
-| `styled-button` | `components/styled-button/` | Themed button with shine effect and color variants         |
-| `styled-title`  | `components/styled-title/`  | Animated title with entrance animation                     |
-| `countdown`     | `components/countdown/`     | Countdown timer display                                    |
-| `avatar`        | `components/avatar/`        | Circular avatar with badge, entrance animation + breathing |
+| Component          | Path                           | Purpose                                                    |
+| ------------------ | ------------------------------ | ---------------------------------------------------------- |
+| `styled-button`    | `components/styled-button/`    | Themed button with shine effect and color variants         |
+| `styled-title`     | `components/styled-title/`     | Animated title with entrance animation                     |
+| `countdown`        | `components/countdown/`        | Countdown timer display                                    |
+| `avatar`           | `components/avatar/`           | Circular avatar with badge, entrance animation + breathing |
+| `radar-chart`      | `components/radar-chart/`      | Six-dimension radar chart (Canvas 2D) for battle stats     |
+| `secret-modal`     | `components/secret-modal/`     | Bottom-sheet modal for player's secret report              |
+| `post-game-effect` | `components/post-game-effect/` | Full-screen overlay for post-game interaction effects      |
 
 **Avatar component properties**: `src` (image URL), `badge` (emoji, default '👑'), `size` (rpx, default 220), `playEntrance` (boolean), `entranceDelay` (ms), `breathing` (boolean). Uses `wx.createAnimation()` for entrance (scale + fade-in) and breathing (periodic scale oscillation).
 
@@ -90,15 +93,17 @@ Reusable components registered via page `index.json` `usingComponents`:
 
 All services are classes exported as singleton instances:
 
-| Service                  | Export        | Purpose                                     |
-| ------------------------ | ------------- | ------------------------------------------- |
-| `websocket-manager`      | `wsManager`   | WebSocket connection lifecycle (shared bus) |
-| `room-service`           | `roomService` | Room creation via HTTP API                  |
-| `room-websocket-service` | (see file)    | Room join/leave via WebSocket               |
-| `drum-service`           | `drumService` | Drum game message sending/receiving         |
-| `chat-service`           | (see file)    | Chat message handling                       |
-| `asr-service`            | `asrService`  | ASR text sync via WebSocket (throttled)     |
-| `sts-service`            | (see file)    | Tencent Cloud STS token fetching            |
+| Service                  | Export                 | Purpose                                          |
+| ------------------------ | ---------------------- | ------------------------------------------------ |
+| `websocket-manager`      | `wsManager`            | WebSocket connection lifecycle (shared bus)      |
+| `room-service`           | `roomService`          | Room creation via HTTP API                       |
+| `room-websocket-service` | `roomWebSocketService` | Room join/leave via WebSocket                    |
+| `drum-service`           | `drumService`          | Drum game message sending/receiving              |
+| `chat-service`           | `chatService`          | Chat message handling                            |
+| `asr-service`            | `asrService`           | ASR text sync via WebSocket (throttled)          |
+| `sts-service`            | `stsService`           | Tencent Cloud STS token fetching                 |
+| `verdict-service`        | `verdictService`       | Verdict result fetching and caching              |
+| `post-game-service`      | `postGameService`      | Post-game interactions (effects, leave together) |
 
 ### Dual Type System for WebSocket Messages
 
@@ -224,26 +229,30 @@ Husky + lint-staged runs ESLint + Prettier on `.ts`, `.js`, `.json`, `.md`. Comm
 
 **Client → Server**:
 
-| Type            | Description                                                         |
-| --------------- | ------------------------------------------------------------------- |
-| `JOIN_ROOM`     | Join a room via room code                                           |
-| `DRUM_TAP`      | Record drum tap during game                                         |
-| `CHAT_SEND`     | Send a chat message                                                 |
-| `ASR_TEXT_PUSH` | Push ASR transcription text (throttled partials + immediate finals) |
+| Type               | Description                                                         |
+| ------------------ | ------------------------------------------------------------------- |
+| `JOIN_ROOM`        | Join a room via room code                                           |
+| `DRUM_TAP`         | Record drum tap during game                                         |
+| `CHAT_SEND`        | Send a chat message                                                 |
+| `ASR_TEXT_PUSH`    | Push ASR transcription text (throttled partials + immediate finals) |
+| `POST_GAME_EFFECT` | Send post-game effect (execute punishment / beg for mercy)          |
+| `LEAVE_TOGETHER`   | Request mutual leave from verdict page                              |
 
 **Server → Client**:
 
-| Type           | Description                                               |
-| -------------- | --------------------------------------------------------- |
-| `JOIN_ACK`     | Confirm room join (broadcast)                             |
-| `DRUM_READY`   | Both players ready for drum game                          |
-| `DRUM_START`   | Drum game starts (includes `startAtMs` timing)            |
-| `DRUM_TAP`     | Tap count update (forwarded to opponent)                  |
-| `DRUM_FINISH`  | Drum game ends                                            |
-| `DRUM_RESULT`  | Final game results (scores + winner)                      |
-| `CHAT_RECEIVE` | Receive chat message (broadcast)                          |
-| `ASR_TEXT`     | ASR transcription result (broadcast to other participant) |
-| `ERROR`        | Error notification                                        |
+| Type                 | Description                                               |
+| -------------------- | --------------------------------------------------------- |
+| `JOIN_ACK`           | Confirm room join (broadcast)                             |
+| `DRUM_READY`         | Both players ready for drum game                          |
+| `DRUM_START`         | Drum game starts (includes `startAtMs` timing)            |
+| `DRUM_TAP`           | Tap count update (forwarded to opponent)                  |
+| `DRUM_FINISH`        | Drum game ends                                            |
+| `DRUM_RESULT`        | Final game results (scores + winner)                      |
+| `CHAT_RECEIVE`       | Receive chat message (broadcast)                          |
+| `ASR_TEXT`           | ASR transcription result (broadcast to other participant) |
+| `POST_GAME_EFFECT`   | Post-game effect broadcast (stamp/emoji)                  |
+| `LEAVE_TOGETHER_ACK` | Acknowledge mutual leave (with `allReady` flag)           |
+| `ERROR`              | Error notification                                        |
 
 ### Room Flow
 

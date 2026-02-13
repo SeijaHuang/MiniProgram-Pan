@@ -1,5 +1,5 @@
 {
-    "pages": ["pages/verdict/index", "pages/welcome/index"],
+    "pages": ["pages/welcome/index"],
     "window": {
         "navigationBarTextStyle": "black",
         "navigationBarTitleText": "Weixin",
@@ -23,7 +23,11 @@
         {
             "name": "packageB",
             "root": "packageB",
-            "pages": ["pages/chat-room/index", "pages/verdict-waiting/index"]
+            "pages": [
+                "pages/chat-room/index",
+                "pages/verdict-waiting/index",
+                "pages/verdict/index"
+            ]
         }
     ]
 }

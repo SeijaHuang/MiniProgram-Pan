@@ -66,6 +66,10 @@ Component({
 
     data: {
         canvasHeight: 560 as number,
+        _canvas: null as WechatMiniprogram.Canvas | null,
+        _ctx: null as ICanvas2DContext | null,
+        _animTimer: null as number | null,
+        _animFrame: 0 as number,
     },
 
     lifetimes: {
@@ -77,17 +81,12 @@ Component({
         },
 
         detached(): void {
-            if (this._animTimer !== null) {
-                clearTimeout(this._animTimer);
-                this._animTimer = null;
+            if (this.data._animTimer !== null) {
+                clearTimeout(this.data._animTimer);
+                this.data._animTimer = null;
             }
         },
     },
-
-    _canvas: null as WechatMiniprogram.Canvas | null,
-    _ctx: null as ICanvas2DContext | null,
-    _animTimer: null as number | null,
-    _animFrame: 0 as number,
 
     methods: {
         /**
@@ -110,13 +109,13 @@ Component({
                         '2d'
                     ) as ICanvas2DContext;
 
-                    const dpr: number = wx.getWindowInfo().pixelRatio;
+                    const dpr: number = wx.getSystemInfoSync().pixelRatio;
                     canvas.width = result.width * dpr;
                     canvas.height = result.height * dpr;
                     ctx.scale(dpr, dpr);
 
-                    this._canvas = canvas;
-                    this._ctx = ctx;
+                    this.data._canvas = canvas;
+                    this.data._ctx = ctx;
 
                     this.startExpandAnimation(result.width, result.height);
                 })
@@ -127,12 +126,12 @@ Component({
          * Start expand animation (radius 0 → target)
          */
         startExpandAnimation(width: number, height: number): void {
-            this._animFrame = 0;
+            this.data._animFrame = 0;
 
             const animate = (): void => {
-                this._animFrame++;
+                this.data._animFrame++;
                 const progress: number = Math.min(
-                    this._animFrame / ANIM_FRAMES,
+                    this.data._animFrame / ANIM_FRAMES,
                     1
                 );
                 // Ease-out cubic
@@ -141,7 +140,7 @@ Component({
                 this.drawFrame(width, height, eased);
 
                 if (progress < 1) {
-                    this._animTimer = setTimeout(
+                    this.data._animTimer = setTimeout(
                         animate,
                         ANIM_DURATION / ANIM_FRAMES
                     ) as unknown as number;
@@ -155,7 +154,7 @@ Component({
          * Draw a single frame of the radar chart
          */
         drawFrame(width: number, height: number, progress: number): void {
-            const ctx: ICanvas2DContext | null = this._ctx;
+            const ctx: ICanvas2DContext | null = this.data._ctx;
             if (!ctx) return;
 
             const centerX: number = width / 2;

@@ -10,6 +10,10 @@
 - **Room WebSocket Service**（`room-websocket-service.ts`）: 加入房间与 JOIN_ACK
 - **Chat Service**（`chat-service.ts`）: 文本消息发送与 CHAT_RECEIVE
 - **Drum Service**（`drum-service.ts`）: 鼓点消息发送与对抗结果
+- **ASR Service**（`asr-service.ts`）: ASR 语音识别文本同步
+- **STS Service**（`sts-service.ts`）: 腾讯云 STS 临时凭证获取
+- **Verdict Service**（`verdict-service.ts`）: AI 判决结果获取与缓存
+- **Post Game Service**（`post-game-service.ts`）: 赛后互动（特效、共同退堂）
 
 ## WebSocket Manager
 
@@ -136,6 +140,75 @@ interface IDrumServiceOptions {
 当 handlers 未就绪时（页面跳转期间），`DRUM_READY` 和 `DRUM_START` 消息会被队列，
 并记录原始接收时间 `receivedAtMs`。`initialize()` 调用后会处理队列消息，
 使用原始接收时间进行时间同步，避免队列延迟影响偏移计算。
+
+## ASR Service
+
+**文件**: `miniprogram/services/asr-service.ts`
+
+**职责**:
+
+- 通过 WebSocket 推送 ASR 语音识别文本
+- 节流发送 partial 结果，立即发送 final 结果
+- 去重机制防止重复发送相同文本
+
+**核心方法**:
+
+- `initialize(options)`: 注册回调并开始监听
+- `pushText(text, isFinal)`: 推送 ASR 识别文本
+- `cleanup()`: 清理计时器与回调
+
+## STS Service
+
+**文件**: `miniprogram/services/sts-service.ts`
+
+**职责**:
+
+- 获取腾讯云 STS 临时凭证用于客户端 ASR
+- 凭证缓存与自动过期处理
+
+**核心方法**:
+
+- `getCredentials(): Promise<ISTSCredentials>`: 获取 STS 凭证（优先缓存）
+
+## Verdict Service
+
+**文件**: `miniprogram/services/verdict-service.ts`
+
+**职责**:
+
+- 通过 HTTP 请求 AI 判决结果
+- 缓存判决结果供页面使用
+- 管理判决结果生命周期
+
+**核心方法**:
+
+- `fetchVerdict(roomId): Promise<IVerdictResult>`: 请求 AI 判决
+- `getResult(): IVerdictResult | null`: 获取缓存的判决结果
+- `clear()`: 清除缓存
+
+## Post Game Service
+
+**文件**: `miniprogram/services/post-game-service.ts`
+
+**职责**:
+
+- 赛后互动消息收发（执行惩戒/跪地求饶）
+- 共同退堂请求与确认
+- WebSocket 消息监听与分发
+
+**核心方法**:
+
+- `initialize()`: 注册 WebSocket 消息回调
+- `sendAction(roomId, action, remaining)`: 发送赛后互动动作
+- `sendLeaveTogether(roomId)`: 发送共同退堂请求
+- `onEffect(callback)`: 注册特效接收回调
+- `onLeaveAck(callback)`: 注册退堂确认回调
+- `destroy()`: 清理回调
+
+**消息类型**:
+
+- 发送: `POST_GAME_EFFECT`, `LEAVE_TOGETHER`
+- 接收: `POST_GAME_EFFECT`, `LEAVE_TOGETHER_ACK`
 
 ## 使用约定与注意事项
 

@@ -3,16 +3,16 @@
  * 判决书页面 — 展示 AI 判决结果 + 赛后互动
  */
 
-import { postGameService } from '../../services/post-game-service';
-import { verdictService } from '../../services/verdict-service';
+import { postGameService } from '../../../services/post-game-service';
+import { verdictService } from '../../../services/verdict-service';
 import type {
     IVerdictResult,
     IDimensionScores,
     ISecretReport,
     IPostGameEffectPayload,
     ILeaveTogetherAckPayload,
-} from '../../types/verdict';
-import { DIMENSION_LABELS, DIMENSION_KEYS } from '../../types/verdict';
+} from '../../../types/verdict';
+import { DIMENSION_LABELS, DIMENSION_KEYS } from '../../../types/verdict';
 
 type AnimResult = WechatMiniprogram.AnimationExportResult;
 
