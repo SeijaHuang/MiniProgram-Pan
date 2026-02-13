@@ -1,5 +1,7 @@
 {
     "navigationStyle": "custom",
     "disableScroll": true,
-    "usingComponents": {}
+    "usingComponents": {
+        "styled-button": "../../components/styled-button/index"
+    }
 }

@@ -111,23 +111,23 @@
                 可能在处理银河系其他情侣的案件...
             </text>
 
-            <view
-                class="timeout__btn timeout__btn--primary"
-                bindtap="onTapRetry"
-            >
-                <text class="timeout__btn-text">
-                    🔄 重新发起审判
-                </text>
-            </view>
-            <view
-                class="timeout__btn timeout__btn--secondary"
-                bindtap="onTapHome"
-            >
-                <text
-                    class="timeout__btn-text timeout__btn-text--light"
-                >
-                    🏠 返回首页
-                </text>
+            <view class="timeout__actions">
+                <view class="timeout__btn-wrap">
+                    <styled-button
+                        text="重新发起审判"
+                        color="yellow"
+                        showShine="{{ false }}"
+                        bind:tap="onTapRetry"
+                    />
+                </view>
+                <view class="timeout__btn-wrap">
+                    <styled-button
+                        text="返回首页"
+                        color="grey"
+                        showShine="{{ false }}"
+                        bind:tap="onTapHome"
+                    />
+                </view>
             </view>
         </view>
     </view>
