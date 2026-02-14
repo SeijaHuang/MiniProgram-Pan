@@ -19,12 +19,14 @@ docs/
 │       ├── 04-connection-lifecycle.md   # 连接生命周期
 │       ├── 05-error-handling.md         # 错误处理
 │       ├── 06-drum-game.md              # 震天鼓游戏
-│       └── 07-asr-real-time-speech.md   # ASR 实时语音识别
+│       ├── 07-asr-real-time-speech.md   # ASR 实时语音识别
+│       └── 08-tencent-sts-token.md      # 腾讯云 STS 凭证
 └── miniprogram/                # 小程序前端文档
     ├── welcome.md              # 欢迎页
     ├── waiting-room.md         # 等待页
     ├── drum-room.md            # 震天鼓抢麦页
     ├── chat-room.md            # 对簿公堂页
+    ├── verdict.md              # 判决书页（AI 判决结果）
     ├── components.md           # 组件文档
     └── services.md             # 服务层说明
 ```
@@ -88,6 +90,22 @@ docs/
     - 状态流转管理（waiting → speaker_turn → listener_turn → completed）
     - WebSocket 实时状态同步
 
+#### Verdict（清汤大老爷判决书）
+
+- **文件**: `miniprogram/verdict.md`
+- **页面路径**: `packageB/pages/verdict/index`
+- **功能**: AI 判决结果可视化核心产出页面，以长滚动卡片形式展示判决结果各维度
+- **核心特性**:
+    - 标题区（红色背景 + 鸭子图标 + 案件编号）
+    - 责任分布（三列布局：双方百分比 + 第三方因素）
+    - 六维战力雷达图（Canvas 2D 绘制）
+    - 大老爷赠言（打字机效果）
+    - 惩罚令牌（盖章动画 + 震动反馈）
+    - 密折弹窗（半屏弹窗，仅显示当前用户私密反馈）
+    - 保存判决书图片（离屏 Canvas 生成 + 保存到相册）
+    - 赛后互动（赢家惩戒 / 输家求饶 / 平局退堂，WebSocket 双向通信）
+    - 完整入场动画序列（3.5s 依次展开）
+
 ### 组件文档
 
 - **文件**: `miniprogram/components.md`
@@ -106,6 +124,18 @@ docs/
         - 统一的大号粗体白色文字风格
         - 黑色描边和投影效果
         - 支持动画绑定和初始状态控制
+    - **Avatar** (`avatar`) - 圆形头像组件
+        - 入场动画 + 呼吸动画
+        - 徽标 badge 支持
+    - **Radar Chart** (`radar-chart`) - 六维战力雷达图
+        - Canvas 2D 绘制
+        - 展开动画
+    - **Secret Modal** (`secret-modal`) - 密折弹窗组件
+        - 底部弹出半屏面板
+        - 封号 + 锦囊妙计展示
+    - **Post Game Effect** (`post-game-effect`) - 赛后互动特效组件
+        - 全屏覆盖层
+        - 惩戒 / 求饶动画效果
 
 ### 服务文档
 
@@ -117,6 +147,10 @@ docs/
     - **Room WebSocket Service** (`room-websocket-service.ts`) - WebSocket 加入房间与 JOIN_ACK
     - **Chat Service** (`chat-service.ts`) - 文本消息发送与 CHAT_RECEIVE
     - **Drum Service** (`drum-service.ts`) - 抢麦点击与对抗结果消息
+    - **ASR Service** (`asr-service.ts`) - ASR 语音识别文本同步
+    - **STS Service** (`sts-service.ts`) - 腾讯云 STS 临时凭证
+    - **Verdict Service** (`verdict-service.ts`) - AI 判决结果获取与缓存
+    - **Post Game Service** (`post-game-service.ts`) - 赛后互动（特效、共同退堂）
 
 ---
 

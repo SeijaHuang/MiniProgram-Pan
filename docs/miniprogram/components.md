@@ -241,6 +241,129 @@ Page({
 
 ---
 
+### 4. Avatar（头像组件）
+
+- **文件路径**: `miniprogram/components/avatar/`
+- **组件名称**: `avatar`
+- **功能**: 圆形头像组件，支持入场动画、呼吸动画和徽标
+
+#### 属性（Properties）
+
+| 属性名          | 类型    | 默认值 | 必填 | 说明             |
+| --------------- | ------- | ------ | ---- | ---------------- |
+| `src`           | String  | ''     | 否   | 头像图片 URL     |
+| `badge`         | String  | '👑'   | 否   | 徽标 emoji       |
+| `size`          | Number  | 220    | 否   | 头像直径（rpx）  |
+| `playEntrance`  | Boolean | false  | 否   | 是否触发入场动画 |
+| `entranceDelay` | Number  | 0      | 否   | 入场延迟（ms）   |
+| `breathing`     | Boolean | true   | 否   | 是否启用呼吸动画 |
+
+#### 动画效果
+
+- **入场动画**: `wx.createAnimation()` 实现 scale + fade-in（600ms）
+- **呼吸动画**: 周期性 scale 缩放（1.0 ↔ 1.3，间隔 1500ms）
+
+---
+
+### 5. Radar Chart（六维战力雷达图）
+
+- **文件路径**: `miniprogram/components/radar-chart/`
+- **组件名称**: `radar-chart`
+- **功能**: 基于 Canvas 2D 绘制的六维战力雷达图，用于判决书页面展示双方对战数据
+
+#### 属性（Properties）
+
+| 属性名        | 类型   | 默认值 | 必填 | 说明                                |
+| ------------- | ------ | ------ | ---- | ----------------------------------- |
+| `hostScores`  | Object | {}     | 否   | 玩家1的六维分数（IDimensionScores） |
+| `guestScores` | Object | {}     | 否   | 玩家2的六维分数（IDimensionScores） |
+| `size`        | Number | 500    | 否   | 图表尺寸（rpx）                     |
+
+#### 方法（Methods）
+
+| 方法名 | 说明                     | 参数 | 返回值 |
+| ------ | ------------------------ | ---- | ------ |
+| `draw` | 绘制雷达图（含展开动画） | -    | -      |
+
+#### 六维指标
+
+嘴硬程度、翻旧账、逻辑滑坡、撒娇暴击、求生欲、受害者演技
+
+#### 使用示例
+
+```xml
+<radar-chart
+    id="radarChart"
+    hostScores="{{ verdict.battleStats.host }}"
+    guestScores="{{ verdict.battleStats.guest }}"
+    size="{{ 500 }}"
+></radar-chart>
+```
+
+```typescript
+// 页面 onReady 后调用
+const radarChart = this.selectComponent('#radarChart');
+if (radarChart) {
+    (radarChart as Record<string, () => void>).draw();
+}
+```
+
+---
+
+### 6. Secret Modal（密折弹窗）
+
+- **文件路径**: `miniprogram/components/secret-modal/`
+- **组件名称**: `secret-modal`
+- **功能**: 底部弹出半屏面板，显示当前玩家的私密反馈（封号 + 锦囊妙计）
+
+#### 属性（Properties）
+
+| 属性名         | 类型    | 默认值 | 必填 | 说明         |
+| -------------- | ------- | ------ | ---- | ------------ |
+| `visible`      | Boolean | false  | 否   | 是否显示弹窗 |
+| `title`        | String  | ''     | 否   | 封号名称     |
+| `advice`       | String  | ''     | 否   | 锦囊妙计文案 |
+| `topDimension` | String  | ''     | 否   | 最高维度名称 |
+| `topScore`     | Number  | 0      | 否   | 最高维度分数 |
+
+#### 事件（Events）
+
+| 事件名  | 说明         | 回调参数 |
+| ------- | ------------ | -------- |
+| `close` | 关闭弹窗事件 | -        |
+
+#### 动画效果
+
+- 从底部滑入/滑出（`wx.createAnimation()`，400ms）
+- 点击遮罩层或关闭按钮触发关闭
+
+---
+
+### 7. Post Game Effect（赛后互动特效）
+
+- **文件路径**: `miniprogram/components/post-game-effect/`
+- **组件名称**: `post-game-effect`
+- **功能**: 全屏覆盖层特效组件，用于赛后互动的视觉反馈
+
+#### 属性（Properties）
+
+| 属性名   | 类型   | 默认值 | 必填 | 说明                                       |
+| -------- | ------ | ------ | ---- | ------------------------------------------ |
+| `effect` | String | ''     | 否   | 特效类型：`'stamp_death'` 或 `'beg_emoji'` |
+
+#### 特效类型
+
+- **`stamp_death`**（执行惩戒）: 「卒」字从大缩小 + 淡入 + 长震动
+- **`beg_emoji`**（跪地求饶）: emoji 从下方浮入 + 淡入 + 短震动
+
+#### 动画效果
+
+- 所有动画使用 `wx.createAnimation()` 实现
+- 特效持续 2000ms 后自动消失
+- 配合 `wx.vibrateLong()` / `wx.vibrateShort()` 震动反馈
+
+---
+
 ## 组件开发规范
 
 ### 文件结构
@@ -297,10 +420,15 @@ Component({
     - `miniprogram/components/styled-button/` - 样式化按钮
     - `miniprogram/components/countdown/` - 倒计时组件
     - `miniprogram/components/styled-title/` - 样式化标题
+    - `miniprogram/components/avatar/` - 头像组件
+    - `miniprogram/components/radar-chart/` - 六维战力雷达图
+    - `miniprogram/components/secret-modal/` - 密折弹窗
+    - `miniprogram/components/post-game-effect/` - 赛后互动特效
 - **使用示例**：
     - `miniprogram/pages/welcome/index.wxml` - 使用 styled-button、styled-title
-    - `miniprogram/pages/waiting-room/index.wxml` - 使用 styled-button、countdown
-    - `miniprogram/pages/drum-room/index.wxml` - 使用 countdown
+    - `miniprogram/packageA/pages/waiting-room/index.wxml` - 使用 styled-button、countdown、avatar
+    - `miniprogram/packageA/pages/drum-room/index.wxml` - 使用 countdown
+    - `miniprogram/packageB/pages/verdict/index.wxml` - 使用 styled-button、radar-chart、secret-modal、post-game-effect
 - **开发规范**：
     - `../../CLAUDE.md` - 项目开发规范
     - `../../README.md` - 项目主文档

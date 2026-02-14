@@ -1,0 +1,25 @@
+<!--components/radar-chart/index.wxml-->
+<view class="radar-chart">
+    <canvas
+        type="2d"
+        id="radarCanvas"
+        class="radar-chart__canvas"
+        style="width: {{ size }}rpx; height: {{ canvasHeight }}rpx;"
+    ></canvas>
+    <view class="radar-chart__legend">
+        <view class="radar-chart__legend-item">
+            <view
+                class="radar-chart__legend-color"
+                style="background-color: #666666;"
+            ></view>
+            <text class="radar-chart__legend-text">玩家1</text>
+        </view>
+        <view class="radar-chart__legend-item">
+            <view
+                class="radar-chart__legend-color"
+                style="background-color: #D4380D;"
+            ></view>
+            <text class="radar-chart__legend-text">玩家2</text>
+        </view>
+    </view>
+</view>

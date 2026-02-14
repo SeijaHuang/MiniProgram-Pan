@@ -1,0 +1,12 @@
+{
+    "usingComponents": {
+        "avatar": "../../../components/avatar/index",
+        "styled-button": "../../../components/styled-button/index",
+        "radar-chart": "../../../components/radar-chart/index",
+        "secret-modal": "../../../components/secret-modal/index",
+        "post-game-effect": "../../../components/post-game-effect/index"
+    },
+    "navigationBarTitleText": "判决书",
+    "navigationBarBackgroundColor": "#D4380D",
+    "navigationBarTextStyle": "white"
+}

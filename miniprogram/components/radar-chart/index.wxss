@@ -1,0 +1,38 @@
+/* components/radar-chart/index.wxss */
+
+.radar-chart {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 1;
+}
+
+.radar-chart__canvas {
+    display: block;
+}
+
+.radar-chart__legend {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 48rpx;
+    margin-top: 16rpx;
+}
+
+.radar-chart__legend-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12rpx;
+}
+
+.radar-chart__legend-color {
+    width: 24rpx;
+    height: 24rpx;
+    border-radius: 4rpx;
+}
+
+.radar-chart__legend-text {
+    font-size: 24rpx;
+    color: #666666;
+}
