@@ -7,6 +7,7 @@ import { stsService } from '../../../services/sts-service';
 import { wsManager } from '../../../services/websocket-manager';
 import type { IEmojiReceiveData } from '../../../types/emoji-websocket';
 import type { ISTSCredentials } from '../../../types/sts-api';
+import type { IChatCompletePayload } from '../../../types/verdict-ws';
 import { EWSMessageType, EPlayerRole } from '../../../types/websocket-common';
 
 // 引入腾讯云语音识别插件
@@ -83,10 +84,14 @@ interface IChatRoomPageData {
 
     // 麦克风权限状态
     hasMicPermission: boolean; // 是否已获得麦克风权限
+
+    // 完成状态（收到 CHAT_COMPLETE 后的过渡）
+    isCompleted: boolean;
 }
 
 interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     timerId: number | null;
+    completedTimerId: number | null;
     reactionIdCounter: number;
     myReactionTimeouts: number[];
     opponentReactionTimeouts: number[];
@@ -169,9 +174,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 麦克风权限状态
         hasMicPermission: false,
+
+        // 完成状态
+        isCompleted: false,
     },
 
     timerId: null,
+    completedTimerId: null,
     reactionIdCounter: 0,
     myReactionTimeouts: [],
     opponentReactionTimeouts: [],
@@ -264,6 +273,12 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         if (this.timerId) {
             clearInterval(this.timerId);
             this.timerId = null;
+        }
+
+        // 清理过渡跳转定时器
+        if (this.completedTimerId) {
+            clearTimeout(this.completedTimerId);
+            this.completedTimerId = null;
         }
 
         // 停止语音识别
@@ -683,11 +698,16 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 切换阶段
      */
     switchPhase(): void {
-        const { phase, localRole, totalPerTurn } = this.data;
+        const { phase, localRole, totalPerTurn, canSpeak } = this.data;
 
         // 强制停止语音识别
         if (this.asrManager && this.data.isRecording) {
             this.asrManager.stop();
+        }
+
+        // 发送 SPEECH_TURN_END（仅当本轮是我方发言时）
+        if (canSpeak) {
+            this.sendSpeechTurnEnd();
         }
 
         const nextPhase: EPhase = PHASE_TRANSITION[phase];
@@ -704,6 +724,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 canSpeak: false,
                 canReact: false,
                 remaining: 0,
+                isRecording: false,
                 // 清空 ASR 文本
                 speechTextLive: '',
                 speechTextFinal: '',
@@ -711,18 +732,16 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 opponentTextFinal: '',
                 hasStartedSpeaking: false,
             });
-            return;
-
-            // TODO: 跳转到分析页面
+            // 等待 CHAT_COMPLETE 消息触发跳转
         } else {
             // 切换到下一阶段
-            const canSpeak = this.computeCanSpeak(nextPhase, localRole);
-            const canReact = !canSpeak;
+            const nextCanSpeak = this.computeCanSpeak(nextPhase, localRole);
+            const canReact = !nextCanSpeak;
 
             this.setData({
                 phase: nextPhase,
                 remaining: totalPerTurn,
-                canSpeak,
+                canSpeak: nextCanSpeak,
                 canReact,
                 countdownClass: this.getCountdownClass(totalPerTurn),
                 isRecording: false,
@@ -737,6 +756,76 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             // 重置 ASR 服务序列号
             asrService.resetSequence();
         }
+    },
+
+    /**
+     * 发送 SPEECH_TURN_END 给服务器
+     * 当本方发言轮次结束时调用
+     */
+    sendSpeechTurnEnd(): void {
+        const roomId: string = this.data.roomCode;
+        const userId: string = wx.getStorageSync('userId') ?? '';
+
+        if (!roomId || !userId) {
+            console.warn(
+                '[ChatRoom] Cannot send SPEECH_TURN_END: missing roomId or userId'
+            );
+            return;
+        }
+
+        wsManager.send({
+            type: EWSMessageType.SpeechTurnEnd,
+            data: { roomId, userId },
+            timestamp: Date.now(),
+        });
+
+        console.log('[ChatRoom] Sent SPEECH_TURN_END');
+    },
+
+    /**
+     * 处理 CHAT_COMPLETE 消息
+     * 双方发言均已结束，显示过渡 UI 后跳转 verdict-waiting
+     */
+    handleChatComplete(_payload: IChatCompletePayload): void {
+        // 防止重复处理
+        if (this.data.isCompleted) {
+            return;
+        }
+
+        console.log('[ChatRoom] CHAT_COMPLETE received');
+
+        // 停止所有录音/识别
+        this.stopRecording();
+
+        // 清理定时器
+        if (this.timerId) {
+            clearInterval(this.timerId);
+            this.timerId = null;
+        }
+
+        // 更新为完成状态（显示过渡 UI）
+        this.setData({
+            phase: EPhase.Done,
+            isCompleted: true,
+            canSpeak: false,
+            canReact: false,
+            remaining: 0,
+            isRecording: false,
+        });
+
+        // 1.5s 后跳转到 verdict-waiting
+        this.completedTimerId = setTimeout(() => {
+            const roomId: string = this.data.roomCode;
+            const role: string =
+                this.data.localRole === EPlayerRole.Organizer
+                    ? 'host'
+                    : 'guest';
+            void wx.redirectTo({
+                url:
+                    `/packageB/pages/verdict-waiting/index` +
+                    `?roomId=${roomId}&role=${role}`,
+            });
+        }, 1500) as unknown as number;
     },
 
     /**
@@ -945,11 +1034,15 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         try {
             const message = JSON.parse(data) as {
                 type: EWSMessageType;
-                data: IEmojiReceiveData;
+                data: IChatCompletePayload | IEmojiReceiveData;
             };
 
-            if (message.type === EWSMessageType.EmojiReceive) {
-                this.handleEmojiReceive(message.data.emoji);
+            if (message.type === EWSMessageType.ChatComplete) {
+                this.handleChatComplete(message.data as IChatCompletePayload);
+            } else if (message.type === EWSMessageType.EmojiReceive) {
+                this.handleEmojiReceive(
+                    (message.data as IEmojiReceiveData).emoji
+                );
             }
         } catch (error) {
             console.error(

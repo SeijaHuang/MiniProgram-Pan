@@ -14,6 +14,23 @@
     overflow: hidden;
 }
 
+/* ==================== Completed Transition ==================== */
+
+.chat-room__completed {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    padding: 0 60rpx;
+}
+
+.chat-room__completed-text {
+    font-size: 36rpx;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    line-height: 1.8;
+}
+
 /* ==================== Top Section (Countdown + Stage) ==================== */
 
 .chat-room__top-section {

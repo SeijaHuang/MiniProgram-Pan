@@ -3,8 +3,15 @@
     Phase: SPEAKER_A -> SPEAKER_B -> DONE
 -->
 <view class="chat-room">
-    <!-- 顶部区域：倒计时 + 发言舞台 -->
-    <view class="chat-room__top-section">
+    <!-- 完成过渡 UI（收到 CHAT_COMPLETE 后显示） -->
+    <view class="chat-room__completed" wx:if="{{isCompleted}}">
+        <text class="chat-room__completed-text">
+            双方陈述完毕，大老爷正在审阅...
+        </text>
+    </view>
+
+    <!-- 顶部区域：倒计时 + 发言舞台（完成后隐藏） -->
+    <view class="chat-room__top-section" wx:if="{{!isCompleted}}">
         <!-- 倒计时区域 -->
         <view class="chat-room__countdown-area">
             <view class="chat-room__countdown chat-room__countdown--{{countdownClass}}">
@@ -91,8 +98,8 @@
         </view>
     </scroll-view>
 
-    <!-- 麦克风按钮 -->
-    <view class="chat-room__mic-area">
+    <!-- 麦克风按钮（完成后隐藏） -->
+    <view class="chat-room__mic-area" wx:if="{{!isCompleted}}">
         <view
             class="chat-room__mic {{canSpeak ? (isRecording ? 'chat-room__mic--recording' : 'chat-room__mic--active') : 'chat-room__mic--disabled'}}"
             bindtouchstart="onMicTouchStart"
@@ -106,8 +113,8 @@
         </text>
     </view>
 
-    <!-- 底部表情面板 -->
-    <view class="chat-room__emoji-panel {{canReact ? '' : 'chat-room__emoji-panel--disabled'}}">
+    <!-- 底部表情面板（完成后隐藏） -->
+    <view class="chat-room__emoji-panel {{canReact ? '' : 'chat-room__emoji-panel--disabled'}}" wx:if="{{!isCompleted}}">
         <view
             wx:for="{{emojiList}}"
             wx:key="*this"

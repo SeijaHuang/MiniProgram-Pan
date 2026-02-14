@@ -35,65 +35,6 @@ interface ICanvasNodeResult {
     node: WechatMiniprogram.Canvas | null;
 }
 
-/** Whether to use mock data for testing */
-const USE_MOCK: boolean = true;
-
-/** Mock verdict data for frontend testing */
-const MOCK_VERDICT: IVerdictResult = {
-    caseNumber: '20260213-001',
-    winnerId: 'host',
-    loserId: 'guest',
-    responsibility: {
-        host: 35,
-        guest: 55,
-        thirdParty: [
-            { reason: '水逆', percentage: 5, emoji: '🌙' },
-            { reason: '天气太热', percentage: 5, emoji: '☀️' },
-        ],
-    },
-    battleStats: {
-        host: {
-            mouthHard: 85,
-            oldAccountDigging: 60,
-            logicSlippery: 72,
-            charmAttack: 90,
-            survivalInstinct: 65,
-            victimActing: 45,
-        },
-        guest: {
-            mouthHard: 70,
-            oldAccountDigging: 88,
-            logicSlippery: 55,
-            charmAttack: 40,
-            survivalInstinct: 78,
-            victimActing: 92,
-        },
-    },
-    verdictSummary:
-        '经本大老爷审理，双方各有过错。' +
-        '玩家1虽嘴硬但撒娇暴击拉满，' +
-        '玩家2翻旧账技术了得但逻辑漏洞百出。' +
-        '望双方和好如初，下次吵架记得带本大老爷！',
-    punishmentTask: {
-        loserId: 'guest',
-        task: '请对方喝一杯奶茶',
-        deadline: '须在24小时内完成',
-    },
-    secretReports: {
-        host: {
-            title: '撒娇王者',
-            advice:
-                '你的撒娇暴击值高达90分！' + '建议适当收敛，否则对方迟早免疫。',
-        },
-        guest: {
-            title: '翻旧账大师',
-            advice:
-                '你的翻旧账能力高达88分！' +
-                '但逻辑滑坡严重，建议下次准备好证据链。',
-        },
-    },
-};
-
 /** Animation timing constants (ms) */
 const TIMING = {
     HEADER_DELAY: 0,
@@ -184,12 +125,6 @@ Page({
         this._roomId = options.roomId ?? '';
         const currentRole: 'host' | 'guest' =
             (options.role as 'host' | 'guest') ?? 'host';
-
-        // --- Mock mode: skip services, use hardcoded data ---
-        if (USE_MOCK) {
-            this.initWithVerdict(MOCK_VERDICT, currentRole);
-            return;
-        }
 
         // Try to get verdict from service cache or globalData
         let verdict: IVerdictResult | null = verdictService.getResult();
