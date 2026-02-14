@@ -263,9 +263,6 @@ enum EMessageType {
 | 类型 | 描述 | 状态 |
 |------|------|------|
 | `TEXT` | 文本消息 | ✅ 已实现 |
-| `IMAGE` | 图片消息 | ⏳ 未来 |
-| `AUDIO` | 语音消息 | ⏳ 未来 |
-| `EMOJI` | 表情消息 | ⏳ 未来 |
 
 ---
 
@@ -437,6 +434,254 @@ ASR 识别文本分为两种类型，通过 `isFinal` 字段区分。
     "isFinal": true
   },
   "timestamp": 1737849601100
+}
+```
+
+---
+
+### 震天鼓游戏状态
+
+震天鼓是双人实时竞技小游戏，通过 `DrumGameManager` 单例管理游戏状态。
+
+#### EGamePhase（游戏阶段）
+
+```typescript
+enum EGamePhase {
+  Waiting = 'WAITING',       // 等待游戏初始化
+  Countdown = 'COUNTDOWN',   // 3秒倒计时中
+  Running = 'RUNNING',       // 游戏进行中（10秒）
+  Finished = 'FINISHED'      // 游戏结束
+}
+```
+
+#### EPlayerRole（玩家角色）
+
+```typescript
+enum EPlayerRole {
+  Organizer = 'Organizer',   // 房主（创建者）
+  Joiner = 'Joiner'          // 加入者
+}
+```
+
+#### IDrumGameState（游戏状态）
+
+```typescript
+interface IDrumGameState {
+  roomId: string;
+  phase: EGamePhase;
+  organizerScore: number;     // 房主总点击数
+  joinerScore: number;        // 加入者总点击数
+  startAtMs?: number;         // 游戏开始时间戳
+  endAtMs?: number;           // 游戏结束时间戳
+}
+```
+
+#### IDrumGameResult（游戏结果）
+
+```typescript
+interface IDrumGameResult {
+  roomId: string;
+  organizerScore: number;
+  joinerScore: number;
+  winnerRole: EPlayerRole;    // 获胜者角色（平局时房主胜）
+}
+```
+
+#### 游戏状态流转
+
+```
+initGame(room) → WAITING
+   ↓ setPhase(COUNTDOWN)
+COUNTDOWN
+   ↓ setPhase(RUNNING) + setTiming(startAtMs, endAtMs)
+RUNNING → recordTap(roomId, role, delta) 记录点击
+   ↓ setPhase(FINISHED)
+FINISHED → calculateResult(roomId) 计算结果
+   ↓
+cleanupGame(roomId) 清理状态
+```
+
+---
+
+### 表情消息类型
+
+#### IEmojiSendMessage（发送表情）
+
+```typescript
+interface IEmojiSendMessage {
+  type: "EMOJI_SEND";
+  data: {
+    roomId: string;       // 房间ID
+    senderId: string;     // 发送者 userId
+    emoji: string;        // 表情内容
+  };
+  timestamp: number;
+}
+```
+
+#### IEmojiReceiveMessage（接收表情）
+
+```typescript
+interface IEmojiReceiveMessage {
+  type: "EMOJI_RECEIVE";
+  data: {
+    roomId: string;
+    senderId: string;
+    emoji: string;
+  };
+  timestamp: number;
+}
+```
+
+**关键行为**:
+- 仅转发给对方（`broadcastToRoomExcept`）
+- 发送者必须是房间参与者
+
+---
+
+### 震天鼓 WebSocket 消息类型
+
+#### IDrumReadyMessage
+
+游戏准备消息（Server → All），房间满员后 3 秒发送。
+
+```typescript
+interface IDrumReadyMessage {
+  type: "DRUM_READY";
+  data: {
+    roomId: string;
+    serverTimeMs: number;        // 服务器当前时间（同步基准）
+    hostRole: EPlayerRole;       // 房主角色
+    organizerName: string;       // 房主昵称（或默认 '小冤家'）
+    joinerName: string;          // 加入者昵称（或默认 '家冤小'）
+  };
+  timestamp: number;
+}
+```
+
+#### IDrumStartMessage
+
+游戏开始消息（Server → All），DRUM_READY 同时发送。
+
+```typescript
+interface IDrumStartMessage {
+  type: "DRUM_START";
+  data: {
+    roomId: string;
+    startAtMs: number;           // 游戏开始绝对时间戳
+  };
+  timestamp: number;
+}
+```
+
+#### IDrumTapMessage
+
+点击消息（Bidirectional）。
+
+```typescript
+// Client → Server
+interface IDrumTapMessage {
+  type: "DRUM_TAP";
+  data: {
+    roomId: string;
+    role: EPlayerRole;
+    delta: number;               // 本次批量点击数
+    clientTimeMs: number;        // 客户端时间戳
+  };
+  timestamp: number;
+}
+
+// Server → Opponent Only（转发给对方）
+// 格式相同
+```
+
+#### IDrumFinishMessage
+
+游戏结束消息（Server → All），游戏时间到时发送。
+
+```typescript
+interface IDrumFinishMessage {
+  type: "DRUM_FINISH";
+  data: {
+    roomId: string;
+    endAtMs: number;             // 游戏结束绝对时间戳
+  };
+  timestamp: number;
+}
+```
+
+#### IDrumResultMessage
+
+游戏结果消息（Server → All），DRUM_FINISH 后立即发送。
+
+```typescript
+interface IDrumResultMessage {
+  type: "DRUM_RESULT";
+  data: {
+    roomId: string;
+    organizerScore: number;
+    joinerScore: number;
+    winnerRole: EPlayerRole;     // 'Organizer' | 'Joiner'
+  };
+  timestamp: number;
+}
+```
+
+---
+
+### LLM 判决相关类型
+
+#### IJudgmentResponse（判决结果）
+
+LLM 生成的 AI 判决结果。
+
+```typescript
+interface IJudgmentResponse {
+  caseNumber: string;              // 案件编号，如 "NO.12345"
+  responsibility: {
+    player1: number;               // 0-100
+    player2: number;               // 0-100
+    thirdParty: {
+      factors: IThirdPartyFactor[];
+    };
+  };
+  radarChart: {
+    player1: IRadarScores;
+    player2: IRadarScores;
+  };
+  verdict: string;                 // 大老爷赠言（50-100 字符）
+}
+```
+
+#### IRadarScores（雷达图六维评分）
+
+```typescript
+interface IRadarScores {
+  嘴硬程度: number;    // 0-100
+  翻旧账: number;      // 0-100
+  逻辑滑坡: number;    // 0-100
+  撒娇暴击: number;    // 0-100
+  求生欲: number;      // 0-100
+  受害者演技: number;  // 0-100
+}
+```
+
+#### IThirdPartyFactor（第三方因素）
+
+```typescript
+interface IThirdPartyFactor {
+  name: string;        // 搞笑因素名称，如 "水星逆行"
+  percentage: number;  // 百分比
+}
+```
+
+#### ICreateJudgmentRequest（判决请求）
+
+```typescript
+interface ICreateJudgmentRequest {
+  player1Speech: string;           // 1-8000 字符
+  player2Speech: string;           // 1-8000 字符
+  idempotencyKey?: string;         // 可选，最长 128 字符
 }
 ```
 
@@ -643,33 +888,41 @@ interface IASRTextMessage {
 当前版本使用内存 Map 存储：
 
 ```typescript
-class RoomRepository {
+// RoomManager — 房间状态
+class RoomManager {
   private roomsById: Map<string, IRoom>;      // roomId → Room
   private roomsByCode: Map<string, string>;   // roomCode → roomId
 }
 
+// ConnectionManager — 连接映射
+class ConnectionManager {
+  private connections: Map<string, { socket, userId?, roomId? }>;  // connectionId → 连接数据
+  private userConnections: Map<string, string>;  // userId → connectionId
+  private roomConnections: Map<string, Set<string>>;  // roomId → Set<connectionId>
+}
+
+// DrumGameManager — 游戏状态
+class DrumGameManager {
+  private games: Map<string, IDrumGameState>;  // roomId → 游戏状态
+}
+
+// AsrTextHandler — ASR 同步状态
 class AsrTextHandler {
-  private sessionStates: Map<string, IASRSessionState>; // "${roomId}:${speakerId}" → State
+  private sessionStates: Map<string, IASRSessionState>;  // "${roomId}:${speakerId}" → State
 }
 ```
 
 ### 索引策略
 
-| 索引 | 键 | 值 | 用途 |
-|------|----|----|------|
-| `roomsById` | roomId | IRoom | 根据 ID 查找房间 |
-| `roomsByCode` | roomCode | roomId | 根据代码查找房间 |
-| `sessionStates` | `${roomId}:${speakerId}` | IASRSessionState | ASR 文本同步状态 |
-
-### 数据持久化（未来）
-
-```typescript
-// 未来使用 MongoDB
-interface IRoomDocument extends IRoom {
-  _id: ObjectId;
-  updatedAt: number;
-}
-```
+| 存储 | 索引键 | 值 | 用途 |
+|------|--------|----|----|
+| RoomManager.roomsById | roomId | IRoom | 根据 ID 查找房间 |
+| RoomManager.roomsByCode | roomCode | roomId | 根据代码查找房间 |
+| ConnectionManager.connections | connectionId | 连接数据 | 消息路由 |
+| ConnectionManager.userConnections | userId | connectionId | 用户查找连接 |
+| ConnectionManager.roomConnections | roomId | Set\<connectionId\> | 房间广播 |
+| DrumGameManager.games | roomId | IDrumGameState | 游戏状态查找 |
+| AsrTextHandler.sessionStates | `${roomId}:${speakerId}` | IASRSessionState | ASR 去重/节流 |
 
 ---
 
@@ -776,17 +1029,37 @@ IMessage
 │   └── { type: "TEXT", text: string }
 └── createdAt: number
 
-IAsrSession
-├── sessionId: string
+IDrumGameState
 ├── roomId: string
-├── speakerId: string
-├── status: EAsrSessionStatus
-│   ├── ACTIVE
-│   ├── STOPPED
-│   └── ERROR
-├── startedAt: number
-├── lastAudioSeq: number
-└── tencentWsConn?: WebSocket
+├── phase: EGamePhase
+│   ├── WAITING
+│   ├── COUNTDOWN
+│   ├── RUNNING
+│   └── FINISHED
+├── organizerScore: number
+├── joinerScore: number
+├── startAtMs?: number
+└── endAtMs?: number
+
+IASRSessionState (内部状态)
+├── lastSeq: number
+├── finalReceived: boolean
+├── pendingPartial?: IASRTextPushMessage
+└── throttleTimer?: NodeJS.Timeout
+
+IJudgmentResponse
+├── caseNumber: string
+├── responsibility
+│   ├── player1: number
+│   ├── player2: number
+│   └── thirdParty
+│       └── factors: IThirdPartyFactor[]
+│           ├── name: string
+│           └── percentage: number
+├── radarChart
+│   ├── player1: IRadarScores (6 维度)
+│   └── player2: IRadarScores (6 维度)
+└── verdict: string
 ```
 
 ---
@@ -819,4 +1092,8 @@ IAsrSession
 - [加入房间](features/02-join-room.md)
 - [聊天消息](features/03-chat-messaging.md)
 - [错误处理](features/05-error-handling.md)
+- [震天鼓游戏](features/06-drum-game.md)
 - [ASR 实时语音识别](features/07-asr-real-time-speech.md)
+- [腾讯云 STS Token](features/08-tencent-sts-token.md)
+- [LLM 判决书生成](features/09-llm-judgment.md)
+- [表情互动消息](features/10-emoji-messages.md)
