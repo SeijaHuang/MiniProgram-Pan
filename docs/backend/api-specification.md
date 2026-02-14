@@ -18,6 +18,11 @@
 - ✅ HTTP 用于房间创建，WebSocket 用于实时通信
 - ✅ 完整的类型安全和错误处理
 - ✅ 消息广播机制（服务器权威）
+- ✅ 震天鼓实时对抗游戏（10 秒点击竞技）
+- ✅ ASR 语音转文字实时同步（去重 + 节流）
+- ✅ 表情互动消息（实时转发）
+- ✅ LLM 判决书生成（OpenAI 集成）
+- ✅ 腾讯云 STS 临时凭证服务
 
 ---
 
@@ -212,6 +217,156 @@ curl -X GET http://localhost:8080/v1/tencent/credentials
 
 ---
 
+### 3. LLM 判决书生成
+
+**Endpoint**: `POST /v1/rooms/:roomId/judgments`
+
+**描述**: 基于双方发言内容，调用 LLM 生成 AI 判决结果
+
+#### Request
+
+**Headers**:
+```
+Content-Type: application/json
+```
+
+**URL Parameters**:
+- `roomId`: 房间 ID（必填）
+
+**Body**:
+```typescript
+{
+  "player1Speech": string,      // 玩家1发言内容（1-8000 字符）
+  "player2Speech": string,      // 玩家2发言内容（1-8000 字符）
+  "idempotencyKey"?: string     // 幂等键（可选，最长128字符）
+}
+```
+
+**验证规则**:
+- `player1Speech`: 必填，字符串，长度 1-8000
+- `player2Speech`: 必填，字符串，长度 1-8000
+- `idempotencyKey`: 可选，字符串，最长 128 字符
+
+#### Response
+
+**成功响应** (200 OK):
+```typescript
+{
+  "success": true,
+  "data": {
+    "caseNumber": string,          // 案件编号，如 "NO.12345"
+    "responsibility": {
+      "player1": number,           // 玩家1责任占比（0-100）
+      "player2": number,           // 玩家2责任占比（0-100）
+      "thirdParty": {
+        "factors": [               // 第三方搞笑因素
+          {
+            "name": string,        // 因素名称
+            "percentage": number   // 百分比
+          }
+        ]
+      }
+    },
+    "radarChart": {
+      "player1": {
+        "嘴硬程度": number,        // 0-100
+        "翻旧账": number,          // 0-100
+        "逻辑滑坡": number,        // 0-100
+        "撒娇暴击": number,        // 0-100
+        "求生欲": number,          // 0-100
+        "受害者演技": number       // 0-100
+      },
+      "player2": {
+        // 同上六个维度
+      }
+    },
+    "verdict": string              // 大老爷赠言（50-100 字符）
+  }
+}
+```
+
+**错误响应** (400 Bad Request):
+```typescript
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": string
+  }
+}
+```
+
+**错误响应** (502 Bad Gateway):
+```typescript
+{
+  "success": false,
+  "error": {
+    "code": "LLM_CALL_FAILED",
+    "message": string
+  }
+}
+```
+
+#### 示例
+
+**cURL**:
+```bash
+curl -X POST http://localhost:8080/v1/rooms/room_123456/judgments \
+  -H "Content-Type: application/json" \
+  -d '{
+    "player1Speech": "你总是不听我说话，每次都自己做决定！",
+    "player2Speech": "我哪有，你才是每次都不考虑我的感受！"
+  }'
+```
+
+**成功响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "caseNumber": "NO.23456",
+    "responsibility": {
+      "player1": 40,
+      "player2": 45,
+      "thirdParty": {
+        "factors": [
+          { "name": "水星逆行", "percentage": 10 },
+          { "name": "空调温度分歧", "percentage": 5 }
+        ]
+      }
+    },
+    "radarChart": {
+      "player1": {
+        "嘴硬程度": 75,
+        "翻旧账": 60,
+        "逻辑滑坡": 40,
+        "撒娇暴击": 30,
+        "求生欲": 85,
+        "受害者演技": 50
+      },
+      "player2": {
+        "嘴硬程度": 65,
+        "翻旧账": 80,
+        "逻辑滑坡": 55,
+        "撒娇暴击": 70,
+        "求生欲": 40,
+        "受害者演技": 60
+      }
+    },
+    "verdict": "本官判定双方各打五十大板，建议下次吵架前先喝杯奶茶冷静一下。"
+  }
+}
+```
+
+**技术说明**:
+- 使用 OpenAI API 生成判决结果（模型: gpt-4o）
+- 请求超时: 60 秒
+- Temperature: 0.7（保证创意性）
+- 强制 JSON 响应格式
+- 支持通过 `idempotencyKey` 防止重复请求
+
+---
+
 ## WebSocket API
 
 ### 连接
@@ -248,6 +403,8 @@ curl -X GET http://localhost:8080/v1/tencent/credentials
 | `CHAT_RECEIVE` | Server → Client | 聊天 | 接收消息（广播） |
 | `ASR_TEXT_PUSH` | Client → Server | 语音识别 | 推送识别文本 |
 | `ASR_TEXT` | Server → Client | 语音识别 | 广播识别文本 |
+| `EMOJI_SEND` | Client → Server | 表情互动 | 发送表情 |
+| `EMOJI_RECEIVE` | Server → Client | 表情互动 | 接收表情（转发给对方） |
 | `DRUM_READY` | Server → Client | 震天鼓游戏 | 游戏准备 |
 | `DRUM_START` | Server → Client | 震天鼓游戏 | 游戏开始 |
 | `DRUM_TAP` | Bidirectional | 震天鼓游戏 | 点击事件 |
@@ -518,7 +675,59 @@ ASR（Automatic Speech Recognition）功能为 Chat Room 提供实时语音转�
 
 ---
 
-### 4. 震天鼓游戏 (DRUM)
+### 4. 表情互动 (EMOJI)
+
+表情互动功能允许参与者在对方发言时发送表情反应。
+
+---
+
+#### 4.1 发送表情 (EMOJI_SEND)
+
+**方向**: Client → Server
+
+**描述**: 参与者发送表情给对方
+
+**消息格式**:
+```typescript
+{
+  "type": "EMOJI_SEND",
+  "data": {
+    "roomId": string,      // 房间ID
+    "senderId": string,    // 发送者 userId
+    "emoji": string        // 表情内容
+  },
+  "timestamp": number
+}
+```
+
+---
+
+#### 4.2 接收表情 (EMOJI_RECEIVE)
+
+**方向**: Server → Opponent Only（仅转发给对方）
+
+**描述**: 服务器将表情转发给房间内的其他参与者
+
+**消息格式**:
+```typescript
+{
+  "type": "EMOJI_RECEIVE",
+  "data": {
+    "roomId": string,      // 房间ID
+    "senderId": string,    // 发送者 userId
+    "emoji": string        // 表情内容
+  },
+  "timestamp": number
+}
+```
+
+**关键行为**:
+- ✅ 仅转发给对方（不回传给发送者）
+- ✅ 发送者必须是房间参与者
+
+---
+
+### 5. 震天鼓游戏 (DRUM)
 
 震天鼓游戏是双人实时竞技小游戏，玩家通过点击鼓面竞争，获胜者获得优先发言权。
 
@@ -623,7 +832,10 @@ type IMessageContent = {
 |---------|-----------|------|
 | `INVALID_REQUEST` | 400 | 请求参数验证失败 |
 | `ROOM_CREATE_FAILED` | 500 | 房间创建失败 |
+| `ROOM_NOT_FOUND` | 404 | 房间不存在 |
+| `LLM_CALL_FAILED` | 502 | LLM 调用失败（OpenAI API 错误） |
 | `STS_GET_FAILED` | 500 | 获取 STS Token 失败 |
+| `INTERNAL_ERROR` | 500 | 服务器内部错误 |
 
 ### WebSocket 错误代码
 
@@ -934,6 +1146,8 @@ npm run ws:test
 ## 参考文档
 
 - [腾讯云 STS Token 获取](features/08-tencent-sts-token.md)
+- [LLM 判决书生成](features/09-llm-judgment.md)
+- [表情互动消息](features/10-emoji-messages.md)
 - [ASR 实时语音识别详细文档](features/07-asr-real-time-speech.md)
 - [震天鼓游戏](features/06-drum-game.md)
 - [数据模型](data-models.md)

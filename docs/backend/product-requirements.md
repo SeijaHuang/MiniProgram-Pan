@@ -4,7 +4,7 @@
 
 ### 1.1 产品定位
 
-双人实时聊天室后端服务，为微信小程序「情侣审判」提供房间管理和实时通信能力。
+双人实时互动后端服务，为微信小程序「申冤」提供房间管理、实时对战、语音转文字、AI 判决等能力。
 
 ### 1.2 核心价值
 
@@ -12,6 +12,9 @@
 - **实时同步**: WebSocket 确保双方消息即时送达
 - **严格限制**: 每个房间仅限2人，确保私密性
 - **状态驱动**: 自动化的房间状态管理
+- **趣味竞技**: 震天鼓点击对抗决定发言顺序
+- **语音识别**: ASR 实时语音转文字同步
+- **AI 判决**: LLM 生成搞笑风格的判决书
 
 ### 1.3 技术选型理由
 
@@ -21,6 +24,9 @@
 | WebSocket (ws) | 原生 WebSocket 协议，性能最优 |
 | TypeScript | 类型安全，减少运行时错误 |
 | In-Memory Storage | 无需数据库，降低部署复杂度 |
+| OpenAI API | LLM 判决书生成 |
+| Tencent Cloud STS | ASR 临时凭证安全分发 |
+| Zod | 运行时请求验证 |
 
 ---
 
@@ -200,6 +206,107 @@
 
 ---
 
+### 2.4 震天鼓游戏
+
+#### 功能 4.1: 双人点击对抗
+
+**需求描述**:
+- 房间满员后自动触发震天鼓游戏
+- 双方在 10 秒内比拼点击速度
+- 获胜者获得优先发言权
+
+**业务规则**:
+- ✅ 房间满员 3 秒后发送 `DRUM_READY` 和 `DRUM_START`
+- ✅ 游戏开始前有 3 秒倒计时
+- ✅ 游戏持续 10 秒
+- ✅ 点击事件实时转发给对方
+- ✅ 游戏结束后计算最终分数和获胜者
+- ✅ 平局时房主（Organizer）获胜
+
+**游戏流程**:
+```
+房间满员 → 等待3秒 → DRUM_READY + DRUM_START
+→ 3秒倒计时 → 10秒游戏 → DRUM_FINISH → DRUM_RESULT
+```
+
+**消息类型**: `DRUM_READY`, `DRUM_START`, `DRUM_TAP`, `DRUM_FINISH`, `DRUM_RESULT`
+
+---
+
+### 2.5 ASR 实时语音识别同步
+
+#### 功能 5.1: 语音转文字同步
+
+**需求描述**:
+- 客户端直连腾讯云 ASR 进行语音识别
+- 识别结果通过 WebSocket 推送到服务器
+- 服务器负责去重、节流后广播给对方
+
+**业务规则**:
+- ✅ 支持 Partial（实时中间结果）和 Final（最终结果）两种文本类型
+- ✅ 基于 `seq` 序列号去重（`seq ≤ lastSeq` 的消息被丢弃）
+- ✅ Partial 消息节流到 200ms 间隔
+- ✅ Final 消息立即广播，不节流
+- ✅ Final 后自动重置会话状态（准备下次录音）
+
+**前置条件**: 客户端需先调用 `GET /v1/tencent/credentials` 获取 STS 临时凭证
+
+**消息类型**: `ASR_TEXT_PUSH` (Client → Server), `ASR_TEXT` (Server → Opponent)
+
+---
+
+### 2.6 表情互动
+
+#### 功能 6.1: 发送表情反应
+
+**需求描述**:
+- 参与者可以在对方发言时发送表情反应
+- 表情实时转发给对方
+
+**业务规则**:
+- ✅ 仅转发给对方（不回传给发送者）
+- ✅ 发送者必须是房间参与者
+
+**消息类型**: `EMOJI_SEND` (Client → Server), `EMOJI_RECEIVE` (Server → Opponent)
+
+---
+
+### 2.7 LLM 判决书生成
+
+#### 功能 7.1: AI 判决
+
+**需求描述**:
+- 基于双方发言内容，调用 LLM 生成搞笑风格的 AI 判决书
+- 包含责任分布、六维雷达图评分、大老爷赠言
+
+**业务规则**:
+- ✅ 接受双方发言文本（1-8000 字符）
+- ✅ 调用 OpenAI API（gpt-4o）生成判决
+- ✅ 返回结构化 JSON（案件编号、责任、雷达图、赠言）
+- ✅ 支持幂等键防止重复请求
+- ✅ 请求超时 60 秒
+
+**接口**: `POST /v1/rooms/:roomId/judgments`
+
+---
+
+### 2.8 腾讯云 STS 凭证
+
+#### 功能 8.1: 临时凭证分发
+
+**需求描述**:
+- 为客户端提供腾讯云 ASR 服务的临时安全凭证
+- 使用 STS 方式避免客户端暴露永久密钥
+
+**业务规则**:
+- ✅ 凭证有效期 24 小时
+- ✅ 权限限制为仅 ASR 服务（`name/asr:*`）
+- ✅ 服务端缓存凭证（剩余 > 1 分钟时复用）
+
+**接口**: `GET /v1/tencent/credentials`
+
+---
+
 ## 3. 数据模型
 
 ### 3.1 房间 (Room)
@@ -328,6 +435,8 @@ interface IConnectionData {
 | Endpoint | 方法 | 功能 | 详细文档 |
 |----------|------|------|----------|
 | `/v1/rooms` | POST | 创建房间 | [01-room-creation.md](./features/01-room-creation.md) |
+| `/v1/rooms/:roomId/judgments` | POST | LLM 判决 | [09-llm-judgment.md](./features/09-llm-judgment.md) |
+| `/v1/tencent/credentials` | GET | STS 临时凭证 | [08-tencent-sts-token.md](./features/08-tencent-sts-token.md) |
 
 ### 4.2 WebSocket 消息类型
 
@@ -337,6 +446,15 @@ interface IConnectionData {
 | `JOIN_ACK` | Server → Client | 加入确认（广播） | [02-join-room.md](./features/02-join-room.md) |
 | `CHAT_SEND` | Client → Server | 发送消息 | [03-chat-messaging.md](./features/03-chat-messaging.md) |
 | `CHAT_RECEIVE` | Server → Client | 接收消息（广播） | [03-chat-messaging.md](./features/03-chat-messaging.md) |
+| `ASR_TEXT_PUSH` | Client → Server | 推送识别文本 | [07-asr-real-time-speech.md](./features/07-asr-real-time-speech.md) |
+| `ASR_TEXT` | Server → Client | 广播识别文本 | [07-asr-real-time-speech.md](./features/07-asr-real-time-speech.md) |
+| `EMOJI_SEND` | Client → Server | 发送表情 | [10-emoji-messages.md](./features/10-emoji-messages.md) |
+| `EMOJI_RECEIVE` | Server → Client | 接收表情 | [10-emoji-messages.md](./features/10-emoji-messages.md) |
+| `DRUM_READY` | Server → Client | 游戏准备 | [06-drum-game.md](./features/06-drum-game.md) |
+| `DRUM_START` | Server → Client | 游戏开始 | [06-drum-game.md](./features/06-drum-game.md) |
+| `DRUM_TAP` | Bidirectional | 点击事件 | [06-drum-game.md](./features/06-drum-game.md) |
+| `DRUM_FINISH` | Server → Client | 游戏结束 | [06-drum-game.md](./features/06-drum-game.md) |
+| `DRUM_RESULT` | Server → Client | 游戏结果 | [06-drum-game.md](./features/06-drum-game.md) |
 | `ERROR` | Server → Client | 错误通知 | [05-error-handling.md](./features/05-error-handling.md) |
 
 ---
@@ -427,12 +545,19 @@ interface IConnectionData {
 
 ### 8.1 功能验收
 
-- [ ] 创建房间返回正确的房间信息
-- [ ] 两个用户可以成功加入同一房间
-- [ ] 房间状态自动从 WAITING 变为 READY
-- [ ] 消息可以实时广播给所有参与者
-- [ ] 第三个用户加入失败并返回 ROOM_FULL 错误
-- [ ] 连接断开后用户自动从房间移除
+- [x] 创建房间返回正确的房间信息
+- [x] 两个用户可以成功加入同一房间
+- [x] 房间状态自动从 WAITING 变为 READY
+- [x] 消息可以实时广播给所有参与者
+- [x] 第三个用户加入失败并返回 ROOM_FULL 错误
+- [x] 连接断开后用户自动从房间移除
+- [x] 房间满员后自动触发震天鼓游戏
+- [x] 震天鼓点击实时同步给对方
+- [x] 游戏结束后返回正确的胜负结果
+- [x] ASR 文本去重和节流正常工作
+- [x] 表情消息正确转发给对方
+- [x] LLM 判决书返回完整的结构化数据
+- [x] STS 临时凭证正确获取和缓存
 
 ### 8.2 性能验收
 
@@ -460,16 +585,26 @@ interface IConnectionData {
 - ✅ 基本错误处理
 - ✅ 内存存储
 
-### Phase 2: 优化（进行中）
+### Phase 2: 核心玩法（已完成）
 
 - ✅ 完整的类型定义
 - ✅ Zod 运行时验证
 - ✅ 三层架构重构
-- ⏳ 单元测试
-- ⏳ 性能优化
+- ✅ 震天鼓实时对抗游戏
+- ✅ ASR 语音转文字同步（去重 + 节流）
+- ✅ 腾讯云 STS 临时凭证服务
+- ✅ 表情互动消息转发
 
-### Phase 3: 生产就绪（未来）
+### Phase 3: AI 判决（已完成）
 
+- ✅ LLM 判决书生成（OpenAI 集成）
+- ✅ 六维雷达图评分
+- ✅ 责任分布 + 第三方搞笑因素
+- ✅ 幂等请求支持
+
+### Phase 4: 生产就绪（未来）
+
+- ⏳ 单元测试和集成测试
 - ⏳ 数据库集成
 - ⏳ 消息历史
 - ⏳ 用户认证
@@ -478,7 +613,28 @@ interface IConnectionData {
 
 ---
 
-## 10. 相关文档
+## 10. 环境变量
+
+```bash
+# 必需
+PORT=8080                          # HTTP/WS 监听端口
+NODE_ENV=development               # 环境（development/production）
+WS_PATH=/ws                        # WebSocket 路径
+
+# OpenAI（LLM 判决功能必需）
+OPENAI_API_KEY=sk-...              # OpenAI API 密钥
+OPENAI_MODEL=gpt-4o               # LLM 模型（默认 gpt-4o）
+OPENAI_BASE_URL=...               # 可选自定义端点
+
+# 腾讯云（ASR 功能必需）
+TENCENT_SECRET_ID=...             # 腾讯云 SecretId
+TENCENT_SECRET_KEY=...            # 腾讯云 SecretKey
+TENCENT_REGION=ap-guangzhou       # 腾讯云区域
+```
+
+---
+
+## 11. 相关文档
 
 - **功能详细文档**: [features/](./features/) - 按功能模块的详细实现文档
 - **API 完整规格**: [api-specification.md](./api-specification.md) - 所有 API 的完整规格说明
@@ -493,13 +649,19 @@ interface IConnectionData {
 | 术语 | 定义 |
 |------|------|
 | Room | 双人聊天室，由6位代码标识 |
-| Host | 房主，创建房间的用户 |
-| Guest | 访客，通过代码加入的用户 |
+| Host / Organizer | 房主，创建房间的用户 |
+| Guest / Joiner | 访客，通过代码加入的用户 |
 | Participant | 参与者，房间内的用户 |
 | roomCode | 6位房间邀请代码 |
 | roomId | 服务器生成的唯一房间标识 |
 | connectionId | WebSocket 连接唯一标识 |
 | Broadcast | 向房间内所有参与者发送消息 |
+| Drum Game | 震天鼓，10秒点击对抗小游戏 |
+| ASR | 自动语音识别（Automatic Speech Recognition） |
+| STS | 安全令牌服务（Security Token Service） |
+| Judgment / Verdict | AI 生成的判决书 |
+| Partial | ASR 实时中间识别结果（可覆盖） |
+| Final | ASR 最终确认识别结果（不可覆盖） |
 
 ---
 

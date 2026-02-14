@@ -20,7 +20,9 @@ docs/
 │       ├── 05-error-handling.md         # 错误处理
 │       ├── 06-drum-game.md              # 震天鼓游戏
 │       ├── 07-asr-real-time-speech.md   # ASR 实时语音识别
-│       └── 08-tencent-sts-token.md      # 腾讯云 STS 凭证
+│       ├── 08-tencent-sts-token.md      # 腾讯云 STS 凭证
+│       ├── 09-llm-judgment.md           # LLM 判决书生成
+│       └── 10-emoji-messages.md         # 表情互动消息
 └── miniprogram/                # 小程序前端文档
     ├── welcome.md              # 欢迎页
     ├── waiting-room.md         # 等待页
@@ -163,9 +165,9 @@ docs/
 - **文件**: `backend/api-specification.md`
 - **功能**: 完整的 HTTP 和 WebSocket API 规范
 - **核心内容**:
-    - HTTP REST API（房间创建）
+    - HTTP REST API（房间创建、LLM 判决、STS 凭证）
     - WebSocket 实时通信协议
-    - 消息类型和格式（JOIN_ROOM, CHAT_SEND, ASR_START 等）
+    - 消息类型和格式（JOIN*ROOM, CHAT_SEND, DRUM*\*, ASR_TEXT_PUSH, EMOJI_SEND 等）
     - 错误代码参考
     - 完整流程示例
 
@@ -174,31 +176,35 @@ docs/
 - **文件**: `backend/data-models.md`
 - **功能**: 后端数据模型定义
 - **核心内容**:
-    - 核心实体（IRoom, IUser, IMessage, IAsrSession）
-    - 枚举类型（ERoomStatus, EMessageType, EAsrSessionStatus）
+    - 核心实体（IRoom, IUser, IMessage, IASRSessionState）
+    - 游戏状态（IDrumGameState, EGamePhase, EPlayerRole）
+    - LLM 判决类型（IJudgmentResponse, IRadarScores）
+    - 表情消息类型（IEmojiSendMessage, IEmojiReceiveMessage）
+    - 枚举类型（ERoomStatus, EMessageType, EWSMessageType）
     - 数据传输对象（DTO）
-    - WebSocket 消息类型
-    - 数据存储和验证
+    - 内存存储索引策略
 
 #### 架构可视化
 
 - **文件**: `backend/architecture-visual.md`
 - **功能**: 后端整体架构设计和可视化
 - **核心内容**:
-    - 三层架构模式（Controller → Service → Repository）
-    - 单例模式（RoomManager, ConnectionManager）
-    - 处理器模式
-    - 技术栈和依赖
+    - 三层架构模式（Routes → Controllers → Services/Handlers → Domain Services）
+    - 单例模式（RoomManager, ConnectionManager, DrumGameManager）
+    - 处理器模式（5 个纯函数 Handler）
+    - HTTP 数据流（3 条路由）和 WebSocket 数据流（5 种消息）
+    - 震天鼓游戏编排流程
+    - 外部服务集成（OpenAI, Tencent Cloud）
 
 #### 产品需求
 
 - **文件**: `backend/product-requirements.md`
 - **功能**: 后端产品需求文档
 - **核心内容**:
-    - 业务需求
-    - 功能范围
-    - 技术约束
-    - 优先级划分
+    - 业务需求（房间管理、聊天、震天鼓、ASR、表情、LLM 判决、STS 凭证）
+    - 功能范围和接口设计
+    - 环境变量配置
+    - 技术约束和优先级划分
 
 ### 功能模块文档（features/）
 
@@ -265,13 +271,42 @@ docs/
 #### 07. ASR 实时语音识别
 
 - **文件**: `backend/features/07-asr-real-time-speech.md`
-- **功能**: 实时语音转文字
+- **功能**: 实时语音转文字同步
 - **核心内容**:
-    - ASR_START/AUDIO/STOP/TEXT 消息
-    - 腾讯云 ASR 集成
-    - 会话管理和幂等性
-    - Partial/Final 文本处理
-    - 音频分片传输
+    - ASR_TEXT_PUSH/ASR_TEXT 消息
+    - 客户端直连腾讯云 ASR 架构
+    - 去重机制（seq 序列号）
+    - Partial 节流（200ms）和 Final 立即广播
+    - 会话状态管理
+
+#### 08. 腾讯云 STS 凭证
+
+- **文件**: `backend/features/08-tencent-sts-token.md`
+- **功能**: ASR 临时安全凭证分发
+- **核心内容**:
+    - GET /v1/tencent/credentials 接口
+    - STS 凭证缓存机制
+    - 权限限制和安全说明
+
+#### 09. LLM 判决书生成
+
+- **文件**: `backend/features/09-llm-judgment.md`
+- **功能**: AI 判决结果生成
+- **核心内容**:
+    - POST /v1/rooms/:roomId/judgments 接口
+    - OpenAI 集成（gpt-4o, JSON 格式）
+    - 六维雷达图评分体系
+    - 责任分布 + 第三方搞笑因素
+    - 幂等请求支持
+
+#### 10. 表情互动消息
+
+- **文件**: `backend/features/10-emoji-messages.md`
+- **功能**: 表情实时互动
+- **核心内容**:
+    - EMOJI_SEND/EMOJI_RECEIVE 消息
+    - 仅转发给对方的广播机制
+    - Chat Room 监听方互动
 
 ---
 
