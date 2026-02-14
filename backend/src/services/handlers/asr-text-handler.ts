@@ -268,6 +268,31 @@ export function handleASRTextPush(
             `[ASR_TEXT_PUSH] Final from ${speakerId} in room ${roomId}: "${text}"`
         );
 
+        // Accumulate final text into room's speech state
+        if (text.trim()) {
+            const isHost = speakerId === room.hostUserId;
+
+            if (!room.speechState) {
+                room.speechState = {
+                    hostText: '',
+                    guestText: '',
+                    hostFinished: false,
+                    guestFinished: false,
+                };
+            }
+
+            if (isHost) {
+                room.speechState.hostText += text.trim() + ' ';
+            } else {
+                room.speechState.guestText += text.trim() + ' ';
+            }
+
+            console.log(
+                `[ASR] Accumulated ${isHost ? 'host' : 'guest'} speech: ` +
+                    `${isHost ? room.speechState.hostText.length : room.speechState.guestText.length} chars`
+            );
+        }
+
         // Reset session for next utterance
         // Note: We do this after a short delay to allow the final to be processed
         setTimeout(() => {

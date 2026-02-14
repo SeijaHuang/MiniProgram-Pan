@@ -46,6 +46,8 @@ export interface IJudgmentResponse {
     };
     /** 大老爷赠言 */
     verdict: string;
+    /** 惩罚任务：败诉方需要完成的任务 */
+    punishmentTask: string;
 }
 
 /**

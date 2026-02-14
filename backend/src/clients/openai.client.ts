@@ -153,6 +153,11 @@ function validateJudgment(obj: unknown): IJudgmentResponse {
         throw new Error('verdict 必须是字符串');
     }
 
+    // punishmentTask
+    if (typeof rec.punishmentTask !== 'string') {
+        throw new Error('punishmentTask 必须是字符串');
+    }
+
     return {
         caseNumber: rec.caseNumber,
         responsibility: {
@@ -165,6 +170,7 @@ function validateJudgment(obj: unknown): IJudgmentResponse {
             player2: p2Radar,
         },
         verdict: rec.verdict,
+        punishmentTask: rec.punishmentTask,
     };
 }
 

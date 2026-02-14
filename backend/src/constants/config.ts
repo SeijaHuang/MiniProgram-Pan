@@ -30,6 +30,13 @@ export const DRUM_CONFIG = {
     GAME_DURATION_MS: 10000,
 } as const;
 
+export const VERDICT_CONFIG = {
+    /** LLM call timeout (ms) */
+    LLM_TIMEOUT_MS: 30000,
+    /** Maximum retry attempts */
+    MAX_RETRIES: 3,
+} as const;
+
 export const OPENAI_CONFIG = {
     /** OpenAI API key */
     API_KEY: process.env.OPENAI_API_KEY || '',

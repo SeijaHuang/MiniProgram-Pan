@@ -32,8 +32,11 @@ import {
     type TASRTextPushHandlerResult,
     type IASRTextPushResult,
 } from '../services/handlers/asr-text-handler';
+import { handleSpeechTurnEnd } from '../services/handlers/speech-turn-end-handler';
+import { handleVerdictRetry } from '../services/handlers/verdict-retry-handler';
 import { drumGameManager } from '../services/websocket/drum-game-manager';
 import { roomManager } from '../services/websocket/room-manager';
+import { verdictOrchestratorService } from '../services/core/verdict-orchestrator.service';
 import type {
     IWSMessage,
     IJoinRoomMessage,
@@ -41,6 +44,9 @@ import type {
     IDrumTapMessage,
     IASRTextPushMessage,
     IEmojiSendMessage,
+    ISpeechTurnEndMessage,
+    IVerdictRetryMessage,
+    IChatCompleteData,
 } from '../types/websocket';
 import { EWSMessageType, EWSErrorCode, EGamePhase } from '../types/websocket';
 import { ERoomStatus } from '../models/entities/room';
@@ -90,6 +96,20 @@ export class WebSocketController {
                     WebSocketController.handleEmojiSendMessage(
                         connectionId,
                         message as IEmojiSendMessage
+                    );
+                    break;
+
+                case EWSMessageType.SpeechTurnEnd:
+                    WebSocketController.handleSpeechTurnEndMessage(
+                        connectionId,
+                        message as ISpeechTurnEndMessage
+                    );
+                    break;
+
+                case EWSMessageType.VerdictRetry:
+                    WebSocketController.handleVerdictRetryMessage(
+                        connectionId,
+                        message as IVerdictRetryMessage
                     );
                     break;
 
@@ -435,6 +455,98 @@ export class WebSocketController {
         console.log(
             `[WebSocketController] Game ${roomId} finished: ${result.winnerRole} wins (${result.organizerScore} vs ${result.joinerScore})`
         );
+    }
+
+    /**
+     * Handle SPEECH_TURN_END message
+     * Called when a player finishes their speech
+     */
+    private static handleSpeechTurnEndMessage(
+        connectionId: string,
+        message: ISpeechTurnEndMessage
+    ): void {
+        // Call handler
+        const result = handleSpeechTurnEnd(message);
+
+        if (!result.success) {
+            WebSocketController.sendError(
+                connectionId,
+                result.code,
+                result.message
+            );
+            return;
+        }
+
+        console.log(
+            `[WebSocketController] Speech turn end for user ${result.userId} in room ${result.roomId}`
+        );
+
+        // If both players finished, broadcast CHAT_COMPLETE and trigger verdict
+        if (result.bothFinished) {
+            console.log(
+                `[WebSocketController] Chat complete, triggering verdict generation for room ${result.roomId}`
+            );
+
+            // Broadcast CHAT_COMPLETE
+            const chatCompleteData: IChatCompleteData = {
+                roomId: result.roomId,
+            };
+
+            connectionManager.broadcastToRoom(result.roomId, {
+                type: EWSMessageType.ChatComplete,
+                data: chatCompleteData,
+                timestamp: Date.now(),
+            });
+
+            // Trigger verdict generation (async, don't block)
+            verdictOrchestratorService
+                .generateVerdict(result.roomId, connectionManager)
+                .catch(error => {
+                    console.error(
+                        `[WebSocketController] Verdict generation error: ${error}`
+                    );
+                });
+        }
+    }
+
+    /**
+     * Handle VERDICT_RETRY message
+     * Called when user requests retry after verdict failure
+     */
+    private static handleVerdictRetryMessage(
+        connectionId: string,
+        message: IVerdictRetryMessage
+    ): void {
+        // Call handler
+        const result = handleVerdictRetry(message);
+
+        if (!result.success) {
+            WebSocketController.sendError(
+                connectionId,
+                result.code,
+                result.message
+            );
+            return;
+        }
+
+        console.log(
+            `[WebSocketController] Verdict retry requested by user ${result.userId} in room ${result.roomId}`
+        );
+
+        // If can retry, trigger verdict generation again
+        if (result.canRetry) {
+            verdictOrchestratorService
+                .generateVerdict(result.roomId, connectionManager)
+                .catch(error => {
+                    console.error(
+                        `[WebSocketController] Verdict retry error: ${error}`
+                    );
+                });
+        } else {
+            console.log(
+                `[WebSocketController] Max retries reached for room ${result.roomId}`
+            );
+        }
     }
 
     /**
