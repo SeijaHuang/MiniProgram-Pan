@@ -30,13 +30,6 @@ enum EReactionSource {
     Opponent = 'opponent',
 }
 
-interface IDisplayMessage {
-    id: number;
-    role: EPlayerRole;
-    content: string;
-    timestamp: number;
-}
-
 interface IReaction {
     id: number;
     emoji: string;
@@ -65,25 +58,21 @@ interface IChatRoomPageData {
     // 录音状态
     isRecording: boolean;
 
-    // 消息列表（语音转文字）
-    messages: IDisplayMessage[];
-
     // 表情系统
     myReactions: IReaction[];
     opponentReactions: IReaction[];
     emojiList: string[];
     emojiAnimations: WechatMiniprogram.AnimationExportResult[];
 
-    // 语音识别相关（本地）
-    speechTextLive: string; // 实时识别文本（Partial）
-    speechTextFinal: string; // 最终识别文本（Final）
-    isRecognizing: boolean; // 是否识别中
-    recognizeError: string | null; // 识别错误信息
-    hasStartedSpeaking: boolean; // 是否已开始发言（用于保持对话框显示）
+    // 按阶段保存的语音文本（持久化，不因切换阶段而清空）
+    speakerAFinal: string; // Phase A 累积最终文本
+    speakerALive: string; // Phase A 实时识别文本
+    speakerBFinal: string; // Phase B 累积最终文本
+    speakerBLive: string; // Phase B 实时识别文本
 
-    // 对方语音识别相关（通过 WebSocket 同步）
-    opponentTextLive: string; // 对方实时识别文本
-    opponentTextFinal: string; // 对方最终识别文本
+    // 语音识别状态
+    isRecognizing: boolean;
+    recognizeError: string | null;
 
     // 麦克风权限状态
     hasMicPermission: boolean; // 是否已获得麦克风权限
@@ -92,14 +81,16 @@ interface IChatRoomPageData {
     isCompleted: boolean;
 }
 
+type TSpeakerFinal = Pick<IChatRoomPageData, 'speakerAFinal' | 'speakerBFinal'>;
+
+type TSpeakerLive = Pick<IChatRoomPageData, 'speakerALive' | 'speakerBLive'>;
+
 interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     timerId: number | null;
-    completedTimerId: number | null;
     reactionIdCounter: number;
     myReactionTimeouts: number[];
     opponentReactionTimeouts: number[];
     rpxToPx: number;
-    messageIdCounter: number;
     asrManager: AsrManager; // 语音识别管理器
     stsCredentials: ISTSCredentials | null; // STS 临时凭证
 }
@@ -157,23 +148,19 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         isRecording: false,
 
-        messages: [],
-
         myReactions: [],
         opponentReactions: [],
         emojiList: EMOJI_LIST,
         emojiAnimations: [],
 
-        // 语音识别相关（本地）
-        speechTextLive: '',
-        speechTextFinal: '',
+        // 按阶段保存的语音文本
+        speakerAFinal: '',
+        speakerALive: '',
+        speakerBFinal: '',
+        speakerBLive: '',
+
         isRecognizing: false,
         recognizeError: null,
-        hasStartedSpeaking: false,
-
-        // 对方语音识别相关
-        opponentTextLive: '',
-        opponentTextFinal: '',
 
         // 麦克风权限状态
         hasMicPermission: false,
@@ -183,12 +170,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     timerId: null,
-    completedTimerId: null,
     reactionIdCounter: 0,
     myReactionTimeouts: [],
     opponentReactionTimeouts: [],
     rpxToPx: 0.5,
-    messageIdCounter: 0,
     asrManager: null,
     stsCredentials: null,
 
@@ -250,10 +235,11 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     onShow(): void {
-        // 如果定时器不存在且不是 DONE 状态且已获得麦克风权限，重新启动
+        // 仅在发言者页面重新启动定时器
         if (
             !this.timerId &&
             this.data.phase !== EPhase.Done &&
+            this.data.canSpeak &&
             this.data.hasMicPermission
         ) {
             this.startTimer();
@@ -276,12 +262,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         if (this.timerId) {
             clearInterval(this.timerId);
             this.timerId = null;
-        }
-
-        // 清理过渡跳转定时器
-        if (this.completedTimerId) {
-            clearTimeout(this.completedTimerId);
-            this.completedTimerId = null;
         }
 
         // 停止语音识别
@@ -368,24 +348,53 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
+     * 获取本地发言对应的 data key（基于角色，不受阶段切换影响）
+     * Organizer 在 SpeakerA 发言，Joiner 在 SpeakerB 发言
+     */
+    getLocalSpeechKeys(): {
+        finalKey: keyof TSpeakerFinal;
+        liveKey: keyof TSpeakerLive;
+    } {
+        if (this.data.localRole === EPlayerRole.Organizer) {
+            return { finalKey: 'speakerAFinal', liveKey: 'speakerALive' };
+        }
+        return { finalKey: 'speakerBFinal', liveKey: 'speakerBLive' };
+    },
+
+    /**
+     * 获取对方发言对应的 data key（基于角色，不受阶段切换影响）
+     */
+    getOpponentSpeechKeys(): {
+        finalKey: keyof TSpeakerFinal;
+        liveKey: keyof TSpeakerLive;
+    } {
+        if (this.data.localRole === EPlayerRole.Organizer) {
+            return { finalKey: 'speakerBFinal', liveKey: 'speakerBLive' };
+        }
+        return { finalKey: 'speakerAFinal', liveKey: 'speakerALive' };
+    },
+
+    /**
      * 处理对方的 ASR 文本
-     * @param text 识别文本
-     * @param isFinal 是否为最终结果
+     * 基于角色确定写入 key，避免阶段切换竞态
      */
     handleOpponentASRText(text: string, isFinal: boolean): void {
+        const { finalKey, liveKey } = this.getOpponentSpeechKeys();
+
         if (isFinal) {
-            // 最终结果：固化文本
+            const existingFinal: string =
+                this.data[finalKey as keyof TSpeakerFinal];
+            const textWithPunctuation: string = this.addPeriodIfNeeded(text);
+            const newFinal: string = existingFinal
+                ? existingFinal + textWithPunctuation
+                : textWithPunctuation;
             this.setData({
-                opponentTextFinal: text,
-                opponentTextLive: text,
+                [finalKey]: newFinal,
+                [liveKey]: '',
             });
-            console.log('[ChatRoom] Opponent final text:', text);
+            console.log('[ChatRoom] Opponent final text:', newFinal);
         } else {
-            // 部分结果：只更新 live
-            this.setData({
-                opponentTextLive: text,
-            });
-            console.log('[ChatRoom] Opponent partial text:', text);
+            this.setData({ [liveKey]: text });
         }
     },
 
@@ -446,20 +455,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             } | null;
             if (result?.result?.voice_text_str) {
                 const text = result.result.voice_text_str;
-                console.log('[ASR] 实时识别文字:', text);
-
-                // 更新本地 UI
-                this.setData({
-                    speechTextLive: text,
-                });
-
-                // 发送 partial 到对方（节流）
+                const { liveKey } = this.getLocalSpeechKeys();
+                this.setData({ [liveKey]: text });
                 asrService.sendPartial(text);
             }
         };
 
-        // 4. 一句话结束（发送 final，立即）
-        // 注意：不在此处更新 speechTextFinal，由 OnRecognitionComplete 统一处理累积
+        // 4. 一句话结束 — 立即累积到本地 final 并发送给对方
         manager.OnSentenceEnd = (res: unknown) => {
             console.log('[ASR] 一句话结束', res);
             const result = res as {
@@ -467,68 +469,46 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             } | null;
             if (result?.result?.voice_text_str) {
                 const text = result.result.voice_text_str;
-                console.log('[ASR] 一句话识别文字:', text);
-
-                // 发送 final 到对方（立即）- 一句话结束也是 final
+                const { finalKey, liveKey } = this.getLocalSpeechKeys();
+                const existing: string =
+                    this.data[finalKey as keyof TSpeakerFinal];
+                const withPunc: string = this.addPeriodIfNeeded(text);
+                const newFinal: string = existing
+                    ? existing + withPunc
+                    : withPunc;
+                this.setData({
+                    [finalKey]: newFinal,
+                    [liveKey]: '',
+                });
                 asrService.sendFinal(text);
             }
         };
 
-        // 5. 识别结束（发送 final，立即）
+        // 5. 识别结束 — 仅处理未被 OnSentenceEnd 捕获的残余文本
         manager.OnRecognitionComplete = (res: unknown) => {
             console.log('[ASR] 识别结束', res);
-            const result = res as {
-                result?: { voice_text_str?: string };
-            } | null;
-            if (result?.result?.voice_text_str) {
-                const text = result.result.voice_text_str;
-                console.log('[ASR] 最终识别文字:', text);
+            const { finalKey, liveKey } = this.getLocalSpeechKeys();
+            const liveText: string = this.data[liveKey as keyof TSpeakerLive];
 
-                // 追加到已有的最终文字后面（多次录音累积）
-                // 如果文本已经以标点符号结尾，则不再添加句号
-                const existingFinal = this.data.speechTextFinal;
-                const textWithPunctuation = this.addPeriodIfNeeded(text);
-                const newFinal = existingFinal
-                    ? existingFinal + textWithPunctuation
-                    : textWithPunctuation;
-                console.log(
-                    '[ASR] 累积文字 - 已有:',
-                    existingFinal,
-                    '新增:',
-                    textWithPunctuation,
-                    '合并后:',
-                    newFinal
-                );
-
-                // 更新本地 UI
+            if (liveText) {
+                // 有残余 live 文本（未触发 OnSentenceEnd），固化它
+                const existing: string =
+                    this.data[finalKey as keyof TSpeakerFinal];
+                const withPunc: string = this.addPeriodIfNeeded(liveText);
+                const newFinal: string = existing
+                    ? existing + withPunc
+                    : withPunc;
                 this.setData({
-                    speechTextFinal: newFinal,
-                    speechTextLive: '',
+                    [finalKey]: newFinal,
+                    [liveKey]: '',
                     isRecognizing: false,
                 });
-
-                // 发送 final 到对方（立即）
-                asrService.sendFinal(text);
+                asrService.sendFinal(liveText);
             } else {
-                // 没有返回最终文字时，将实时文字保留到 speechTextFinal
-                const existingFinal = this.data.speechTextFinal;
-                const liveText = this.data.speechTextLive;
-                if (liveText) {
-                    const liveTextWithPunctuation =
-                        this.addPeriodIfNeeded(liveText);
-                    const newFinal = existingFinal
-                        ? existingFinal + liveTextWithPunctuation
-                        : liveTextWithPunctuation;
-                    this.setData({
-                        speechTextFinal: newFinal,
-                        speechTextLive: '',
-                        isRecognizing: false,
-                    });
-                } else {
-                    this.setData({
-                        isRecognizing: false,
-                    });
-                }
+                this.setData({
+                    [liveKey]: '',
+                    isRecognizing: false,
+                });
             }
         };
 
@@ -556,10 +536,11 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         console.error('[ASR] 识别错误', errorMessage);
 
         // 2. 更新状态
+        const { liveKey } = this.getLocalSpeechKeys();
         this.setData({
             recognizeError: errorMessage,
             isRecognizing: false,
-            speechTextLive: '',
+            [liveKey]: '',
         });
 
         // 3. 显示 Toast 提示
@@ -702,6 +683,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      */
     switchPhase(): void {
         const { phase, localRole, totalPerTurn, canSpeak } = this.data;
+        // 根据当前阶段直接计算 liveKey（同步，无竞态问题）
+        const liveKey: 'speakerALive' | 'speakerBLive' =
+            phase === EPhase.SpeakerA ? 'speakerALive' : 'speakerBLive';
 
         // 强制停止语音识别
         if (this.asrManager && this.data.isRecording) {
@@ -728,18 +712,18 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 canReact: false,
                 remaining: 0,
                 isRecording: false,
-                // 清空 ASR 文本
-                speechTextLive: '',
-                speechTextFinal: '',
-                opponentTextLive: '',
-                opponentTextFinal: '',
-                hasStartedSpeaking: false,
+                [liveKey]: '', // 仅清 live，final 保留
             });
             // 等待 CHAT_COMPLETE 消息触发跳转
         } else {
-            // 切换到下一阶段
             const nextCanSpeak = this.computeCanSpeak(nextPhase, localRole);
-            const canReact = !nextCanSpeak;
+            const canReact: boolean = !nextCanSpeak;
+
+            // 不再发言时停止倒计时（由新发言者自行启动）
+            if (!nextCanSpeak && this.timerId) {
+                clearInterval(this.timerId);
+                this.timerId = null;
+            }
 
             this.setData({
                 phase: nextPhase,
@@ -748,15 +732,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 canReact,
                 countdownClass: this.getCountdownClass(totalPerTurn),
                 isRecording: false,
-                // 清空 ASR 文本
-                speechTextLive: '',
-                speechTextFinal: '',
-                opponentTextLive: '',
-                opponentTextFinal: '',
-                hasStartedSpeaking: false,
+                [liveKey]: '', // 仅清结束阶段的 live
             });
 
-            // 重置 ASR 服务序列号
             asrService.resetSequence();
         }
     },
@@ -793,17 +771,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     handleSpeechTurnSwitch(): void {
         const { phase, localRole, totalPerTurn } = this.data;
 
-        // 如果已经不在 SpeakerA 阶段，说明本地已切换过，忽略
+        // 已经不在 SpeakerA 阶段，忽略
         if (phase !== EPhase.SpeakerA) {
-            console.log(
-                '[ChatRoom] SPEECH_TURN_SWITCH ignored (already past SpeakerA)'
-            );
+            console.log('[ChatRoom] SPEECH_TURN_SWITCH ignored');
             return;
         }
 
-        console.log(
-            '[ChatRoom] SPEECH_TURN_SWITCH received, switching to SpeakerB'
-        );
+        console.log('[ChatRoom] SPEECH_TURN_SWITCH → SpeakerB');
 
         const nextCanSpeak: boolean = this.computeCanSpeak(
             EPhase.SpeakerB,
@@ -818,14 +792,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             canReact,
             countdownClass: this.getCountdownClass(totalPerTurn),
             isRecording: false,
-            speechTextLive: '',
-            speechTextFinal: '',
-            opponentTextLive: '',
-            opponentTextFinal: '',
-            hasStartedSpeaking: false,
+            speakerALive: '', // 清 Phase A live，final 保留
         });
 
-        // 重置 ASR 服务序列号
         asrService.resetSequence();
     },
 
@@ -850,7 +819,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             this.timerId = null;
         }
 
-        // 更新为完成状态（显示过渡 UI）
         this.setData({
             phase: EPhase.Done,
             isCompleted: true,
@@ -860,19 +828,15 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             isRecording: false,
         });
 
-        // 1.5s 后跳转到 verdict-waiting
-        this.completedTimerId = setTimeout(() => {
-            const roomId: string = this.data.roomCode;
-            const role: string =
-                this.data.localRole === EPlayerRole.Organizer
-                    ? 'host'
-                    : 'guest';
-            void wx.redirectTo({
-                url:
-                    `/packageB/pages/verdict-waiting/index` +
-                    `?roomId=${roomId}&role=${role}`,
-            });
-        }, 1500) as unknown as number;
+        // 直接跳转到 verdict-waiting
+        const roomId: string = this.data.roomCode;
+        const role: string =
+            this.data.localRole === EPlayerRole.Organizer ? 'host' : 'guest';
+        void wx.redirectTo({
+            url:
+                `/packageB/pages/verdict-waiting/index` +
+                `?roomId=${roomId}&role=${role}`,
+        });
     },
 
     /**
@@ -932,13 +896,12 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        // 清空实时识别状态（保留已累积的 speechTextFinal）
-        // 设置 hasStartedSpeaking 确保对话框不会消失
+        // 清空当前阶段实时识别文本（保留已累积的 final）
+        const { liveKey } = this.getLocalSpeechKeys();
         this.setData({
-            speechTextLive: '',
+            [liveKey]: '',
             recognizeError: null,
             isRecognizing: false,
-            hasStartedSpeaking: true,
         });
 
         // 重置 ASR 服务序列号（新的录音会话）
