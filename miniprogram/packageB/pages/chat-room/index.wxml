@@ -5,10 +5,13 @@
 <view class="chat-room">
     <!-- 顶部区域：倒计时 + 发言舞台 -->
     <view class="chat-room__top-section">
-        <!-- 倒计时区域 -->
+        <!-- 倒计时区域：发言者显示倒计时，非发言者显示提示文案 -->
         <view class="chat-room__countdown-area">
-            <view class="chat-room__countdown chat-room__countdown--{{countdownClass}}">
+            <view wx:if="{{canSpeak}}" class="chat-room__countdown chat-room__countdown--{{countdownClass}}">
                 <text class="chat-room__countdown-text">{{remaining}}</text>
+            </view>
+            <view wx:else class="chat-room__listener-hint">
+                <text class="chat-room__listener-hint-text">{{listenerHint}}</text>
             </view>
         </view>
 

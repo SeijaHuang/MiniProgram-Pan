@@ -79,6 +79,9 @@ interface IChatRoomPageData {
 
     // 完成状态（收到 CHAT_COMPLETE 后的过渡）
     isCompleted: boolean;
+
+    // 非发言者提示文案
+    listenerHint: string;
 }
 
 type TSpeakerFinal = Pick<IChatRoomPageData, 'speakerAFinal' | 'speakerBFinal'>;
@@ -87,6 +90,7 @@ type TSpeakerLive = Pick<IChatRoomPageData, 'speakerALive' | 'speakerBLive'>;
 
 interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     timerId: number | null;
+    listenerHintTimerId: number | null;
     reactionIdCounter: number;
     myReactionTimeouts: number[];
     opponentReactionTimeouts: number[];
@@ -121,6 +125,16 @@ const PHASE_TRANSITION: Record<EPhase, EPhase> = {
     [EPhase.Done]: EPhase.Done,
 };
 const REACTION_LANES = [0, 1, 2];
+
+const LISTENER_HINTS: string[] = [
+    '你的冤家正在嗷嗷大叫中…',
+    '大老爷正在洗耳恭听…',
+    '对方正在声泪俱下…',
+    '冤家正在慷慨陈词中…',
+    '对面那位正在卖惨中…',
+    '请稍安勿躁，马上轮到你…',
+];
+const LISTENER_HINT_INTERVAL_MS = 10000;
 
 /**
  * ASR 语音识别配置
@@ -167,9 +181,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 完成状态
         isCompleted: false,
+
+        // 非发言者提示文案
+        listenerHint: '',
     },
 
     timerId: null,
+    listenerHintTimerId: null,
     reactionIdCounter: 0,
     myReactionTimeouts: [],
     opponentReactionTimeouts: [],
@@ -223,7 +241,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             canReact,
             countdownClass: this.getCountdownClass(TOTAL_PER_TURN),
             emojiAnimations,
+            listenerHint: canSpeak ? '' : this.pickListenerHint(),
         });
+
+        // 非发言者启动提示文案轮播
+        if (!canSpeak) {
+            this.startListenerHintRotation();
+        }
 
         // 初始化 ASR WebSocket 服务
         this.initASRService();
@@ -263,6 +287,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             clearInterval(this.timerId);
             this.timerId = null;
         }
+
+        // 清理提示文案轮播定时器
+        this.stopListenerHintRotation();
 
         // 停止语音识别
         if (this.asrManager && this.data.isRecording) {
@@ -308,6 +335,40 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return 'warn';
         }
         return 'normal';
+    },
+
+    /**
+     * 随机选取一条不重复的非发言者提示文案
+     */
+    pickListenerHint(): string {
+        const current: string = this.data.listenerHint;
+        const candidates: string[] = LISTENER_HINTS.filter(h => h !== current);
+        const pool: string[] =
+            candidates.length > 0 ? candidates : LISTENER_HINTS;
+        const idx: number = Math.floor(Math.random() * pool.length);
+        return pool[idx];
+    },
+
+    /**
+     * 启动非发言者提示文案轮播（每 10s 换一条）
+     */
+    startListenerHintRotation(): void {
+        this.stopListenerHintRotation();
+        this.listenerHintTimerId = setInterval(() => {
+            this.setData({
+                listenerHint: this.pickListenerHint(),
+            });
+        }, LISTENER_HINT_INTERVAL_MS) as unknown as number;
+    },
+
+    /**
+     * 停止非发言者提示文案轮播
+     */
+    stopListenerHintRotation(): void {
+        if (this.listenerHintTimerId) {
+            clearInterval(this.listenerHintTimerId);
+            this.listenerHintTimerId = null;
+        }
     },
 
     /**
@@ -706,6 +767,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 this.timerId = null;
             }
 
+            this.stopListenerHintRotation();
+
             this.setData({
                 phase: EPhase.Done,
                 canSpeak: false,
@@ -733,7 +796,14 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 countdownClass: this.getCountdownClass(totalPerTurn),
                 isRecording: false,
                 [liveKey]: '', // 仅清结束阶段的 live
+                listenerHint: nextCanSpeak ? '' : this.pickListenerHint(),
             });
+
+            if (nextCanSpeak) {
+                this.stopListenerHintRotation();
+            } else {
+                this.startListenerHintRotation();
+            }
 
             asrService.resetSequence();
         }
@@ -793,7 +863,14 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             countdownClass: this.getCountdownClass(totalPerTurn),
             isRecording: false,
             speakerALive: '', // 清 Phase A live，final 保留
+            listenerHint: nextCanSpeak ? '' : this.pickListenerHint(),
         });
+
+        if (nextCanSpeak) {
+            this.stopListenerHintRotation();
+        } else {
+            this.startListenerHintRotation();
+        }
 
         asrService.resetSequence();
     },

@@ -92,6 +92,22 @@
     }
 }
 
+/* Listener Hint - 非发言者提示文案 */
+.chat-room__listener-hint {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 150rpx;
+    padding: 0 32rpx;
+}
+
+.chat-room__listener-hint-text {
+    font-size: 30rpx;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    letter-spacing: 2rpx;
+}
+
 /* ==================== Reactions (Flying Emojis) ==================== */
 
 .chat-room__reactions {
