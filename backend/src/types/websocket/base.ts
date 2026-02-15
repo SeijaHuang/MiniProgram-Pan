@@ -29,6 +29,7 @@ export enum EWSMessageType {
 
     // Speech Turn Management
     SpeechTurnEnd = 'SPEECH_TURN_END', // Client → Server
+    SpeechTurnSwitch = 'SPEECH_TURN_SWITCH', // Server → Client
     ChatComplete = 'CHAT_COMPLETE', // Server → Client
 
     // Verdict Delivery

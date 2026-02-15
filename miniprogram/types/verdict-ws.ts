@@ -15,6 +15,14 @@ export interface ISpeechTurnEndPayload {
 }
 
 /**
+ * SPEECH_TURN_SWITCH payload (Server → Client)
+ * Broadcast when first speaker finishes, notifying turn switch
+ */
+export interface ISpeechTurnSwitchPayload {
+    roomId: string;
+}
+
+/**
  * CHAT_COMPLETE payload (Server → Client)
  * Broadcast when both players have finished speaking
  */

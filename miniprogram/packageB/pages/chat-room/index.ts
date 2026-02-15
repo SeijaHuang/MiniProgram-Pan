@@ -7,7 +7,10 @@ import { stsService } from '../../../services/sts-service';
 import { wsManager } from '../../../services/websocket-manager';
 import type { IEmojiReceiveData } from '../../../types/emoji-websocket';
 import type { ISTSCredentials } from '../../../types/sts-api';
-import type { IChatCompletePayload } from '../../../types/verdict-ws';
+import type {
+    IChatCompletePayload,
+    ISpeechTurnSwitchPayload,
+} from '../../../types/verdict-ws';
 import { EWSMessageType, EPlayerRole } from '../../../types/websocket-common';
 
 // 引入腾讯云语音识别插件
@@ -783,6 +786,50 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
+     * 处理 SPEECH_TURN_SWITCH 消息
+     * 第一位发言者结束后，服务器通知切换发言人
+     * 已在正确阶段的一方（发送者）忽略，未切换的一方更新状态
+     */
+    handleSpeechTurnSwitch(): void {
+        const { phase, localRole, totalPerTurn } = this.data;
+
+        // 如果已经不在 SpeakerA 阶段，说明本地已切换过，忽略
+        if (phase !== EPhase.SpeakerA) {
+            console.log(
+                '[ChatRoom] SPEECH_TURN_SWITCH ignored (already past SpeakerA)'
+            );
+            return;
+        }
+
+        console.log(
+            '[ChatRoom] SPEECH_TURN_SWITCH received, switching to SpeakerB'
+        );
+
+        const nextCanSpeak: boolean = this.computeCanSpeak(
+            EPhase.SpeakerB,
+            localRole
+        );
+        const canReact: boolean = !nextCanSpeak;
+
+        this.setData({
+            phase: EPhase.SpeakerB,
+            remaining: totalPerTurn,
+            canSpeak: nextCanSpeak,
+            canReact,
+            countdownClass: this.getCountdownClass(totalPerTurn),
+            isRecording: false,
+            speechTextLive: '',
+            speechTextFinal: '',
+            opponentTextLive: '',
+            opponentTextFinal: '',
+            hasStartedSpeaking: false,
+        });
+
+        // 重置 ASR 服务序列号
+        asrService.resetSequence();
+    },
+
+    /**
      * 处理 CHAT_COMPLETE 消息
      * 双方发言均已结束，显示过渡 UI 后跳转 verdict-waiting
      */
@@ -1034,15 +1081,28 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         try {
             const message = JSON.parse(data) as {
                 type: EWSMessageType;
-                data: IChatCompletePayload | IEmojiReceiveData;
+                data:
+                    | IChatCompletePayload
+                    | ISpeechTurnSwitchPayload
+                    | IEmojiReceiveData;
             };
 
-            if (message.type === EWSMessageType.ChatComplete) {
-                this.handleChatComplete(message.data as IChatCompletePayload);
-            } else if (message.type === EWSMessageType.EmojiReceive) {
-                this.handleEmojiReceive(
-                    (message.data as IEmojiReceiveData).emoji
-                );
+            switch (message.type) {
+                case EWSMessageType.SpeechTurnSwitch:
+                    this.handleSpeechTurnSwitch();
+                    break;
+                case EWSMessageType.ChatComplete:
+                    this.handleChatComplete(
+                        message.data as IChatCompletePayload
+                    );
+                    break;
+                case EWSMessageType.EmojiReceive:
+                    this.handleEmojiReceive(
+                        (message.data as IEmojiReceiveData).emoji
+                    );
+                    break;
+                default:
+                    break;
             }
         } catch (error) {
             console.error(

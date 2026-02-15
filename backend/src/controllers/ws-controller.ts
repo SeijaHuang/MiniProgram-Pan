@@ -481,13 +481,12 @@ export class WebSocketController {
             `[WebSocketController] Speech turn end for user ${result.userId} in room ${result.roomId}`
         );
 
-        // If both players finished, broadcast CHAT_COMPLETE and trigger verdict
         if (result.bothFinished) {
+            // Both players finished, broadcast CHAT_COMPLETE and trigger verdict
             console.log(
                 `[WebSocketController] Chat complete, triggering verdict generation for room ${result.roomId}`
             );
 
-            // Broadcast CHAT_COMPLETE
             const chatCompleteData: IChatCompleteData = {
                 roomId: result.roomId,
             };
@@ -506,6 +505,19 @@ export class WebSocketController {
                         `[WebSocketController] Verdict generation error: ${error}`
                     );
                 });
+        } else {
+            // First speaker finished, broadcast SPEECH_TURN_SWITCH
+            console.log(
+                `[WebSocketController] Speech turn switch in room ${result.roomId}`
+            );
+
+            connectionManager.broadcastToRoom(result.roomId, {
+                type: EWSMessageType.SpeechTurnSwitch,
+                data: {
+                    roomId: result.roomId,
+                },
+                timestamp: Date.now(),
+            });
         }
     }
 

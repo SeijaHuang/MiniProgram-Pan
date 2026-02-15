@@ -20,6 +20,18 @@ export interface ISpeechTurnEndMessage extends IWSMessage<ISpeechTurnEndData> {
 }
 
 /**
+ * SPEECH_TURN_SWITCH: Server → Client
+ * Broadcast when first speaker finishes, notifying turn switch
+ */
+export interface ISpeechTurnSwitchData {
+    roomId: string;
+}
+
+export interface ISpeechTurnSwitchMessage extends IWSMessage<ISpeechTurnSwitchData> {
+    type: EWSMessageType.SpeechTurnSwitch;
+}
+
+/**
  * CHAT_COMPLETE: Server → Client
  * Broadcast when both players have finished speaking
  */
@@ -162,6 +174,7 @@ export interface IVerdictResult {
  */
 export type TVerdictMessage =
     | ISpeechTurnEndMessage
+    | ISpeechTurnSwitchMessage
     | IChatCompleteMessage
     | IVerdictResultMessage
     | IVerdictFailedMessage
