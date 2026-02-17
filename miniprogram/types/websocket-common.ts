@@ -22,8 +22,17 @@ export enum EWSMessageType {
     EmojiReceive = 'EMOJI_RECEIVE',
     Error = 'ERROR',
 
-    // Verdict & Post-Game
-    VerdictResult = 'VERDICT_RESULT',
+    // Speech Turn Management
+    SpeechTurnEnd = 'SPEECH_TURN_END', // Client → Server
+    SpeechTurnSwitch = 'SPEECH_TURN_SWITCH', // Server → Client
+    ChatComplete = 'CHAT_COMPLETE', // Server → Client
+
+    // Verdict Delivery
+    VerdictResult = 'VERDICT_RESULT', // Server → Client
+    VerdictFailed = 'VERDICT_FAILED', // Server → Client
+    VerdictRetry = 'VERDICT_RETRY', // Client → Server
+
+    // Post-Game
     PostGameAction = 'POST_GAME_ACTION',
     PostGameEffect = 'POST_GAME_EFFECT',
     LeaveTogether = 'LEAVE_TOGETHER',

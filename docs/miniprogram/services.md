@@ -176,15 +176,44 @@ interface IDrumServiceOptions {
 
 **职责**:
 
-- 通过 HTTP 请求 AI 判决结果
+- WebSocket 监听判决结果推送（主通道）
+- HTTP 请求判决结果（回退通道）
+- LLM 原始格式 → 前端格式转换
 - 缓存判决结果供页面使用
 - 管理判决结果生命周期
 
 **核心方法**:
 
-- `fetchVerdict(roomId): Promise<IVerdictResult>`: 请求 AI 判决
+- `startListening(options)`: 注册 WebSocket 监听（`VERDICT_RESULT` / `VERDICT_FAILED`）
+- `mapVerdictResult(backend): IVerdictResult`: 转换后端格式为前端格式
+- `fetchVerdict(roomId): Promise<IVerdictResult>`: HTTP 回退请求判决
+- `cacheResult(result)`: 缓存判决结果
 - `getResult(): IVerdictResult | null`: 获取缓存的判决结果
-- `clear()`: 清除缓存
+- `clear()`: 清除缓存和 WebSocket 监听
+
+**监听选项**:
+
+```typescript
+interface IVerdictListeningOptions {
+    onResult: (result: IVerdictResult) => void;
+    onError: (payload: IVerdictFailedPayload) => void;
+}
+```
+
+**数据格式转换**:
+
+| 后端字段           | 前端字段                   | 转换说明    |
+| ------------------ | -------------------------- | ----------- |
+| `logicFallacy`     | `logicSlippery`            | 维度键映射  |
+| `coquettishDamage` | `charmAttack`              | 维度键映射  |
+| `factors[].name`   | `factors[].reason`         | 字段重命名  |
+| `secretReports[]`  | `secretReports.host/guest` | 数组 → 对象 |
+
+**消息类型**:
+
+- 监听: `VERDICT_RESULT`, `VERDICT_FAILED`
+- 发送: `VERDICT_RETRY`（通过 verdict-waiting 页面）
+- 回退: `POST /v1/rooms/:roomId/judgments`
 
 ## Post Game Service
 

@@ -277,16 +277,35 @@
 
 **需求描述**:
 - 基于双方发言内容，调用 LLM 生成搞笑风格的 AI 判决书
-- 包含责任分布、六维雷达图评分、大老爷赠言
+- 包含责任分布、六维雷达图评分、大老爷赠言、惩罚任务、私密战报
 
 **业务规则**:
 - ✅ 接受双方发言文本（1-8000 字符）
 - ✅ 调用 OpenAI API（gpt-4o）生成判决
-- ✅ 返回结构化 JSON（案件编号、责任、雷达图、赠言）
+- ✅ 返回结构化 JSON（案件编号、责任、雷达图、赠言、惩罚任务）
+- ✅ 责任百分比自动归一化（player1 + player2 + thirdParty = 100）
 - ✅ 支持幂等键防止重复请求
-- ✅ 请求超时 60 秒
+- ✅ 请求超时 30 秒
 
-**接口**: `POST /v1/rooms/:roomId/judgments`
+**接口**: `POST /v1/rooms/:roomId/judgments`（直接调用）
+
+#### 功能 7.2: WebSocket 驱动判决流程
+
+**需求描述**:
+- Chat Room 双方发言结束后，自动触发 LLM 判决
+- 通过 WebSocket 推送判决结果，支持失败重试
+- HTTP 回退接口获取缓存结果
+
+**业务规则**:
+- ✅ `SPEECH_TURN_END` 跟踪双方发言完成状态
+- ✅ 双方完成后广播 `CHAT_COMPLETE`，异步触发判决生成
+- ✅ ASR Final 文本自动累积到 `room.speechState`
+- ✅ 判决结果通过 `VERDICT_RESULT` WebSocket 推送
+- ✅ 失败时通过 `VERDICT_FAILED` 通知，最多重试 3 次
+- ✅ 缓存判决结果到 `room.verdictResult`
+- ✅ HTTP 回退接口 `GET /v1/rooms/:roomId/verdict`
+
+**消息类型**: `SPEECH_TURN_END`, `SPEECH_TURN_SWITCH`, `CHAT_COMPLETE`, `VERDICT_RESULT`, `VERDICT_FAILED`, `VERDICT_RETRY`
 
 ---
 
@@ -435,7 +454,8 @@ interface IConnectionData {
 | Endpoint | 方法 | 功能 | 详细文档 |
 |----------|------|------|----------|
 | `/v1/rooms` | POST | 创建房间 | [01-room-creation.md](./features/01-room-creation.md) |
-| `/v1/rooms/:roomId/judgments` | POST | LLM 判决 | [09-llm-judgment.md](./features/09-llm-judgment.md) |
+| `/v1/rooms/:roomId/judgments` | POST | LLM 判决（直接调用） | [09-llm-judgment.md](./features/09-llm-judgment.md) |
+| `/v1/rooms/:roomId/verdict` | GET | 获取缓存判决（回退） | [09-llm-judgment.md](./features/09-llm-judgment.md) |
 | `/v1/tencent/credentials` | GET | STS 临时凭证 | [08-tencent-sts-token.md](./features/08-tencent-sts-token.md) |
 
 ### 4.2 WebSocket 消息类型
@@ -450,6 +470,12 @@ interface IConnectionData {
 | `ASR_TEXT` | Server → Client | 广播识别文本 | [07-asr-real-time-speech.md](./features/07-asr-real-time-speech.md) |
 | `EMOJI_SEND` | Client → Server | 发送表情 | [10-emoji-messages.md](./features/10-emoji-messages.md) |
 | `EMOJI_RECEIVE` | Server → Client | 接收表情 | [10-emoji-messages.md](./features/10-emoji-messages.md) |
+| `SPEECH_TURN_END` | Client → Server | 发言结束 | [09-llm-judgment.md](./features/09-llm-judgment.md) |
+| `SPEECH_TURN_SWITCH` | Server → Client | 轮次切换 | [09-llm-judgment.md](./features/09-llm-judgment.md) |
+| `CHAT_COMPLETE` | Server → Client | 对话完成 | [09-llm-judgment.md](./features/09-llm-judgment.md) |
+| `VERDICT_RESULT` | Server → Client | 判决结果推送 | [09-llm-judgment.md](./features/09-llm-judgment.md) |
+| `VERDICT_FAILED` | Server → Client | 判决失败 | [09-llm-judgment.md](./features/09-llm-judgment.md) |
+| `VERDICT_RETRY` | Client → Server | 请求重试 | [09-llm-judgment.md](./features/09-llm-judgment.md) |
 | `DRUM_READY` | Server → Client | 游戏准备 | [06-drum-game.md](./features/06-drum-game.md) |
 | `DRUM_START` | Server → Client | 游戏开始 | [06-drum-game.md](./features/06-drum-game.md) |
 | `DRUM_TAP` | Bidirectional | 点击事件 | [06-drum-game.md](./features/06-drum-game.md) |
@@ -558,6 +584,11 @@ interface IConnectionData {
 - [x] 表情消息正确转发给对方
 - [x] LLM 判决书返回完整的结构化数据
 - [x] STS 临时凭证正确获取和缓存
+- [x] SPEECH_TURN_END 正确跟踪双方发言完成
+- [x] CHAT_COMPLETE 在双方完成后自动广播
+- [x] 判决通过 WebSocket 异步推送给双方
+- [x] 判决失败支持重试（最多 3 次）
+- [x] ASR 文本正确累积到 room.speechState
 
 ### 8.2 性能验收
 
@@ -599,8 +630,14 @@ interface IConnectionData {
 
 - ✅ LLM 判决书生成（OpenAI 集成）
 - ✅ 六维雷达图评分
-- ✅ 责任分布 + 第三方搞笑因素
+- ✅ 责任分布 + 第三方搞笑因素（百分比自动归一化）
 - ✅ 幂等请求支持
+- ✅ WebSocket 驱动判决流程（SPEECH_TURN_END → CHAT_COMPLETE → VERDICT_RESULT）
+- ✅ 判决编排服务（VerdictOrchestratorService + VerdictMapperService）
+- ✅ ASR 文本自动累积（room.speechState）
+- ✅ 判决失败重试机制（最多 3 次）
+- ✅ HTTP 回退接口（GET /v1/rooms/:roomId/verdict）
+- ✅ 惩罚任务 + 私密战报生成
 
 ### Phase 4: 生产就绪（未来）
 

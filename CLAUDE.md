@@ -93,24 +93,25 @@ Reusable components registered via page `index.json` `usingComponents`:
 
 All services are classes exported as singleton instances:
 
-| Service                  | Export                 | Purpose                                          |
-| ------------------------ | ---------------------- | ------------------------------------------------ |
-| `websocket-manager`      | `wsManager`            | WebSocket connection lifecycle (shared bus)      |
-| `room-service`           | `roomService`          | Room creation via HTTP API                       |
-| `room-websocket-service` | `roomWebSocketService` | Room join/leave via WebSocket                    |
-| `drum-service`           | `drumService`          | Drum game message sending/receiving              |
-| `chat-service`           | `chatService`          | Chat message handling                            |
-| `asr-service`            | `asrService`           | ASR text sync via WebSocket (throttled)          |
-| `sts-service`            | `stsService`           | Tencent Cloud STS token fetching                 |
-| `verdict-service`        | `verdictService`       | Verdict result fetching and caching              |
-| `post-game-service`      | `postGameService`      | Post-game interactions (effects, leave together) |
+| Service                  | Export                 | Purpose                                                               |
+| ------------------------ | ---------------------- | --------------------------------------------------------------------- |
+| `websocket-manager`      | `wsManager`            | WebSocket connection lifecycle (shared bus)                           |
+| `room-service`           | `roomService`          | Room creation via HTTP API                                            |
+| `room-websocket-service` | `roomWebSocketService` | Room join/leave via WebSocket                                         |
+| `drum-service`           | `drumService`          | Drum game message sending/receiving                                   |
+| `chat-service`           | `chatService`          | Chat message handling                                                 |
+| `asr-service`            | `asrService`           | ASR text sync via WebSocket (throttled)                               |
+| `sts-service`            | `stsService`           | Tencent Cloud STS token fetching                                      |
+| `verdict-service`        | `verdictService`       | Verdict result (WS listen + HTTP fallback + format mapping + caching) |
+| `post-game-service`      | `postGameService`      | Post-game interactions (effects, leave together)                      |
 
 ### Dual Type System for WebSocket Messages
 
 The frontend uses **two separate type hierarchies** for WebSocket messages:
 
-1. **General messages** (`types/websocket-common.ts`): `EWSMessageType` + `IWSMessage<T>` — for `JOIN_ROOM`, `CHAT_SEND`, `ASR_TEXT_PUSH`, etc.
+1. **General messages** (`types/websocket-common.ts`): `EWSMessageType` + `IWSMessage<T>` — for `JOIN_ROOM`, `CHAT_SEND`, `ASR_TEXT_PUSH`, `SPEECH_TURN_END`, `VERDICT_RESULT`, etc.
 2. **Drum messages** (`types/drum-websocket.ts`): `EDrumMessageType` + `IDrumMessage<T>` — for `DRUM_READY`, `DRUM_START`, `DRUM_TAP`, `DRUM_FINISH`, `DRUM_RESULT`
+3. **Verdict messages** (`types/verdict-ws.ts`): Verdict-specific payload types — `IBackendVerdictResult`, `IVerdictResultPayload`, `IVerdictFailedPayload`, etc.
 
 The backend uses a single unified `EWSMessageType` enum for all message types.
 
@@ -235,6 +236,8 @@ Husky + lint-staged runs ESLint + Prettier on `.ts`, `.js`, `.json`, `.md`. Comm
 | `DRUM_TAP`         | Record drum tap during game                                         |
 | `CHAT_SEND`        | Send a chat message                                                 |
 | `ASR_TEXT_PUSH`    | Push ASR transcription text (throttled partials + immediate finals) |
+| `SPEECH_TURN_END`  | Notify server that player's speech turn is done                     |
+| `VERDICT_RETRY`    | Request retry after verdict generation failure                      |
 | `POST_GAME_EFFECT` | Send post-game effect (execute punishment / beg for mercy)          |
 | `LEAVE_TOGETHER`   | Request mutual leave from verdict page                              |
 
@@ -250,6 +253,10 @@ Husky + lint-staged runs ESLint + Prettier on `.ts`, `.js`, `.json`, `.md`. Comm
 | `DRUM_RESULT`        | Final game results (scores + winner)                      |
 | `CHAT_RECEIVE`       | Receive chat message (broadcast)                          |
 | `ASR_TEXT`           | ASR transcription result (broadcast to other participant) |
+| `SPEECH_TURN_SWITCH` | First speaker done, notify turn switch                    |
+| `CHAT_COMPLETE`      | Both speakers done, triggers verdict generation           |
+| `VERDICT_RESULT`     | AI verdict result push (success)                          |
+| `VERDICT_FAILED`     | AI verdict generation failed (with canRetry flag)         |
 | `POST_GAME_EFFECT`   | Post-game effect broadcast (stamp/emoji)                  |
 | `LEAVE_TOGETHER_ACK` | Acknowledge mutual leave (with `allReady` flag)           |
 | `ERROR`              | Error notification                                        |
@@ -281,7 +288,8 @@ Husky + lint-staged runs ESLint + Prettier on `.ts`, `.js`, `.json`, `.md`. Comm
 | ------ | ----------------------------- | ------------------------------------------------- |
 | GET    | `/health`                     | Health check                                      |
 | POST   | `/v1/rooms`                   | Create a new room (returns `roomId` + `roomCode`) |
-| POST   | `/v1/rooms/:roomId/judgments` | LLM judgment verdict                              |
+| POST   | `/v1/rooms/:roomId/judgments` | LLM judgment verdict (direct call)                |
+| GET    | `/v1/rooms/:roomId/verdict`   | Get cached verdict result (fallback)              |
 | GET    | `/v1/tencent/credentials`     | Get Tencent Cloud STS token for client-side ASR   |
 
 ## Backend Environment Variables

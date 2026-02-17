@@ -14,7 +14,9 @@
       "Bash(then echo \"EXISTS \\(BAD\\): $f\")",
       "Bash(else echo \"GONE \\(OK\\): $f\")",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(npm run format:*)",
+      "Bash(timeout 8 npm run dev:*)"
     ]
   }
 }

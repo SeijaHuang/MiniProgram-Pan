@@ -133,4 +133,35 @@
         </view>
     </view>
 
+    <!-- Error overlay -->
+    <view class="timeout" wx:if="{{ showError }}">
+        <view class="timeout__content">
+            <text class="timeout__duck-emoji">😵</text>
+
+            <text class="timeout__title">判决生成失败</text>
+            <text class="timeout__subtitle">
+                {{ errorMessage }}
+            </text>
+
+            <view class="timeout__actions">
+                <view class="timeout__btn-wrap" wx:if="{{ canRetry }}">
+                    <styled-button
+                        text="重试"
+                        color="yellow"
+                        showShine="{{ false }}"
+                        bind:tap="onTapRetry"
+                    />
+                </view>
+                <view class="timeout__btn-wrap">
+                    <styled-button
+                        text="返回首页"
+                        color="grey"
+                        showShine="{{ false }}"
+                        bind:tap="onTapHome"
+                    />
+                </view>
+            </view>
+        </view>
+    </view>
+
 </view>

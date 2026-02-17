@@ -21,7 +21,7 @@ docs/
 │       ├── 06-drum-game.md              # 震天鼓游戏
 │       ├── 07-asr-real-time-speech.md   # ASR 实时语音识别
 │       ├── 08-tencent-sts-token.md      # 腾讯云 STS 凭证
-│       ├── 09-llm-judgment.md           # LLM 判决书生成
+│       ├── 09-llm-judgment.md           # LLM 判决书生成（含 WebSocket 判决推送）
 │       └── 10-emoji-messages.md         # 表情互动消息
 └── miniprogram/                # 小程序前端文档
     ├── welcome.md              # 欢迎页
@@ -90,7 +90,23 @@ docs/
     - 麦克风按钮（可发言/录音中/禁用三种状态）
     - 表情互动系统（仅监听方可操作，弹幕/飞行物形式）
     - 状态流转管理（waiting → speaker_turn → listener_turn → completed）
+    - ASR 文本持久化展示（双气泡：Phase A + Phase B 的 Final + Live 文本）
+    - 发言轮次管理（`SPEECH_TURN_END` → `SPEECH_TURN_SWITCH` → `CHAT_COMPLETE`）
+    - 发言结束后自动跳转至判决等待页
     - WebSocket 实时状态同步
+
+#### Verdict Waiting（判决等待页）
+
+- **页面路径**: `packageB/pages/verdict-waiting/index`
+- **功能**: LLM 判决生成期间的等待页面，通过 WebSocket 接收判决结果
+- **核心特性**:
+    - WebSocket 监听（`VERDICT_RESULT` / `VERDICT_FAILED`）
+    - 多组并行动画（标题发光、鸭子浮动、小狗碰撞、齿轮旋转、粒子上升）
+    - 随机加载文案轮播（30 条趣味文案，每 3 秒切换）
+    - 90 秒超时处理（显示重试叠层）
+    - 失败重试机制（发送 `VERDICT_RETRY`，最多 3 次）
+    - 最小展示时间 5 秒（防止闪烁）
+    - 收到结果后跳转至判决展示页
 
 #### Verdict（清汤大老爷判决书）
 
@@ -98,6 +114,7 @@ docs/
 - **页面路径**: `packageB/pages/verdict/index`
 - **功能**: AI 判决结果可视化核心产出页面，以长滚动卡片形式展示判决结果各维度
 - **核心特性**:
+    - 数据来源优先级：verdictService 缓存 → globalData → HTTP 回退
     - 标题区（红色背景 + 鸭子图标 + 案件编号）
     - 责任分布（三列布局：双方百分比 + 第三方因素）
     - 六维战力雷达图（Canvas 2D 绘制）
@@ -151,7 +168,7 @@ docs/
     - **Drum Service** (`drum-service.ts`) - 抢麦点击与对抗结果消息
     - **ASR Service** (`asr-service.ts`) - ASR 语音识别文本同步
     - **STS Service** (`sts-service.ts`) - 腾讯云 STS 临时凭证
-    - **Verdict Service** (`verdict-service.ts`) - AI 判决结果获取与缓存
+    - **Verdict Service** (`verdict-service.ts`) - AI 判决结果获取（WebSocket 监听 + HTTP 回退）、格式转换与缓存
     - **Post Game Service** (`post-game-service.ts`) - 赛后互动（特效、共同退堂）
 
 ---
@@ -165,9 +182,10 @@ docs/
 - **文件**: `backend/api-specification.md`
 - **功能**: 完整的 HTTP 和 WebSocket API 规范
 - **核心内容**:
-    - HTTP REST API（房间创建、LLM 判决、STS 凭证）
+    - HTTP REST API（房间创建、LLM 判决、判决回退、STS 凭证）
     - WebSocket 实时通信协议
-    - 消息类型和格式（JOIN*ROOM, CHAT_SEND, DRUM*\*, ASR_TEXT_PUSH, EMOJI_SEND 等）
+    - 消息类型和格式（JOIN*ROOM, CHAT_SEND, DRUM*\*, ASR*TEXT_PUSH, EMOJI_SEND, SPEECH_TURN_END, VERDICT*\* 等）
+    - 完整判决 WebSocket 流程
     - 错误代码参考
     - 完整流程示例
 
@@ -176,10 +194,13 @@ docs/
 - **文件**: `backend/data-models.md`
 - **功能**: 后端数据模型定义
 - **核心内容**:
-    - 核心实体（IRoom, IUser, IMessage, IASRSessionState）
+    - 核心实体（IRoom, IUser, IMessage, IASRSessionState, ISpeechState）
     - 游戏状态（IDrumGameState, EGamePhase, EPlayerRole）
-    - LLM 判决类型（IJudgmentResponse, IRadarScores）
+    - LLM 判决类型（IJudgmentResponse, IRadarScores, IVerdictResult, IVerdictDimensionScores）
+    - 判决状态（TVerdictStatus, ISecretReport, IVerdictFactor）
     - 表情消息类型（IEmojiSendMessage, IEmojiReceiveMessage）
+    - 语音轮次消息类型（ISpeechTurnEndMessage, IChatCompleteMessage）
+    - 判决消息类型（IVerdictResultMessage, IVerdictFailedMessage, IVerdictRetryMessage）
     - 枚举类型（ERoomStatus, EMessageType, EWSMessageType）
     - 数据传输对象（DTO）
     - 内存存储索引策略
@@ -191,9 +212,10 @@ docs/
 - **核心内容**:
     - 三层架构模式（Routes → Controllers → Services/Handlers → Domain Services）
     - 单例模式（RoomManager, ConnectionManager, DrumGameManager）
-    - 处理器模式（5 个纯函数 Handler）
-    - HTTP 数据流（3 条路由）和 WebSocket 数据流（5 种消息）
+    - 处理器模式（7 个纯函数 Handler）
+    - HTTP 数据流（4 条路由）和 WebSocket 数据流（7 种消息）
     - 震天鼓游戏编排流程
+    - 判决生成编排流程（VerdictOrchestratorService）
     - 外部服务集成（OpenAI, Tencent Cloud）
 
 #### 产品需求
@@ -291,13 +313,18 @@ docs/
 #### 09. LLM 判决书生成
 
 - **文件**: `backend/features/09-llm-judgment.md`
-- **功能**: AI 判决结果生成
+- **功能**: AI 判决结果生成（WebSocket 驱动 + HTTP 回退）
 - **核心内容**:
-    - POST /v1/rooms/:roomId/judgments 接口
-    - OpenAI 集成（gpt-4o, JSON 格式）
-    - 六维雷达图评分体系
-    - 责任分布 + 第三方搞笑因素
-    - 幂等请求支持
+    - WebSocket 判决流程（SPEECH_TURN_END → CHAT_COMPLETE → VERDICT_RESULT）
+    - 判决编排服务（VerdictOrchestratorService + VerdictMapperService）
+    - ASR 文本自动累积（room.speechState）
+    - 判决失败重试机制（最多 3 次）
+    - POST /v1/rooms/:roomId/judgments 接口（直接调用）
+    - GET /v1/rooms/:roomId/verdict 接口（回退获取缓存）
+    - OpenAI 集成（gpt-4o, JSON 格式, 30s 超时）
+    - 六维雷达图评分体系（中文→英文键映射）
+    - 责任分布 + 第三方搞笑因素（百分比归一化）
+    - 惩罚任务 + 私密战报生成
 
 #### 10. 表情互动消息
 

@@ -47,7 +47,7 @@ export const TEXT_INTERVAL_MS: number = 3000;
 export const MAX_VISIBLE_TEXTS: number = 20;
 
 /** AI 分析超时时间（毫秒） */
-export const ANALYSIS_TIMEOUT_MS: number = 30000;
+export const ANALYSIS_TIMEOUT_MS: number = 90000;
 
 /** 省略号切换间隔（毫秒） */
 export const DOTS_INTERVAL_MS: number = 500;

@@ -5,30 +5,24 @@
 <view class="chat-room">
     <!-- 顶部区域：倒计时 + 发言舞台 -->
     <view class="chat-room__top-section">
-        <!-- 倒计时区域 -->
+        <!-- 倒计时区域：发言者显示倒计时，非发言者显示提示文案 -->
         <view class="chat-room__countdown-area">
-            <view class="chat-room__countdown chat-room__countdown--{{countdownClass}}">
+            <view wx:if="{{canSpeak}}" class="chat-room__countdown chat-room__countdown--{{countdownClass}}">
                 <text class="chat-room__countdown-text">{{remaining}}</text>
+            </view>
+            <view wx:else class="chat-room__listener-hint">
+                <text class="chat-room__listener-hint-text">{{listenerHint}}</text>
             </view>
         </view>
 
         <!-- 发言舞台区 -->
         <view class="chat-room__stage">
-            <!-- 自己说话时：显示累积文字 + 实时识别文字（开始发言后框不消失） -->
-            <view class="chat-room__speech-text" wx:if="{{canSpeak && hasStartedSpeaking}}">
-                <text class="chat-room__speech-text-content" wx:if="{{speechTextFinal || speechTextLive}}">{{speechTextFinal}}{{speechTextLive}}</text>
-                <text class="chat-room__speech-text-placeholder" wx:else>正在聆听...</text>
+            <!-- 提示文案 -->
+            <view class="chat-room__stage-hint" wx:if="{{canSpeak && !isRecording}}">
+                <text>按住麦克风开始申冤</text>
             </view>
-
-            <!-- 对方说话时：显示对方的实时识别文字 -->
-            <view class="chat-room__speech-text chat-room__speech-text--opponent" wx:elif="{{!canSpeak && opponentTextLive}}">
-                <text class="chat-room__speech-text-content">{{opponentTextLive}}</text>
-            </view>
-
-            <!-- 无文字时显示提示文案 -->
-            <view class="chat-room__stage-hint" wx:elif="{{(canSpeak && !hasStartedSpeaking) || (!canSpeak && !opponentTextLive)}}">
-                <text wx:if="{{canSpeak}}">点击麦克风开始申冤...</text>
-                <text wx:else>等待对方陈述...</text>
+            <view class="chat-room__stage-hint" wx:elif="{{!canSpeak}}">
+                <text>等待对方陈述...</text>
             </view>
 
             <!-- 录音中显示波纹动画 -->
@@ -66,26 +60,39 @@
         </view>
     </view>
 
-    <!-- 对话框区域 - 语音转文字内容 -->
+    <!-- 对话框区域 - 按阶段持久化显示的语音转文字内容 -->
     <scroll-view
         class="chat-room__dialog"
         scroll-y="{{true}}"
-        scroll-into-view="msg-{{messages[messages.length - 1].id}}"
+        scroll-into-view="{{speakerBFinal || speakerBLive ? 'msg-speaker-b' : ''}}"
         scroll-with-animation="{{true}}"
     >
         <view class="chat-room__dialog-inner">
-            <!-- 消息列表 -->
+            <!-- Phase A 气泡（原告 / Organizer） -->
             <view
-                wx:for="{{messages}}"
-                wx:key="id"
-                id="msg-{{item.id}}"
-                class="chat-room__message chat-room__message--{{item.role === localRole ? 'self' : 'other'}}"
+                wx:if="{{speakerAFinal || speakerALive}}"
+                id="msg-speaker-a"
+                class="chat-room__message chat-room__message--{{localRole === 'Organizer' ? 'self' : 'other'}}"
             >
                 <view class="chat-room__message-bubble">
-                    <text class="chat-room__message-text">{{item.content}}</text>
+                    <text class="chat-room__message-text">{{speakerAFinal}}{{speakerALive}}</text>
                 </view>
                 <view class="chat-room__message-role">
-                    <text>{{item.role === 'Organizer' ? '原告' : '被告'}}</text>
+                    <text>原告</text>
+                </view>
+            </view>
+
+            <!-- Phase B 气泡（被告 / Joiner） -->
+            <view
+                wx:if="{{speakerBFinal || speakerBLive}}"
+                id="msg-speaker-b"
+                class="chat-room__message chat-room__message--{{localRole === 'Joiner' ? 'self' : 'other'}}"
+            >
+                <view class="chat-room__message-bubble">
+                    <text class="chat-room__message-text">{{speakerBFinal}}{{speakerBLive}}</text>
+                </view>
+                <view class="chat-room__message-role">
+                    <text>被告</text>
                 </view>
             </view>
         </view>

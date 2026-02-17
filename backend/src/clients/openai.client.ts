@@ -90,6 +90,70 @@ function validateRadar(obj: unknown, label: string): IRadarScores {
 }
 
 /**
+ * Normalize responsibility values so player1 + player2 + factors = 100
+ * Uses proportional scaling and rounds to integers.
+ */
+function normalizeResponsibility(
+    player1: number,
+    player2: number,
+    factors: IThirdPartyFactor[]
+): { player1: number; player2: number; factors: IThirdPartyFactor[] } {
+    const factorSum: number = factors.reduce((sum, f) => sum + f.percentage, 0);
+    const rawTotal: number = player1 + player2 + factorSum;
+
+    // Already sums to 100 — no adjustment needed
+    if (rawTotal === 100) {
+        return { player1, player2, factors };
+    }
+
+    // Avoid division by zero (shouldn't happen in practice)
+    if (rawTotal === 0) {
+        return {
+            player1: 50,
+            player2: 50,
+            factors: factors.map(f => ({ ...f, percentage: 0 })),
+        };
+    }
+
+    const scale: number = 100 / rawTotal;
+
+    // Scale and floor everything first
+    const scaledP1: number = Math.round(player1 * scale);
+    const scaledP2: number = Math.round(player2 * scale);
+    const scaledFactors: IThirdPartyFactor[] = factors.map(f => ({
+        ...f,
+        percentage: Math.round(f.percentage * scale),
+    }));
+    const scaledFactorSum: number = scaledFactors.reduce(
+        (sum, f) => sum + f.percentage,
+        0
+    );
+
+    // Fix rounding drift by adjusting the largest bucket (player1 or player2)
+    const drift: number = scaledP1 + scaledP2 + scaledFactorSum - 100;
+    if (drift !== 0) {
+        if (scaledP1 >= scaledP2) {
+            return {
+                player1: scaledP1 - drift,
+                player2: scaledP2,
+                factors: scaledFactors,
+            };
+        }
+        return {
+            player1: scaledP1,
+            player2: scaledP2 - drift,
+            factors: scaledFactors,
+        };
+    }
+
+    return {
+        player1: scaledP1,
+        player2: scaledP2,
+        factors: scaledFactors,
+    };
+}
+
+/**
  * Validate that parsed JSON conforms to IJudgmentResponse
  */
 function validateJudgment(obj: unknown): IJudgmentResponse {
@@ -153,18 +217,31 @@ function validateJudgment(obj: unknown): IJudgmentResponse {
         throw new Error('verdict 必须是字符串');
     }
 
+    // punishmentTask
+    if (typeof rec.punishmentTask !== 'string') {
+        throw new Error('punishmentTask 必须是字符串');
+    }
+
+    // Normalize responsibility so total = 100
+    const normalized = normalizeResponsibility(
+        resp.player1,
+        resp.player2,
+        factors
+    );
+
     return {
         caseNumber: rec.caseNumber,
         responsibility: {
-            player1: resp.player1,
-            player2: resp.player2,
-            thirdParty: { factors },
+            player1: normalized.player1,
+            player2: normalized.player2,
+            thirdParty: { factors: normalized.factors },
         },
         radarChart: {
             player1: p1Radar,
             player2: p2Radar,
         },
         verdict: rec.verdict,
+        punishmentTask: rec.punishmentTask,
     };
 }
 
