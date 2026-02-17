@@ -107,13 +107,6 @@ class RoomWebSocketService {
         this.currentRoomCode = null;
         this.currentUser = null;
     }
-
-    /**
-     * Get current room code
-     */
-    getCurrentRoomCode(): string | null {
-        return this.currentRoomCode;
-    }
 }
 
 // Export singleton instance

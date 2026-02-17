@@ -24,14 +24,6 @@ export interface ILoadingText {
     text: string;
 }
 
-/** VERDICT_READY 消息 payload */
-export interface IVerdictReadyPayload {
-    roomId: string;
-    roomCode: string;
-    /** 判决结果状态 */
-    status: 'success' | 'failed';
-}
-
 /** 页面 data 类型 */
 export interface IVerdictWaitingData {
     /** 房间 ID */

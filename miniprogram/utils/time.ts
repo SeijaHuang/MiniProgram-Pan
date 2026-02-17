@@ -51,18 +51,3 @@ export function getTimeRemainingSec(targetMs: number): number {
     const remainingMs: number = getTimeRemainingMs(targetMs);
     return Math.ceil(remainingMs / 1000);
 }
-
-/**
- * Reset server time offset (for testing/mock mode)
- */
-export function resetServerTimeOffset(): void {
-    serverTimeOffsetMs = 0;
-}
-
-/**
- * Get current server time offset
- * @returns Current offset in milliseconds
- */
-export function getServerTimeOffset(): number {
-    return serverTimeOffsetMs;
-}

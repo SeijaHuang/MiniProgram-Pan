@@ -179,24 +179,6 @@ export class RoomManager {
     }
 
     /**
-     * Check if user is participant of a room
-     */
-    isParticipant(roomId: string, userId: string): boolean {
-        const room = this.rooms.get(roomId);
-        if (!room) {
-            return false;
-        }
-        return room.participants.some(p => p.user.userId === userId);
-    }
-
-    /**
-     * Get all rooms (for debugging/admin purposes)
-     */
-    getAllRooms(): IRoom[] {
-        return Array.from(this.rooms.values());
-    }
-
-    /**
      * Generate unique room ID
      */
     private generateRoomId(): string {

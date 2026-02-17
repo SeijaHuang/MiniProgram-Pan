@@ -156,15 +156,6 @@ class STSService {
             });
         });
     }
-
-    /**
-     * 清除缓存的凭证
-     * 在需要强制刷新时调用
-     */
-    clearCache(): void {
-        this.cachedCredentials = null;
-        console.log('[STSService] Cache cleared');
-    }
 }
 
 // Export singleton instance

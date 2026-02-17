@@ -111,30 +111,6 @@ function resetSessionState(roomId: string, speakerId: string): void {
 }
 
 /**
- * Clean up session state when room/user disconnects
- */
-export function cleanupASRSession(roomId: string, speakerId?: string): void {
-    if (speakerId) {
-        const key = getSessionKey(roomId, speakerId);
-        const state = sessionStates.get(key);
-        if (state?.throttleTimer) {
-            clearTimeout(state.throttleTimer);
-        }
-        sessionStates.delete(key);
-    } else {
-        // Clean up all sessions for this room
-        for (const [key, state] of sessionStates.entries()) {
-            if (key.startsWith(`${roomId}:`)) {
-                if (state.throttleTimer) {
-                    clearTimeout(state.throttleTimer);
-                }
-                sessionStates.delete(key);
-            }
-        }
-    }
-}
-
-/**
  * Handle ASR_TEXT_PUSH message
  *
  * @param connectionManager - Connection manager instance

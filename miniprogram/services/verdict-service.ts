@@ -145,24 +145,10 @@ class VerdictService {
     }
 
     /**
-     * Cache a verdict result (for use by verdict page)
-     */
-    cacheResult(result: IVerdictResult): void {
-        this.cachedResult = result;
-    }
-
-    /**
      * Get cached verdict result
      */
     getResult(): IVerdictResult | null {
         return this.cachedResult;
-    }
-
-    /**
-     * Set verdict result directly
-     */
-    setResult(result: IVerdictResult): void {
-        this.cachedResult = result;
     }
 
     /**

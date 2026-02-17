@@ -71,19 +71,3 @@ export function destroyAudioPool(): void {
     audioPool = [];
     audioIndex = 0;
 }
-
-/**
- * Set audio enabled state
- * @param enabled - Whether to enable audio
- */
-export function setAudioEnabled(enabled: boolean): void {
-    audioEnabled = enabled;
-}
-
-/**
- * Check if audio is enabled
- * @returns Whether audio is enabled
- */
-export function isAudioEnabled(): boolean {
-    return audioEnabled;
-}

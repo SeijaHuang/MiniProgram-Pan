@@ -6,15 +6,6 @@
  */
 
 /**
- * SPEECH_TURN_END payload (Client → Server)
- * Sent when a player finishes their 60-second speech turn
- */
-export interface ISpeechTurnEndPayload {
-    roomId: string;
-    userId: string;
-}
-
-/**
  * SPEECH_TURN_SWITCH payload (Server → Client)
  * Broadcast when first speaker finishes, notifying turn switch
  */
@@ -106,13 +97,4 @@ export interface IVerdictFailedPayload {
     error: string;
     canRetry: boolean;
     retryCount: number;
-}
-
-/**
- * VERDICT_RETRY payload (Client → Server)
- * Sent to request verdict retry after failure
- */
-export interface IVerdictRetryPayload {
-    roomId: string;
-    userId: string;
 }
