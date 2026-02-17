@@ -22,6 +22,7 @@
 - ✅ ASR 语音转文字实时同步（去重 + 节流）
 - ✅ 表情互动消息（实时转发）
 - ✅ LLM 判决书生成（OpenAI 集成）
+- ✅ WebSocket 驱动的判决流程（语音轮次管理 + 异步判决 + 重试机制）
 - ✅ 腾讯云 STS 临时凭证服务
 
 ---
@@ -364,6 +365,61 @@ curl -X POST http://localhost:8080/v1/rooms/room_123456/judgments \
 - Temperature: 0.7（保证创意性）
 - 强制 JSON 响应格式
 - 支持通过 `idempotencyKey` 防止重复请求
+- 责任百分比自动归一化（player1 + player2 + thirdParty = 100）
+
+> **注意**: 此接口为直接调用方式。在实际游戏流程中，判决通过 WebSocket 自动触发（见下方 SPEECH_TURN_END / VERDICT_RESULT 消息），此 HTTP 接口现作为备用回退。
+
+---
+
+### 4. 获取判决结果（回退接口）
+
+**Endpoint**: `GET /v1/rooms/:roomId/verdict`
+
+**描述**: 获取已缓存的判决结果。当 WebSocket 推送失败时，客户端可通过此接口轮询获取结果。此接口不会触发新的 LLM 调用。
+
+#### Request
+
+**URL Parameters**:
+- `roomId`: 房间 ID（必填）
+
+#### Response
+
+**成功响应** (200 OK):
+```typescript
+{
+  "success": true,
+  "data": IVerdictResult  // 完整的判决结果（见数据模型文档）
+}
+```
+
+**未就绪响应** (404 Not Found):
+```typescript
+{
+  "success": false,
+  "error": {
+    "code": "VERDICT_NOT_READY",
+    "message": "判决结果尚未生成"
+  }
+}
+```
+
+**错误响应** (500 Internal Server Error):
+```typescript
+{
+  "success": false,
+  "error": {
+    "code": "INTERNAL_ERROR",
+    "message": string
+  }
+}
+```
+
+#### 示例
+
+**cURL**:
+```bash
+curl -X GET http://localhost:8080/v1/rooms/room_123456/verdict
+```
 
 ---
 
@@ -410,6 +466,12 @@ curl -X POST http://localhost:8080/v1/rooms/room_123456/judgments \
 | `DRUM_TAP` | Bidirectional | 震天鼓游戏 | 点击事件 |
 | `DRUM_FINISH` | Server → Client | 震天鼓游戏 | 游戏结束 |
 | `DRUM_RESULT` | Server → Client | 震天鼓游戏 | 最终结果 |
+| `SPEECH_TURN_END` | Client → Server | 语音轮次 | 玩家发言结束 |
+| `SPEECH_TURN_SWITCH` | Server → Client | 语音轮次 | 第一位发言者结束，切换轮次 |
+| `CHAT_COMPLETE` | Server → Client | 语音轮次 | 双方发言结束，触发判决 |
+| `VERDICT_RESULT` | Server → Client | AI 判决 | 判决结果推送（成功） |
+| `VERDICT_FAILED` | Server → Client | AI 判决 | 判决生成失败 |
+| `VERDICT_RETRY` | Client → Server | AI 判决 | 请求重试判决 |
 | `ERROR` | Server → Client | 错误处理 | 错误通知 |
 
 ---
@@ -754,6 +816,214 @@ ASR（Automatic Speech Recognition）功能为 Chat Room 提供实时语音转�
 
 ---
 
+### 6. 语音轮次管理 (SPEECH_TURN)
+
+Chat Room 中双方轮流发言，每人 60 秒。发言结束时客户端通知服务器，服务器协调轮次切换和判决触发。
+
+---
+
+#### 6.1 发言结束 (SPEECH_TURN_END)
+
+**方向**: Client → Server
+
+**描述**: 玩家发言轮次结束时发送
+
+**消息格式**:
+```typescript
+{
+  "type": "SPEECH_TURN_END",
+  "data": {
+    "roomId": string,      // 房间ID
+    "userId": string       // 发言者 userId
+  },
+  "timestamp": number
+}
+```
+
+#### 6.2 轮次切换 (SPEECH_TURN_SWITCH)
+
+**方向**: Server → All Participants (广播)
+
+**描述**: 第一位发言者结束后，通知双方切换轮次
+
+**消息格式**:
+```typescript
+{
+  "type": "SPEECH_TURN_SWITCH",
+  "data": {
+    "roomId": string
+  },
+  "timestamp": number
+}
+```
+
+#### 6.3 对话完成 (CHAT_COMPLETE)
+
+**方向**: Server → All Participants (广播)
+
+**描述**: 双方都完成发言后广播，触发判决生成流程。客户端收到后跳转至判决等待页。
+
+**消息格式**:
+```typescript
+{
+  "type": "CHAT_COMPLETE",
+  "data": {
+    "roomId": string
+  },
+  "timestamp": number
+}
+```
+
+**关键行为**:
+- ✅ 双方都发送 `SPEECH_TURN_END` 后触发
+- ✅ 服务器异步开始 LLM 判决生成
+- ✅ 不阻塞广播——先通知客户端，再异步生成判决
+
+---
+
+### 7. AI 判决推送 (VERDICT)
+
+判决通过 WebSocket 异步推送，支持失败重试。
+
+---
+
+#### 7.1 判决结果 (VERDICT_RESULT)
+
+**方向**: Server → All Participants (广播)
+
+**描述**: LLM 判决生成成功后推送完整结果
+
+**消息格式**:
+```typescript
+{
+  "type": "VERDICT_RESULT",
+  "data": {
+    "roomId": string,
+    "verdict": {
+      "caseNumber": string,           // 案件编号
+      "winnerId": "host" | "guest",   // 胜者角色
+      "loserId": "host" | "guest",    // 败者角色
+      "responsibility": {
+        "host": number,               // 房主责任百分比
+        "guest": number,              // 访客责任百分比
+        "thirdParty": {
+          "factors": [
+            {
+              "name": string,         // 因素名称
+              "percentage": number,   // 百分比
+              "emoji": string         // 表情符号
+            }
+          ]
+        }
+      },
+      "radarChart": {
+        "host": IVerdictDimensionScores,
+        "guest": IVerdictDimensionScores
+      },
+      "verdict": string,              // 大老爷赠言
+      "punishmentTask": {
+        "role": "host" | "guest",     // 被罚者角色
+        "task": string                // 惩罚任务
+      },
+      "secretReports": [              // 私密战报（每人一份）
+        {
+          "role": "host" | "guest",
+          "highestDimension": string,
+          "advice": string
+        }
+      ]
+    }
+  },
+  "timestamp": number
+}
+```
+
+**IVerdictDimensionScores（六维评分）**:
+```typescript
+{
+  "mouthHard": number,       // 嘴硬程度 0-100
+  "oldAccountDigging": number, // 翻旧账 0-100
+  "logicFallacy": number,    // 逻辑滑坡 0-100
+  "coquettishDamage": number, // 撒娇暴击 0-100
+  "survivalInstinct": number, // 求生欲 0-100
+  "victimActing": number     // 受害者演技 0-100
+}
+```
+
+#### 7.2 判决失败 (VERDICT_FAILED)
+
+**方向**: Server → All Participants (广播)
+
+**描述**: LLM 判决生成失败时推送错误信息
+
+**消息格式**:
+```typescript
+{
+  "type": "VERDICT_FAILED",
+  "data": {
+    "roomId": string,
+    "error": string,         // 错误描述
+    "canRetry": boolean,     // 是否可以重试
+    "retryCount": number     // 当前重试次数
+  },
+  "timestamp": number
+}
+```
+
+#### 7.3 请求重试 (VERDICT_RETRY)
+
+**方向**: Client → Server
+
+**描述**: 判决失败后客户端请求重试
+
+**消息格式**:
+```typescript
+{
+  "type": "VERDICT_RETRY",
+  "data": {
+    "roomId": string,
+    "userId": string
+  },
+  "timestamp": number
+}
+```
+
+**业务规则**:
+- ✅ 最多重试 3 次（`VERDICT_CONFIG.MAX_RETRIES`）
+- ✅ 重试时重新调用 LLM 并推送结果
+- ✅ 超过重试次数后 `canRetry: false`
+
+---
+
+### 完整判决流程
+
+```
+Chat Room (双方各 60 秒发言)
+  ↓
+SPEECH_TURN_END (第一人) → Server
+  ↓
+Server 广播 SPEECH_TURN_SWITCH → 客户端切换轮次
+  ↓
+SPEECH_TURN_END (第二人) → Server
+  ↓
+Server 广播 CHAT_COMPLETE → 客户端跳转至判决等待页
+  ↓ (异步)
+Server: VerdictOrchestratorService.generateVerdict()
+  ├─ 收集 ASR 累积文本 (room.speechState)
+  ├─ 调用 OpenAI API (30s 超时)
+  ├─ VerdictMapperService 转换为前端格式
+  ├─ 缓存到 room.verdictResult
+  └─ 广播 VERDICT_RESULT 或 VERDICT_FAILED
+  ↓
+客户端收到 VERDICT_RESULT → 跳转至判决展示页
+  或
+客户端收到 VERDICT_FAILED → 显示重试按钮
+  ↓
+客户端发送 VERDICT_RETRY → Server 重新生成
+```
+
+---
+
 ## 数据模型
 
 ### Room（房间）
@@ -766,6 +1036,10 @@ interface IRoom {
   participants: IParticipant[];  // 参与者列表（最多2人）
   status: ERoomStatus;   // 房间状态
   createdAt: number;     // 创建时间戳
+  speechState?: ISpeechState;      // 发言状态（ASR 文本累积）
+  verdictStatus?: TVerdictStatus;  // 判决状态
+  verdictResult?: IVerdictResult;  // 缓存的判决结果
+  verdictRetryCount?: number;      // 判决重试次数
 }
 
 enum ERoomStatus {
@@ -1146,7 +1420,7 @@ npm run ws:test
 ## 参考文档
 
 - [腾讯云 STS Token 获取](features/08-tencent-sts-token.md)
-- [LLM 判决书生成](features/09-llm-judgment.md)
+- [LLM 判决书生成](features/09-llm-judgment.md)（含 WebSocket 判决推送流程）
 - [表情互动消息](features/10-emoji-messages.md)
 - [ASR 实时语音识别详细文档](features/07-asr-real-time-speech.md)
 - [震天鼓游戏](features/06-drum-game.md)

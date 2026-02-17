@@ -22,6 +22,10 @@ interface IRoom {
   participants: IParticipant[]; // 参与者列表（最多2人）
   status: ERoomStatus;         // 房间状态
   createdAt: number;           // 创建时间戳（毫秒）
+  speechState?: ISpeechState;      // 发言状态（ASR 文本累积 + 轮次完成跟踪）
+  verdictStatus?: TVerdictStatus;  // 判决状态: 'pending' | 'processing' | 'completed' | 'failed'
+  verdictResult?: IVerdictResult;  // 缓存的判决结果
+  verdictRetryCount?: number;      // 判决重试次数（最多 3 次）
 }
 ```
 
@@ -35,6 +39,10 @@ interface IRoom {
 | `participants` | IParticipant[] | 参与者列表 | `[{user, joinedAt}, ...]` |
 | `status` | ERoomStatus | 房间当前状态 | `"WAITING"`, `"READY"`, `"CLOSED"` |
 | `createdAt` | number | Unix 时间戳（毫秒） | `1737849600000` |
+| `speechState` | ISpeechState? | 发言文本累积与轮次状态 | 见下方 ISpeechState |
+| `verdictStatus` | TVerdictStatus? | 判决生成状态 | `"pending"`, `"processing"`, `"completed"`, `"failed"` |
+| `verdictResult` | IVerdictResult? | 缓存的判决结果 | 见下方 IVerdictResult |
+| `verdictRetryCount` | number? | 判决重试次数 | `0`, `1`, `2`, `3` |
 
 #### 业务约束
 
@@ -687,6 +695,118 @@ interface ICreateJudgmentRequest {
 
 ---
 
+### 发言状态
+
+#### ISpeechState（发言累积状态）
+
+跟踪双方 ASR 文本累积和发言轮次完成状态，存储在 `IRoom.speechState` 中。
+
+```typescript
+interface ISpeechState {
+  hostText: string;         // 房主累积的 Final ASR 文本
+  guestText: string;        // 访客累积的 Final ASR 文本
+  hostFinished: boolean;    // 房主发言轮次是否结束
+  guestFinished: boolean;   // 访客发言轮次是否结束
+}
+```
+
+#### 字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `hostText` | string | ASR Final 消息中房主的累积文本，自动添加句号 |
+| `guestText` | string | ASR Final 消息中访客的累积文本，自动添加句号 |
+| `hostFinished` | boolean | 收到房主 `SPEECH_TURN_END` 后为 `true` |
+| `guestFinished` | boolean | 收到访客 `SPEECH_TURN_END` 后为 `true` |
+
+#### 文本累积机制
+
+- ASR Handler 收到 `isFinal: true` 时，将文本追加到对应的 `hostText` / `guestText`
+- 如果文本末尾没有标点符号，自动追加句号
+- 当 `hostFinished && guestFinished` 时，触发判决生成
+- 如果某方无发言，使用 `"（无发言）"` 作为替代文本
+
+---
+
+### 判决结果（WebSocket 推送格式）
+
+#### IVerdictResult（前端格式判决结果）
+
+经过 `VerdictMapperService` 转换后的判决结果，存储在 `room.verdictResult` 中并通过 WebSocket 推送。
+
+```typescript
+interface IVerdictResult {
+  caseNumber: string;              // 案件编号，如 "NO.12345"
+  winnerId: 'host' | 'guest';     // 胜者角色
+  loserId: 'host' | 'guest';      // 败者角色
+  responsibility: {
+    host: number;                  // 房主责任百分比
+    guest: number;                 // 访客责任百分比
+    thirdParty: {
+      factors: IVerdictFactor[];
+    };
+  };
+  radarChart: {
+    host: IVerdictDimensionScores;
+    guest: IVerdictDimensionScores;
+  };
+  verdict: string;                 // 大老爷赠言
+  punishmentTask: {
+    role: 'host' | 'guest';       // 被罚者角色
+    task: string;                  // 惩罚任务
+  };
+  secretReports: ISecretReport[];  // 私密战报（每人一份）
+}
+```
+
+#### IVerdictDimensionScores（六维评分，英文键）
+
+```typescript
+interface IVerdictDimensionScores {
+  mouthHard: number;           // 嘴硬程度 0-100
+  oldAccountDigging: number;   // 翻旧账 0-100
+  logicFallacy: number;        // 逻辑滑坡 0-100
+  coquettishDamage: number;    // 撒娇暴击 0-100
+  survivalInstinct: number;    // 求生欲 0-100
+  victimActing: number;        // 受害者演技 0-100
+}
+```
+
+#### IVerdictFactor（第三方因素，带 emoji）
+
+```typescript
+interface IVerdictFactor {
+  name: string;        // 因素名称，如 "水星逆行"
+  percentage: number;  // 百分比
+  emoji: string;       // 表情符号，如 "🪐"
+}
+```
+
+#### ISecretReport（私密战报）
+
+```typescript
+interface ISecretReport {
+  role: 'host' | 'guest';
+  highestDimension: string;    // 最高维度名称
+  advice: string;              // 锦囊妙计
+}
+```
+
+#### TVerdictStatus（判决状态）
+
+```typescript
+type TVerdictStatus = 'pending' | 'processing' | 'completed' | 'failed';
+```
+
+#### 判决状态流转
+
+```
+(初始) → pending → processing → completed
+                            ↘ failed → (VERDICT_RETRY) → pending → ...
+```
+
+---
+
 ## 数据传输对象（DTO）
 
 ### CreateRoomRequest
@@ -881,6 +1001,92 @@ interface IASRTextMessage {
 
 ---
 
+### 语音轮次 WebSocket 消息类型
+
+#### ISpeechTurnEndMessage（发言结束）
+
+```typescript
+interface ISpeechTurnEndMessage {
+  type: "SPEECH_TURN_END";
+  data: {
+    roomId: string;
+    userId: string;
+  };
+  timestamp: number;
+}
+```
+
+#### ISpeechTurnSwitchMessage（轮次切换）
+
+```typescript
+interface ISpeechTurnSwitchMessage {
+  type: "SPEECH_TURN_SWITCH";
+  data: {
+    roomId: string;
+  };
+  timestamp: number;
+}
+```
+
+#### IChatCompleteMessage（对话完成）
+
+```typescript
+interface IChatCompleteMessage {
+  type: "CHAT_COMPLETE";
+  data: {
+    roomId: string;
+  };
+  timestamp: number;
+}
+```
+
+---
+
+### 判决 WebSocket 消息类型
+
+#### IVerdictResultMessage（判决结果推送）
+
+```typescript
+interface IVerdictResultMessage {
+  type: "VERDICT_RESULT";
+  data: {
+    roomId: string;
+    verdict: IVerdictResult;
+  };
+  timestamp: number;
+}
+```
+
+#### IVerdictFailedMessage（判决失败）
+
+```typescript
+interface IVerdictFailedMessage {
+  type: "VERDICT_FAILED";
+  data: {
+    roomId: string;
+    error: string;
+    canRetry: boolean;
+    retryCount: number;
+  };
+  timestamp: number;
+}
+```
+
+#### IVerdictRetryMessage（请求重试）
+
+```typescript
+interface IVerdictRetryMessage {
+  type: "VERDICT_RETRY";
+  data: {
+    roomId: string;
+    userId: string;
+  };
+  timestamp: number;
+}
+```
+
+---
+
 ## 数据存储
 
 ### 内存存储结构
@@ -1047,7 +1253,7 @@ IASRSessionState (内部状态)
 ├── pendingPartial?: IASRTextPushMessage
 └── throttleTimer?: NodeJS.Timeout
 
-IJudgmentResponse
+IJudgmentResponse (LLM 原始输出)
 ├── caseNumber: string
 ├── responsibility
 │   ├── player1: number
@@ -1057,9 +1263,32 @@ IJudgmentResponse
 │           ├── name: string
 │           └── percentage: number
 ├── radarChart
-│   ├── player1: IRadarScores (6 维度)
-│   └── player2: IRadarScores (6 维度)
-└── verdict: string
+│   ├── player1: IRadarScores (6 维度，中文键)
+│   └── player2: IRadarScores (6 维度，中文键)
+├── verdict: string
+└── punishmentTask: string
+
+IVerdictResult (推送给前端)
+├── caseNumber: string
+├── winnerId: 'host' | 'guest'
+├── loserId: 'host' | 'guest'
+├── responsibility
+│   ├── host: number
+│   ├── guest: number
+│   └── thirdParty.factors[]
+│       ├── name, percentage, emoji
+├── radarChart
+│   ├── host: IVerdictDimensionScores (6 维度，英文键)
+│   └── guest: IVerdictDimensionScores
+├── verdict: string
+├── punishmentTask: { role, task }
+└── secretReports: ISecretReport[]
+
+ISpeechState
+├── hostText: string
+├── guestText: string
+├── hostFinished: boolean
+└── guestFinished: boolean
 ```
 
 ---

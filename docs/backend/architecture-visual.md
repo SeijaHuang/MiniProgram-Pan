@@ -8,20 +8,24 @@ backend/src/
 ├── 📁 routes/                           # 🔵 路由层 (Route Layer)
 │   ├── room-routes.ts                   # ✅ 房间路由 (POST /v1/rooms)
 │   ├── llm-judgement.routes.ts          # ✅ LLM 判决路由 (POST /v1/rooms/:roomId/judgments)
+│   ├── verdict-routes.ts               # ✅ 判决回退路由 (GET /v1/rooms/:roomId/verdict)
 │   └── tencent-routes.ts               # ✅ 腾讯云路由 (GET /v1/tencent/credentials)
 │
 ├── 📁 controllers/                      # 🟢 控制器层 (Controller Layer)
 │   ├── room-controller.ts               # ✅ HTTP 房间控制器
 │   ├── llm-judgement.controller.ts      # ✅ LLM 判决控制器
+│   ├── verdict-http.controller.ts      # ✅ 判决结果回退控制器 (GET verdict)
 │   ├── tencent-controller.ts            # ✅ 腾讯云 STS 控制器
-│   └── ws-controller.ts                 # ✅ WebSocket 控制器（消息路由 + 游戏编排）
+│   └── ws-controller.ts                 # ✅ WebSocket 控制器（消息路由 + 游戏编排 + 判决编排）
 │
 ├── 📁 services/                         # 🟡 服务层 (Service Layer)
 │   ├── 📁 core/                         # ✅ 核心业务服务
 │   │   ├── 📁 room/
 │   │   │   ├── room.service.ts          # ✅ 房间业务逻辑
 │   │   │   └── room-crud.service.ts     # ✅ 房间 CRUD (预留)
-│   │   └── llm-judgement.service.ts     # ✅ LLM 判决服务
+│   │   ├── llm-judgement.service.ts     # ✅ LLM 判决服务
+│   │   ├── verdict-orchestrator.service.ts # ✅ 判决编排（异步 LLM + WS 推送）
+│   │   └── verdict-mapper.service.ts    # ✅ 判决结果转换（LLM → 前端格式）
 │   ├── 📁 websocket/                    # ✅ WebSocket 领域服务
 │   │   ├── connection-manager.ts        # ✅ 连接管理（路由 + 广播）
 │   │   ├── room-manager.ts              # ✅ 房间状态管理
@@ -30,7 +34,9 @@ backend/src/
 │       ├── join-room-handler.ts         # ✅ 加入房间处理
 │       ├── chat-send-handler.ts         # ✅ 发送消息处理
 │       ├── drum-tap-handler.ts          # ✅ 鼓点点击处理
-│       ├── asr-text-handler.ts          # ✅ ASR 文本推送处理（去重 + 节流）
+│       ├── asr-text-handler.ts          # ✅ ASR 文本推送处理（去重 + 节流 + 文本累积）
+│       ├── speech-turn-end-handler.ts   # ✅ 发言轮次结束处理
+│       ├── verdict-retry-handler.ts     # ✅ 判决重试处理
 │       └── emoji-text-handler.ts        # ✅ 表情消息处理
 │
 ├── 📁 clients/                          # 🌐 外部服务客户端
@@ -50,7 +56,8 @@ backend/src/
 │       ├── ws-message.schema.ts         # ✅ WebSocket 消息验证
 │       ├── drum-message.schema.ts       # ✅ 鼓点消息验证
 │       ├── ws-asr-text-push.schema.ts   # ✅ ASR 文本推送验证
-│       └── emoji-message.schema.ts      # ✅ 表情消息验证
+│       ├── emoji-message.schema.ts      # ✅ 表情消息验证
+│       └── verdict-message.schema.ts    # ✅ 判决消息验证
 │
 ├── 📁 types/                            # 📝 类型定义 (Type Definitions)
 │   ├── 📁 http/                         # ✅ HTTP 类型
@@ -64,6 +71,7 @@ backend/src/
 │   │   ├── drum.ts                      # ✅ 震天鼓消息类型（EGamePhase, IDrumGameState）
 │   │   ├── asr.ts                       # ✅ ASR 消息类型
 │   │   ├── emoji.ts                     # ✅ 表情消息类型
+│   │   ├── verdict.ts                   # ✅ 判决相关消息类型（含 IVerdictResult）
 │   │   ├── error.ts                     # ✅ 错误消息类型（EWSErrorCode）
 │   │   └── index.ts                     # ✅ 导出聚合
 │   ├── 📁 llm/                          # ✅ LLM 类型
@@ -73,6 +81,7 @@ backend/src/
 │
 ├── 📁 constants/                        # 🔢 常量 (Constants)
 │   ├── config.ts                        # ✅ 配置常量（APP/WS/ROOM/DRUM/OPENAI/TENCENT）
+│   ├── config.ts                        # ✅ 配置常量（APP/WS/ROOM/DRUM/OPENAI/TENCENT/VERDICT）
 │   └── prompts.ts                       # ✅ LLM Prompt 模板
 │
 ├── 📁 utils/                            # 🛠️ 工具函数 (Utilities)
@@ -89,15 +98,16 @@ backend/src/
 
 ### HTTP 请求流
 
-**三条 HTTP 路由**:
+**四条 HTTP 路由**:
 - `POST /v1/rooms` → RoomController → RoomService → RoomManager
 - `POST /v1/rooms/:roomId/judgments` → LlmJudgementController → LlmJudgementService → OpenAI Client
+- `GET /v1/rooms/:roomId/verdict` → VerdictHttpController → RoomManager（获取缓存判决）
 - `GET /v1/tencent/credentials` → TencentController → Tencent STS SDK
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     用户请求                             │
-│  POST /v1/rooms | POST .../judgments | GET .../credentials │
+│  POST /v1/rooms | POST .../judgments | GET .../verdict | GET .../credentials │
 └────────────────────┬────────────────────────────────────┘
                      │
                      ▼
@@ -105,6 +115,7 @@ backend/src/
 │  🔵 ROUTE LAYER                                         │
 │  routes/room-routes.ts                                  │
 │  routes/llm-judgement.routes.ts                         │
+│  routes/verdict-routes.ts                               │
 │  routes/tencent-routes.ts                               │
 │  - 定义 URL 路径                                         │
 │  - 映射到 Controller                                     │
@@ -115,6 +126,7 @@ backend/src/
 │  🟢 CONTROLLER LAYER                                    │
 │  controllers/room-controller.ts                         │
 │  controllers/llm-judgement.controller.ts                │
+│  controllers/verdict-http.controller.ts                 │
 │  controllers/tencent-controller.ts                      │
 │  - 验证请求格式（Zod Schema）                             │
 │  - 调用 Service                                         │
@@ -126,6 +138,8 @@ backend/src/
 │  🟡 SERVICE LAYER (Business Logic)                     │
 │  services/core/room/room.service.ts      → 房间创建     │
 │  services/core/llm-judgement.service.ts  → LLM 判决     │
+│  services/core/verdict-orchestrator      → 判决编排     │
+│  services/core/verdict-mapper            → 结果转换     │
 │  - 业务逻辑编排                                          │
 │  - 调用 Domain Service / 外部客户端                      │
 └────────────────────┬────────────────────────────────────┘
@@ -153,12 +167,14 @@ backend/src/
 | `DRUM_TAP` | drum-tap-handler | drum-game-manager | `DRUM_TAP` | 仅对方 |
 | `ASR_TEXT_PUSH` | asr-text-handler | connection-manager | `ASR_TEXT` | 仅对方 |
 | `EMOJI_SEND` | emoji-text-handler | connection-manager | `EMOJI_RECEIVE` | 仅对方 |
+| `SPEECH_TURN_END` | speech-turn-end-handler | room-manager | `SPEECH_TURN_SWITCH` / `CHAT_COMPLETE` | 全部参与者 |
+| `VERDICT_RETRY` | verdict-retry-handler | room-manager | 触发 verdict-orchestrator | 全部参与者 |
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                 客户端 WebSocket                         │
 │  JOIN_ROOM / CHAT_SEND / DRUM_TAP / ASR_TEXT_PUSH /    │
-│  EMOJI_SEND                                             │
+│  EMOJI_SEND / SPEECH_TURN_END / VERDICT_RETRY          │
 └────────────────────┬────────────────────────────────────┘
                      │
                      ▼
@@ -184,7 +200,9 @@ backend/src/
 │  ├─ join-room-handler.ts    (加入房间)                  │
 │  ├─ chat-send-handler.ts    (发送消息)                  │
 │  ├─ drum-tap-handler.ts     (鼓点点击)                  │
-│  ├─ asr-text-handler.ts     (ASR 文本去重 + 节流)       │
+│  ├─ asr-text-handler.ts     (ASR 文本去重 + 节流 + 累积) │
+│  ├─ speech-turn-end-handler (发言轮次结束)              │
+│  ├─ verdict-retry-handler   (判决重试)                  │
 │  └─ emoji-text-handler.ts   (表情转发)                  │
 │  - 验证业务规则，调用 Domain Service                     │
 │  - 返回结果 (不发送!)                                    │
@@ -229,6 +247,35 @@ DRUM_FINISH → 广播 endAtMs
 DRUM_RESULT → 广播 organizerScore, joinerScore, winnerRole
    ↓
 cleanupGame(roomId)
+```
+
+### 判决生成编排流程
+
+ws-controller.ts 负责触发判决编排，verdict-orchestrator.service.ts 执行异步判决生成：
+
+```
+Chat Room 阶段：ASR 文本累积
+   ↓ ASR_TEXT_PUSH (isFinal: true)
+asr-text-handler.ts → 追加到 room.speechState.hostText/guestText
+   ↓
+SPEECH_TURN_END (第一人)
+   ↓ speech-turn-end-handler → 标记 hostFinished/guestFinished
+SPEECH_TURN_SWITCH → 广播给所有参与者
+   ↓
+SPEECH_TURN_END (第二人)
+   ↓ speech-turn-end-handler → bothFinished = true
+CHAT_COMPLETE → 广播给所有参与者
+   ↓ (异步)
+VerdictOrchestratorService.generateVerdict()
+   ├─ 获取 room.speechState 中的 hostText, guestText
+   ├─ 调用 llmJudgementService → OpenAI API (30s 超时)
+   ├─ VerdictMapperService 转换 (中文键→英文键, player→host/guest)
+   ├─ 缓存到 room.verdictResult
+   └─ 广播 VERDICT_RESULT 或 VERDICT_FAILED
+       ↓ (失败时)
+   客户端发送 VERDICT_RETRY
+       ↓ verdict-retry-handler → 检查重试次数
+       ↓ 重新触发 generateVerdict()
 ```
 
 ## 分层职责表
@@ -364,8 +411,9 @@ async create(room) {
 ✅ **三层架构已完整实现**
 - 清晰的职责分离（HTTP / WebSocket 双通道）
 - 标准化的数据流（Handler 纯函数模式）
-- 5 种 WebSocket 消息处理器 + 3 条 HTTP 路由
+- 7 种 WebSocket 消息处理器 + 4 条 HTTP 路由
 - 游戏编排（震天鼓定时流程）与业务逻辑解耦
+- 判决编排（异步 LLM + WebSocket 推送 + 重试机制）
 - OpenAI / 腾讯云外部服务集成
 
 

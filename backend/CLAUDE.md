@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Node.js backend for a two-player real-time chat room system ("申冤" app). Uses HTTP for room creation and WebSocket for real-time communication including room joining, drum game, ASR text sync, and chat messaging. See `../CLAUDE.md` for full project context including frontend.
+Node.js backend for a two-player real-time chat room system ("申冤" app). Uses HTTP for room creation and WebSocket for real-time communication including room joining, drum game, ASR text sync, chat messaging, and AI verdict delivery. See `../CLAUDE.md` for full project context including frontend.
 
 ## Development Commands
 
@@ -39,7 +39,11 @@ Three-layer architecture: Routes → Controllers → Services
 
 **HTTP (LLM)**: `routes/llm-judgement.routes.ts` → `controllers/llm-judgement.controller.ts` → `services/core/llm-judgement.service.ts` → `clients/openai.client.ts`
 
+**HTTP (Verdict fallback)**: `routes/verdict-routes.ts` → `controllers/verdict-http.controller.ts` → `services/websocket/room-manager.ts` (cached result)
+
 **WebSocket**: `ws.ts` assigns connectionId → `WebSocketController.handleMessage()` switches on `message.type` → calls handler in `services/handlers/` → handler uses managers in `services/websocket/` → controller broadcasts response via `connectionManager`
+
+**WebSocket (Verdict)**: `SPEECH_TURN_END` → `speech-turn-end-handler` → when both finished → broadcast `CHAT_COMPLETE` → async `verdict-orchestrator.service.ts` → `llm-judgement.service` → `openai.client` → `verdict-mapper.service` → broadcast `VERDICT_RESULT` or `VERDICT_FAILED`
 
 ### Key Files
 
@@ -48,11 +52,16 @@ Three-layer architecture: Routes → Controllers → Services
 | `src/index.ts` | Entry point, creates HTTP server, calls `initWebSocket()` |
 | `src/app.ts` | Express app — only `express.json()` middleware + routes |
 | `src/ws.ts` | WebSocket init, assigns `conn_*` IDs, delegates to controller |
-| `src/controllers/ws-controller.ts` | Central message router (439 lines) — routes messages AND orchestrates drum game timing |
+| `src/controllers/ws-controller.ts` | Central message router — routes messages AND orchestrates drum game timing + verdict generation |
+| `src/controllers/verdict-http.controller.ts` | GET /v1/rooms/:roomId/verdict — fallback to fetch cached verdict |
+| `src/services/core/verdict-orchestrator.service.ts` | Async verdict generation (LLM call + mapping + WS push) |
+| `src/services/core/verdict-mapper.service.ts` | Transform LLM response to frontend format (Chinese→English keys, player→host/guest) |
+| `src/services/handlers/speech-turn-end-handler.ts` | Mark player speech turn as finished, detect bothFinished |
+| `src/services/handlers/verdict-retry-handler.ts` | Validate retry count, reset verdict status |
 | `src/services/websocket/connection-manager.ts` | Maps connectionId ↔ userId ↔ roomId, handles broadcast |
 | `src/services/websocket/room-manager.ts` | In-memory room state machine |
 | `src/services/websocket/drum-game-manager.ts` | Drum game phase/score tracking |
-| `src/services/handlers/asr-text-handler.ts` | ASR text sync with deduplication and throttling (334 lines) |
+| `src/services/handlers/asr-text-handler.ts` | ASR text sync with deduplication, throttling, and Final text accumulation to speechState |
 | `src/constants/config.ts` | All timing/size constants |
 
 ### Singleton Pattern
@@ -110,9 +119,9 @@ Schemas are in `src/models/schemas/`: `http-request.schema.ts`, `ws-message.sche
 
 ## WebSocket Message Protocol
 
-**Client → Server**: `JOIN_ROOM`, `CHAT_SEND`, `DRUM_TAP`, `ASR_TEXT_PUSH`
+**Client → Server**: `JOIN_ROOM`, `CHAT_SEND`, `DRUM_TAP`, `ASR_TEXT_PUSH`, `SPEECH_TURN_END`, `VERDICT_RETRY`
 
-**Server → Client**: `JOIN_ACK`, `CHAT_RECEIVE`, `DRUM_READY`, `DRUM_START`, `DRUM_TAP`, `DRUM_FINISH`, `DRUM_RESULT`, `ASR_TEXT`, `ERROR`
+**Server → Client**: `JOIN_ACK`, `CHAT_RECEIVE`, `DRUM_READY`, `DRUM_START`, `DRUM_TAP`, `DRUM_FINISH`, `DRUM_RESULT`, `ASR_TEXT`, `SPEECH_TURN_SWITCH`, `CHAT_COMPLETE`, `VERDICT_RESULT`, `VERDICT_FAILED`, `ERROR`
 
 All messages: `{ type: EWSMessageType, data: T, timestamp: number }`
 
@@ -169,7 +178,8 @@ Note: `.env.example` contains additional unused variables (OpenAI, LLM Worker) �
 |--------|------|-------------|
 | GET | `/health` | Health check |
 | POST | `/v1/rooms` | Create room (body: `{ creator: { userId, nickname } }`) |
-| POST | `/v1/rooms/:roomId/judgments` | LLM judgment verdict |
+| POST | `/v1/rooms/:roomId/judgments` | LLM judgment verdict (direct call) |
+| GET | `/v1/rooms/:roomId/verdict` | Get cached verdict result (fallback) |
 | GET | `/v1/tencent/credentials` | Tencent Cloud STS token for client ASR |
 
 ## Error Codes (EWSErrorCode)
@@ -227,6 +237,8 @@ POST /v1/rooms/:roomId/judgments
 | `DRUM_CONFIG.GAME_DURATION_MS` | 10000 | Game length |
 | `OPENAI_CONFIG.API_KEY` | (env) | OpenAI API key |
 | `OPENAI_CONFIG.MODEL` | gpt-4o | LLM model |
+| `VERDICT_CONFIG.LLM_TIMEOUT_MS` | 30000 | LLM call timeout for verdict |
+| `VERDICT_CONFIG.MAX_RETRIES` | 3 | Max verdict retry attempts |
 
 ## Enums
 
