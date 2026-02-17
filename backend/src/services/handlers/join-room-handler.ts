@@ -15,6 +15,7 @@ import { roomManager } from '../websocket/room-manager';
 import type { ConnectionManager } from '../websocket/connection-manager';
 import type { IRoom } from '../../models/entities/room';
 import { JoinRoomDataSchema } from '../../models/schemas/ws-message.schema';
+import { validatePayload } from './handler-utils';
 
 export interface IJoinRoomResult {
     success: true;
@@ -34,18 +35,11 @@ export function handleJoinRoom(
     connectionId: string,
     message: IJoinRoomMessage
 ): TJoinRoomHandlerResult {
-    // Validation: Payload schema is valid
-    const validation = JoinRoomDataSchema.safeParse(message.data);
-    if (!validation.success) {
-        const firstError = validation.error.issues[0];
-        return {
-            success: false,
-            code: EWSErrorCode.InvalidPayload,
-            message: firstError?.message ?? 'Invalid payload',
-        };
-    }
+    // Validate payload schema
+    const v = validatePayload(JoinRoomDataSchema, message.data);
+    if (!v.success) return v;
 
-    const { roomCode, user } = validation.data;
+    const { roomCode, user } = v.data;
 
     // Check if user is already a participant (e.g., room creator)
     const room = roomManager.getRoomByCode(roomCode);
@@ -66,7 +60,9 @@ export function handleJoinRoom(
     if (isAlreadyParticipant) {
         // User is already a participant, just bind the WebSocket connection
         console.log(
-            `[JOIN_ROOM] User ${user.userId} is already a participant, binding WebSocket connection`
+            `[JOIN_ROOM] User ${user.userId} is ` +
+                `already a participant, binding ` +
+                `WebSocket connection`
         );
     } else {
         // User is not a participant, try to join
@@ -102,7 +98,9 @@ export function handleJoinRoom(
     );
 
     console.log(
-        `[JOIN_ROOM] User ${user.userId} connected to room ${finalRoom.roomId} (${finalRoom.participants.length}/2)`
+        `[JOIN_ROOM] User ${user.userId} connected ` +
+            `to room ${finalRoom.roomId} ` +
+            `(${finalRoom.participants.length}/2)`
     );
 
     return {

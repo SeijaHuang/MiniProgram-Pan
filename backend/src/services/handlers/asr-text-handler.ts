@@ -13,10 +13,13 @@
 
 import type { IASRTextPushMessage } from '../../types/websocket';
 import { EWSErrorCode } from '../../types/websocket';
-import { roomManager } from '../websocket/room-manager';
-import { ERoomStatus } from '../../models/entities/room';
 import type { ConnectionManager } from '../websocket/connection-manager';
 import { ASRTextPushDataSchema } from '../../models/schemas/ws-asr-text-push.schema';
+import {
+    validatePayload,
+    validateConnection,
+    validateReadyRoomParticipant,
+} from './handler-utils';
 
 /**
  * ASR session state per speaker in a room
@@ -146,30 +149,17 @@ export function handleASRTextPush(
     onThrottledBroadcast?: (result: IASRTextPushResult) => void
 ): TASRTextPushHandlerResult {
     // 1. Validate payload schema
-    const validation = ASRTextPushDataSchema.safeParse(message.data);
-    if (!validation.success) {
-        const firstError = validation.error.issues[0];
-        return {
-            success: false,
-            code: EWSErrorCode.InvalidPayload,
-            message: firstError?.message ?? 'Invalid payload',
-        };
-    }
+    const v = validatePayload(ASRTextPushDataSchema, message.data);
+    if (!v.success) return v;
 
-    const { roomId, speakerId, seq, text, isFinal } = validation.data;
+    const { roomId, speakerId, seq, text, isFinal } = v.data;
 
-    // 2. Get connection metadata
-    const connectionData = connectionManager.getConnection(connectionId);
-    if (!connectionData || !connectionData.userId || !connectionData.roomId) {
-        return {
-            success: false,
-            code: EWSErrorCode.NotParticipant,
-            message: 'You must join a room first',
-        };
-    }
+    // 2. Validate connection
+    const conn = validateConnection(connectionManager, connectionId);
+    if (!conn.success) return conn;
 
     // 3. Verify speakerId matches connection's userId
-    if (connectionData.userId !== speakerId) {
+    if (conn.userId !== speakerId) {
         return {
             success: false,
             code: EWSErrorCode.InvalidPayload,
@@ -178,7 +168,7 @@ export function handleASRTextPush(
     }
 
     // 4. Verify roomId matches connection's roomId
-    if (connectionData.roomId !== roomId) {
+    if (conn.roomId !== roomId) {
         return {
             success: false,
             code: EWSErrorCode.InvalidPayload,
@@ -186,41 +176,20 @@ export function handleASRTextPush(
         };
     }
 
-    // 5. Validate room exists and is ready
-    const room = roomManager.getRoomById(roomId);
-    if (!room) {
-        return {
-            success: false,
-            code: EWSErrorCode.RoomNotFound,
-            message: 'Room not found',
-        };
-    }
+    // 5. Validate room (READY) + participant
+    const roomResult = validateReadyRoomParticipant(roomId, conn.userId);
+    if (!roomResult.success) return roomResult;
 
-    if (room.status !== ERoomStatus.Ready) {
-        return {
-            success: false,
-            code: EWSErrorCode.RoomNotReady,
-            message: 'Room is not ready (need 2 participants)',
-        };
-    }
+    const { room } = roomResult;
 
-    // 6. Verify sender is a participant
-    const sender = room.participants.find(p => p.user.userId === speakerId);
-    if (!sender) {
-        return {
-            success: false,
-            code: EWSErrorCode.NotParticipant,
-            message: 'You are not a participant of this room',
-        };
-    }
-
-    // 7. Get or create session state
+    // 6. Get or create session state
     const state = getOrCreateSessionState(roomId, speakerId);
 
-    // 8. Check if final was already received (ignore subsequent messages)
+    // 7. Check if final was already received (ignore subsequent messages)
     if (state.finalReceived && seq <= state.lastSeq) {
         console.log(
-            `[ASR_TEXT_PUSH] Ignoring message after final (seq: ${seq}, lastSeq: ${state.lastSeq})`
+            `[ASR_TEXT_PUSH] Ignoring message after final ` +
+                `(seq: ${seq}, lastSeq: ${state.lastSeq})`
         );
         return {
             success: true,
@@ -233,10 +202,11 @@ export function handleASRTextPush(
         };
     }
 
-    // 9. Seq deduplication: only process if seq > lastSeq
+    // 8. Seq deduplication: only process if seq > lastSeq
     if (seq <= state.lastSeq) {
         console.log(
-            `[ASR_TEXT_PUSH] Deduplicating message (seq: ${seq}, lastSeq: ${state.lastSeq})`
+            `[ASR_TEXT_PUSH] Deduplicating message ` +
+                `(seq: ${seq}, lastSeq: ${state.lastSeq})`
         );
         return {
             success: true,
@@ -249,10 +219,10 @@ export function handleASRTextPush(
         };
     }
 
-    // 10. Update last seq
+    // 9. Update last seq
     state.lastSeq = seq;
 
-    // 11. Handle final vs partial
+    // 10. Handle final vs partial
     if (isFinal) {
         // Final message: broadcast immediately
         state.finalReceived = true;
@@ -265,7 +235,8 @@ export function handleASRTextPush(
         state.pendingPartial = null;
 
         console.log(
-            `[ASR_TEXT_PUSH] Final from ${speakerId} in room ${roomId}: "${text}"`
+            `[ASR_TEXT_PUSH] Final from ${speakerId} ` +
+                `in room ${roomId}: "${text}"`
         );
 
         // Accumulate final text into room's speech state
@@ -288,7 +259,8 @@ export function handleASRTextPush(
             }
 
             console.log(
-                `[ASR] Accumulated ${isHost ? 'host' : 'guest'} speech: ` +
+                `[ASR] Accumulated ` +
+                    `${isHost ? 'host' : 'guest'} speech: ` +
                     `${isHost ? room.speechState.hostText.length : room.speechState.guestText.length} chars`
             );
         }
@@ -322,7 +294,9 @@ export function handleASRTextPush(
                 if (pendingMessage && onThrottledBroadcast) {
                     const pendingData = pendingMessage.data;
                     console.log(
-                        `[ASR_TEXT_PUSH] Throttled partial from ${pendingData.speakerId}: "${pendingData.text}"`
+                        `[ASR_TEXT_PUSH] Throttled partial ` +
+                            `from ${pendingData.speakerId}: ` +
+                            `"${pendingData.text}"`
                     );
                     onThrottledBroadcast({
                         success: true,
@@ -337,11 +311,15 @@ export function handleASRTextPush(
             }, PARTIAL_THROTTLE_MS);
 
             console.log(
-                `[ASR_TEXT_PUSH] Partial from ${speakerId} queued for throttle: "${text}"`
+                `[ASR_TEXT_PUSH] Partial from ` +
+                    `${speakerId} queued for ` +
+                    `throttle: "${text}"`
             );
         } else {
             console.log(
-                `[ASR_TEXT_PUSH] Partial from ${speakerId} updated pending: "${text}"`
+                `[ASR_TEXT_PUSH] Partial from ` +
+                    `${speakerId} updated ` +
+                    `pending: "${text}"`
             );
         }
 

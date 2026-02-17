@@ -3,11 +3,11 @@
  * Handles VERDICT_RETRY messages to retry failed verdict generation
  */
 
-import { roomManager } from '../websocket/room-manager';
-import { VerdictRetryDataSchema } from '../../models/schemas/verdict-message.schema';
 import { VERDICT_CONFIG } from '../../constants/config';
 import { EWSErrorCode } from '../../types/websocket';
 import type { IVerdictRetryMessage } from '../../types/websocket/verdict';
+import { VerdictRetryDataSchema } from '../../models/schemas/verdict-message.schema';
+import { validatePayload, validateRoomParticipant } from './handler-utils';
 
 /**
  * Handler result type
@@ -36,41 +36,23 @@ export function handleVerdictRetry(
     message: IVerdictRetryMessage
 ): TVerdictRetryHandlerResult {
     // 1. Validate payload
-    const validation = VerdictRetryDataSchema.safeParse(message.data);
-    if (!validation.success) {
-        return {
-            success: false,
-            code: EWSErrorCode.InvalidPayload,
-            message: `Invalid VERDICT_RETRY payload: ${validation.error.message}`,
-        };
-    }
+    const v = validatePayload(VerdictRetryDataSchema, message.data);
+    if (!v.success) return v;
 
-    const { roomId, userId } = validation.data;
+    const { roomId, userId } = v.data;
 
-    // 2. Get room
-    const room = roomManager.getRoomById(roomId);
-    if (!room) {
-        return {
-            success: false,
-            code: EWSErrorCode.RoomNotFound,
-            message: 'Room not found',
-        };
-    }
+    // 2. Validate room + participant
+    const roomResult = validateRoomParticipant(roomId, userId);
+    if (!roomResult.success) return roomResult;
 
-    // 3. Verify user is a participant
-    const isParticipant = room.participants.some(p => p.user.userId === userId);
-    if (!isParticipant) {
-        return {
-            success: false,
-            code: EWSErrorCode.NotParticipant,
-            message: 'User is not a participant in this room',
-        };
-    }
+    const { room } = roomResult;
 
-    // 4. Check retry count
+    // 3. Check retry count
     const retryCount = room.verdictRetryCount || 0;
     if (retryCount >= VERDICT_CONFIG.MAX_RETRIES) {
-        console.log(`[VERDICT_RETRY] Max retries reached for room ${roomId}`);
+        console.log(
+            `[VERDICT_RETRY] Max retries reached ` + `for room ${roomId}`
+        );
         return {
             success: true,
             roomId,
@@ -79,11 +61,13 @@ export function handleVerdictRetry(
         };
     }
 
-    // 5. Reset status to allow retry
+    // 4. Reset status to allow retry
     room.verdictStatus = 'pending';
 
     console.log(
-        `[VERDICT_RETRY] Retry requested for room ${roomId} (attempt ${retryCount + 1}/${VERDICT_CONFIG.MAX_RETRIES})`
+        `[VERDICT_RETRY] Retry requested for ` +
+            `room ${roomId} (attempt ` +
+            `${retryCount + 1}/${VERDICT_CONFIG.MAX_RETRIES})`
     );
 
     return {

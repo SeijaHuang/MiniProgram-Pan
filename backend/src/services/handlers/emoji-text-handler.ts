@@ -2,8 +2,11 @@ import type { ConnectionManager } from '../websocket/connection-manager';
 import type { IEmojiMessage, IEmojiSendMessage } from '../../types/websocket';
 import { EmojiMessageSchema } from '../../models/schemas/emoji-message.schema';
 import { EWSErrorCode } from '../../types/websocket';
-import { roomManager } from '../websocket/room-manager';
-import { ERoomStatus } from '../../models/entities/room';
+import {
+    validatePayload,
+    validateConnection,
+    validateReadyRoomParticipant,
+} from './handler-utils';
 
 export interface IEmojiTextResult {
     success: true;
@@ -24,28 +27,18 @@ export function handleEmojiText(
     connectionId: string,
     message: IEmojiSendMessage
 ): TEmojiTextHandlerResult {
-    const validation = EmojiMessageSchema.safeParse(message.data);
-    if (!validation.success) {
-        const firstError = validation.error.issues[0];
-        return {
-            success: false,
-            code: EWSErrorCode.InvalidPayload,
-            message: firstError?.message ?? 'Invalid payload',
-        };
-    }
+    // Validate payload schema
+    const v = validatePayload(EmojiMessageSchema, message.data);
+    if (!v.success) return v;
 
-    const { roomId, senderId, emoji } = validation.data;
+    const { roomId, senderId, emoji } = v.data;
 
-    const connectionData = connectionManager.getConnection(connectionId);
-    if (!connectionData || !connectionData.userId || !connectionData.roomId) {
-        return {
-            success: false,
-            code: EWSErrorCode.NotParticipant,
-            message: 'You must join a room first',
-        };
-    }
+    // Validate connection
+    const conn = validateConnection(connectionManager, connectionId);
+    if (!conn.success) return conn;
 
-    if (connectionData.userId !== senderId) {
+    // Verify senderId matches connection's userId
+    if (conn.userId !== senderId) {
         return {
             success: false,
             code: EWSErrorCode.InvalidPayload,
@@ -53,7 +46,8 @@ export function handleEmojiText(
         };
     }
 
-    if (connectionData.roomId !== roomId) {
+    // Verify roomId matches connection's roomId
+    if (conn.roomId !== roomId) {
         return {
             success: false,
             code: EWSErrorCode.InvalidPayload,
@@ -61,31 +55,9 @@ export function handleEmojiText(
         };
     }
 
-    const room = roomManager.getRoomById(roomId);
-    if (!room) {
-        return {
-            success: false,
-            code: EWSErrorCode.RoomNotFound,
-            message: 'Room not found',
-        };
-    }
-
-    if (room.status !== ERoomStatus.Ready) {
-        return {
-            success: false,
-            code: EWSErrorCode.RoomNotReady,
-            message: 'Room is not ready (need 2 participants)',
-        };
-    }
-
-    const sender = room.participants.find(p => p.user.userId === senderId);
-    if (!sender) {
-        return {
-            success: false,
-            code: EWSErrorCode.NotParticipant,
-            message: 'You are not a participant of this room',
-        };
-    }
+    // Validate room (READY) + participant
+    const roomResult = validateReadyRoomParticipant(roomId, conn.userId);
+    if (!roomResult.success) return roomResult;
 
     const emojiMessage: IEmojiMessage = {
         roomId,

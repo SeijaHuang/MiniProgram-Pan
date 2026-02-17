@@ -12,12 +12,11 @@
 import { randomBytes } from 'crypto';
 import type { IChatSendMessage } from '../../types/websocket';
 import { EWSErrorCode } from '../../types/websocket';
-import { roomManager } from '../websocket/room-manager';
-import { ERoomStatus } from '../../models/entities/room';
 import type { IMessage } from '../../models/entities/message';
 import { EMessageType } from '../../models/entities/message';
 import type { ConnectionManager } from '../websocket/connection-manager';
 import { ChatSendDataSchema } from '../../models/schemas/ws-message.schema';
+import { validatePayload, validateRoomContext } from './handler-utils';
 
 export interface IChatSendResult {
     success: true;
@@ -38,66 +37,24 @@ export function handleChatSend(
     connectionId: string,
     message: IChatSendMessage
 ): TChatSendHandlerResult {
-    // Validation: Payload schema is valid
-    const validation = ChatSendDataSchema.safeParse(message.data);
-    if (!validation.success) {
-        const firstError = validation.error.issues[0];
-        return {
-            success: false,
-            code: EWSErrorCode.InvalidPayload,
-            message: firstError?.message ?? 'Invalid payload',
-        };
-    }
+    // Validate payload schema
+    const v = validatePayload(ChatSendDataSchema, message.data);
+    if (!v.success) return v;
 
-    const { content } = validation.data;
+    const { content } = v.data;
 
-    // Get connection metadata
-    const connectionData = connectionManager.getConnection(connectionId);
-    if (!connectionData || !connectionData.userId || !connectionData.roomId) {
-        return {
-            success: false,
-            code: EWSErrorCode.NotParticipant,
-            message: 'You must join a room first',
-        };
-    }
+    // Validate connection + room (READY) + participant
+    const ctx = validateRoomContext(connectionManager, connectionId);
+    if (!ctx.success) return ctx;
 
-    const userId: string = connectionData.userId;
-    const roomId: string = connectionData.roomId;
-
-    // Validation: Room exists
-    const room = roomManager.getRoomById(roomId);
-    if (!room) {
-        return {
-            success: false,
-            code: EWSErrorCode.RoomNotFound,
-            message: 'Room not found',
-        };
-    }
-
-    // Validation: Room status is READY
-    if (room.status !== ERoomStatus.Ready) {
-        return {
-            success: false,
-            code: EWSErrorCode.RoomNotReady,
-            message: 'Room is not ready for chat (need 2 participants)',
-        };
-    }
-
-    // Validation: Sender is a participant
-    const sender = room.participants.find(p => p.user.userId === userId);
-    if (!sender) {
-        return {
-            success: false,
-            code: EWSErrorCode.NotParticipant,
-            message: 'You are not a participant of this room',
-        };
-    }
+    const { userId, room, participant } = ctx;
+    const roomId: string = room.roomId;
 
     // Create message
     const chatMessage: IMessage = {
         messageId: `msg_${randomBytes(8).toString('hex')}`,
         roomId: room.roomId,
-        sender: sender.user,
+        sender: participant.user,
         type: EMessageType.Text,
         content: content,
         createdAt: Date.now(),
