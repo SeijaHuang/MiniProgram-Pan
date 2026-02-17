@@ -22,26 +22,3 @@ export * from './drum';
 export * from './asr';
 export * from './emoji';
 export * from './verdict';
-
-// Union types
-import type { IJoinRoomMessage, IJoinAckMessage } from './join-room';
-import type { IChatSendMessage, IChatReceiveMessage } from './chat';
-import type { IWSErrorMessage } from './error';
-import type { TDrumMessage } from './drum';
-import type { TASRMessage } from './asr';
-import type { IEmojiMessage } from './emoji';
-import type { TVerdictMessage } from './verdict';
-
-/**
- * Union type of all WebSocket messages
- */
-export type WSMessage =
-    | IJoinRoomMessage
-    | IChatSendMessage
-    | IJoinAckMessage
-    | IChatReceiveMessage
-    | IWSErrorMessage
-    | TDrumMessage
-    | TASRMessage
-    | IEmojiMessage
-    | TVerdictMessage;

@@ -223,13 +223,6 @@ class WebSocketManager {
     }
 
     /**
-     * Get current connection state
-     */
-    getState(): ConnectionState {
-        return this.state;
-    }
-
-    /**
      * Check if connected
      */
     isConnected(): boolean {

@@ -43,21 +43,6 @@ export const BACKEND_CONFIG = {
 } as const;
 
 /**
- * Tencent Cloud Configuration
- */
-export const TENCENT_CONFIG = {
-    STSSERVICE_URL: 'https://sts.tencentcloudapi.com',
-} as const;
-
-/**
- * Room Configuration
- */
-export const ROOM_CONFIG = {
-    CODE_LENGTH: 6,
-    MAX_PARTICIPANTS: 2,
-} as const;
-
-/**
  * WebSocket Configuration
  */
 export const WS_CONFIG = {

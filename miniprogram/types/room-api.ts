@@ -5,38 +5,6 @@
  */
 
 import type { IRoom } from '../models/room';
-import type { IUser } from '../models/user';
-
-/**
- * HTTP Error Codes
- * HTTP 错误码
- */
-export enum EHttpErrorCode {
-    RoomCreateFailed = 'ROOM_CREATE_FAILED',
-    InvalidRequest = 'INVALID_REQUEST',
-    InternalError = 'INTERNAL_ERROR',
-}
-
-/**
- * Base HTTP Response
- * HTTP 响应基础结构
- */
-export interface IBaseResponse<T> {
-    success: boolean;
-    data?: T;
-    error?: {
-        code: EHttpErrorCode;
-        message?: string;
-    };
-}
-
-/**
- * Create Room Request
- * 创建房间请求
- */
-export interface ICreateRoomRequest {
-    creator: IUser;
-}
 
 /**
  * Create Room Response Data
@@ -50,4 +18,11 @@ export interface ICreateRoomResponseData {
  * Create Room Response
  * 创建房间响应
  */
-export type ICreateRoomResponse = IBaseResponse<ICreateRoomResponseData>;
+export interface ICreateRoomResponse {
+    success: boolean;
+    data?: ICreateRoomResponseData;
+    error?: {
+        code: string;
+        message?: string;
+    };
+}

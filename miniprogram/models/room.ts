@@ -24,11 +24,3 @@ export interface IRoom {
     status: ERoomStatus;
     createdAt: number;
 }
-
-/**
- * 判断用户是否为房主
- * 使用后端返回的 hostUserId 字段进行判断
- */
-export function isRoomHost(room: IRoom, userId: string): boolean {
-    return room.hostUserId === userId;
-}

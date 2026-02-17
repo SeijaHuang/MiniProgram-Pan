@@ -27,16 +27,3 @@ export function vibrateLong(): void {
         },
     });
 }
-
-/**
- * Trigger countdown vibration
- * Short vibration for countdown feedback
- */
-export function vibrateCountdown(): void {
-    wx.vibrateShort({
-        type: 'heavy',
-        fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
-            console.warn('[Haptic] vibrateCountdown failed:', err.errMsg);
-        },
-    });
-}

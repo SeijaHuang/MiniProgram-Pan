@@ -13,7 +13,7 @@ import { EPlayerRole, EGamePhase } from '../../types/websocket/drum';
 /**
  * Drum Game State
  */
-export interface IDrumGameState {
+interface IDrumGameState {
     roomId: string;
     phase: EGamePhase;
     hostRole: EPlayerRole;
@@ -28,7 +28,7 @@ export interface IDrumGameState {
 /**
  * Game Result
  */
-export interface IDrumGameResult {
+interface IDrumGameResult {
     organizerScore: number;
     joinerScore: number;
     winnerRole: EPlayerRole;
@@ -204,13 +204,6 @@ export class DrumGameManager {
             this.games.delete(roomId);
             console.log(`[DrumGameManager] Game ${roomId} cleaned up`);
         }
-    }
-
-    /**
-     * Get all games (for debugging/admin purposes)
-     */
-    getAllGames(): IDrumGameState[] {
-        return Array.from(this.games.values());
     }
 }
 
