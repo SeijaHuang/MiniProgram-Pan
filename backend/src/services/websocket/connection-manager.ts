@@ -154,7 +154,8 @@ export class ConnectionManager {
 
     /**
      * Handle connection disconnect
-     * CRITICAL: Cleans up user from room
+     * CRITICAL: Cleans up connection data only — room-level
+     * leave logic is handled by the controller
      */
     handleDisconnect(connectionId: string): void {
         const connection = this.connections.get(connectionId);
@@ -166,25 +167,8 @@ export class ConnectionManager {
             `[ConnectionManager] Handling disconnect for ${connectionId}`
         );
 
-        // If user was in a room, remove them
-        if (connection.userId && connection.roomId) {
-            const remainingRoom = roomManager.leaveRoom(
-                connection.roomId,
-                connection.userId
-            );
-
-            // If there's still someone in the room, notify them
-            if (remainingRoom) {
-                this.broadcastToRoom(connection.roomId, {
-                    type: 'JOIN_ACK',
-                    data: {
-                        room: remainingRoom,
-                    },
-                    timestamp: Date.now(),
-                });
-            }
-
-            // Clean up user-to-connection mapping
+        // Clean up user-to-connection mapping
+        if (connection.userId) {
             this.userToConnection.delete(connection.userId);
         }
 
@@ -192,6 +176,35 @@ export class ConnectionManager {
         this.connections.delete(connectionId);
         console.log(
             `[ConnectionManager] Removed connection ${connectionId} (Total: ${this.connections.size})`
+        );
+    }
+
+    /**
+     * Disconnect all connections bound to a room
+     * Closes sockets, removes connections, cleans userToConnection
+     */
+    disconnectRoom(roomId: string): void {
+        const room = roomManager.getRoomById(roomId);
+        if (!room) {
+            return;
+        }
+
+        for (const participant of room.participants) {
+            const connectionId = this.userToConnection.get(
+                participant.user.userId
+            );
+            if (connectionId) {
+                const connection = this.connections.get(connectionId);
+                if (connection && connection.socket.readyState === 1) {
+                    connection.socket.close();
+                }
+                this.connections.delete(connectionId);
+                this.userToConnection.delete(participant.user.userId);
+            }
+        }
+
+        console.log(
+            `[ConnectionManager] Disconnected all connections for room ${roomId}`
         );
     }
 

@@ -19,6 +19,7 @@ export enum ERoomStatus {
 export interface IParticipant {
     user: IUser;
     joinedAt: number;
+    leftAt?: number;
 }
 
 /**

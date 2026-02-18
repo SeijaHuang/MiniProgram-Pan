@@ -191,13 +191,12 @@
                     </text>
                 </view>
 
-                <!-- Leave together -->
+                <!-- Leave room -->
                 <view class="post-game__leave">
                     <styled-button
-                        text="{{ leaveWaiting ? '等待对方确认...' : '共同退堂' }}"
+                        text="退堂"
                         color="grey"
-                        disabled="{{ leaveWaiting }}"
-                        bind:tap="onLeaveTogether"
+                        bind:tap="onLeaveRoom"
                     ></styled-button>
                 </view>
                 </view>

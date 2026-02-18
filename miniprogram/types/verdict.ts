@@ -112,11 +112,3 @@ export interface IPostGameEffectPayload {
     effect: 'stamp_death' | 'beg_emoji';
     fromUserId: string;
 }
-
-/**
- * LEAVE_TOGETHER_ACK payload (received from server)
- */
-export interface ILeaveTogetherAckPayload {
-    roomId: string;
-    allReady: boolean;
-}

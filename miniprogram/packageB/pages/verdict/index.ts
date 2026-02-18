@@ -5,14 +5,65 @@
 
 import { postGameService } from '../../../services/post-game-service';
 import { verdictService } from '../../../services/verdict-service';
+import { wsManager } from '../../../services/websocket-manager';
 import type {
     IVerdictResult,
     IDimensionScores,
     ISecretReport,
     IPostGameEffectPayload,
-    ILeaveTogetherAckPayload,
 } from '../../../types/verdict';
 import { DIMENSION_LABELS, DIMENSION_KEYS } from '../../../types/verdict';
+import { EWSMessageType } from '../../../types/websocket-common';
+
+/** Mock verdict data for standalone page testing */
+const MOCK_VERDICT: IVerdictResult = {
+    caseNumber: '20260218-MOCK',
+    winnerId: 'host',
+    loserId: 'guest',
+    responsibility: {
+        host: 35,
+        guest: 55,
+        thirdParty: [
+            { reason: '水星逆行', percentage: 5, emoji: '🪐' },
+            { reason: '天气太热', percentage: 5, emoji: '☀️' },
+        ],
+    },
+    battleStats: {
+        host: {
+            mouthHard: 82,
+            oldAccountDigging: 65,
+            logicSlippery: 45,
+            charmAttack: 90,
+            survivalInstinct: 73,
+            victimActing: 58,
+        },
+        guest: {
+            mouthHard: 70,
+            oldAccountDigging: 88,
+            logicSlippery: 76,
+            charmAttack: 42,
+            survivalInstinct: 60,
+            victimActing: 85,
+        },
+    },
+    verdictSummary:
+        '本案经清汤大老爷仔细审理，双方均有过错。原告虽然嘴硬功力深厚、撒娇暴击无人能挡，但被告翻旧账技术炉火纯青、受害者演技堪称影后。综合来看，被告需承担主要责任，罚做家务三天以示惩戒。望双方日后多沟通、少翻旧账，和气生财！',
+    punishmentTask: {
+        loserId: 'guest',
+        task: '连续三天负责洗碗+拖地',
+        deadline: '2026年2月21日前完成',
+    },
+    secretReports: {
+        host: {
+            title: '撒娇暴击王',
+            advice: '你的撒娇技能已经点满，但要注意不要过度使用，否则对方会产生抗体。建议适当展示理性的一面，刚柔并济才是吵架的最高境界。',
+        },
+        guest: {
+            title: '翻旧账达人',
+            advice: '你的记忆力令人叹服，但翻旧账是一把双刃剑。建议把这份超强记忆力用在记住对方的优点上，效果会好很多哦。',
+        },
+    },
+};
 
 type AnimResult = WechatMiniprogram.AnimationExportResult;
 
@@ -65,7 +116,6 @@ interface IVerdictPageData {
     showSecretModal: boolean;
     actionRemainingCount: number;
     actionCooldown: boolean;
-    leaveWaiting: boolean;
     headerAnimation: AnimResult;
     section2Animation: AnimResult;
     section3Animation: AnimResult;
@@ -94,7 +144,6 @@ Page({
         showSecretModal: false,
         actionRemainingCount: 5,
         actionCooldown: false,
-        leaveWaiting: false,
         headerAnimation: {} as AnimResult,
         section2Animation: {} as AnimResult,
         section3Animation: {} as AnimResult,
@@ -129,13 +178,19 @@ Page({
         // Try to get verdict from service cache or globalData
         let verdict: IVerdictResult | null = verdictService.getResult();
 
+        // if (!verdict) {
+        //     // Try from globalData
+        //     const app = getApp<IAppOption>();
+        //     const gd = app.globalData as Record<string, unknown>;
+        //     if (gd.verdictResult) {
+        //         verdict = gd.verdictResult as IVerdictResult;
+        //     }
+        // }
+
+        // [DEV] Use mock data when no real verdict is available
         if (!verdict) {
-            // Try from globalData
-            const app = getApp<IAppOption>();
-            const gd = app.globalData as Record<string, unknown>;
-            if (gd.verdictResult) {
-                verdict = gd.verdictResult as IVerdictResult;
-            }
+            console.warn('[Verdict] Using MOCK data for testing');
+            verdict = MOCK_VERDICT;
         }
 
         if (verdict) {
@@ -161,19 +216,6 @@ Page({
         postGameService.initialize();
         postGameService.onEffect((payload: IPostGameEffectPayload) => {
             this.onEffectReceived(payload);
-        });
-        postGameService.onLeaveAck((payload: ILeaveTogetherAckPayload) => {
-            if (payload.allReady) {
-                void wx.showToast({
-                    title: '双方已退堂',
-                    icon: 'success',
-                });
-                setTimeout(() => {
-                    void wx.redirectTo({
-                        url: '/pages/welcome/index',
-                    });
-                }, 1500);
-            }
         });
     },
 
@@ -631,13 +673,19 @@ Page({
     },
 
     /**
-     * Request leave together
+     * Leave room immediately
      */
-    onLeaveTogether(): void {
-        if (this.data.leaveWaiting) return;
-
-        this.setData({ leaveWaiting: true });
-        postGameService.sendLeaveTogether(this._roomId);
+    onLeaveRoom(): void {
+        wsManager.send({
+            type: EWSMessageType.LeaveRoom,
+            data: {
+                roomId: this._roomId,
+            },
+            timestamp: Date.now(),
+        });
+        void wx.reLaunch({
+            url: '/pages/welcome/index',
+        });
     },
 
     /**

@@ -36,6 +36,10 @@ export enum EWSMessageType {
     VerdictResult = 'VERDICT_RESULT', // Server → Client
     VerdictFailed = 'VERDICT_FAILED', // Server → Client
     VerdictRetry = 'VERDICT_RETRY', // Client → Server
+
+    // Leave Room
+    LeaveRoom = 'LEAVE_ROOM', // Client → Server
+    LeaveRoomAck = 'LEAVE_ROOM_ACK', // Server → Client
 }
 
 /**
