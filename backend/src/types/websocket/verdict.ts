@@ -170,6 +170,31 @@ export interface IVerdictResult {
 }
 
 /**
+ * LEAVE_ROOM: Client → Server
+ * Sent when a player leaves the room from verdict page
+ */
+export interface ILeaveRoomData {
+    roomId: string;
+}
+
+export interface ILeaveRoomMessage extends IWSMessage<ILeaveRoomData> {
+    type: EWSMessageType.LeaveRoom;
+}
+
+/**
+ * LEAVE_ROOM_ACK: Server → Client
+ * Confirms room leave (sent to the leaving user)
+ */
+export interface ILeaveRoomAckData {
+    roomId: string;
+    allLeft: boolean;
+}
+
+export interface ILeaveRoomAckMessage extends IWSMessage<ILeaveRoomAckData> {
+    type: EWSMessageType.LeaveRoomAck;
+}
+
+/**
  * Union type of all verdict messages
  */
 export type TVerdictMessage =
@@ -178,4 +203,6 @@ export type TVerdictMessage =
     | IChatCompleteMessage
     | IVerdictResultMessage
     | IVerdictFailedMessage
-    | IVerdictRetryMessage;
+    | IVerdictRetryMessage
+    | ILeaveRoomMessage
+    | ILeaveRoomAckMessage;

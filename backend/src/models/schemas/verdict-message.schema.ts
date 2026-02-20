@@ -20,3 +20,10 @@ export const VerdictRetryDataSchema = z.object({
     roomId: z.string().min(1, 'roomId is required'),
     userId: z.string().min(1, 'userId is required'),
 });
+
+/**
+ * LEAVE_ROOM data validation
+ */
+export const LeaveRoomDataSchema = z.object({
+    roomId: z.string().min(1, 'roomId is required'),
+});

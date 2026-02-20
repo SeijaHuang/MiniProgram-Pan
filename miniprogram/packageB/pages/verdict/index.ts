@@ -5,14 +5,15 @@
 
 import { postGameService } from '../../../services/post-game-service';
 import { verdictService } from '../../../services/verdict-service';
+import { wsManager } from '../../../services/websocket-manager';
 import type {
     IVerdictResult,
     IDimensionScores,
     ISecretReport,
     IPostGameEffectPayload,
-    ILeaveTogetherAckPayload,
 } from '../../../types/verdict';
 import { DIMENSION_LABELS, DIMENSION_KEYS } from '../../../types/verdict';
+import { EWSMessageType } from '../../../types/websocket-common';
 
 type AnimResult = WechatMiniprogram.AnimationExportResult;
 
@@ -56,6 +57,11 @@ const TIMING = {
     EFFECT_CLEAR_DELAY: 2000,
 } as const;
 
+interface IEffectQueueItem {
+    effect: 'stamp_death' | 'beg_emoji';
+    fromUserId: string;
+}
+
 interface IVerdictPageData {
     loading: boolean;
     verdict: IVerdictResult | null;
@@ -65,7 +71,6 @@ interface IVerdictPageData {
     showSecretModal: boolean;
     actionRemainingCount: number;
     actionCooldown: boolean;
-    leaveWaiting: boolean;
     headerAnimation: AnimResult;
     section2Animation: AnimResult;
     section3Animation: AnimResult;
@@ -77,11 +82,15 @@ interface IVerdictPageData {
     hostPercentDisplay: number;
     guestPercentDisplay: number;
     summaryDisplayText: string;
-    currentEffect: string;
     saving: boolean;
     mySecretReport: ISecretReport;
     myTopDimension: string;
     myTopScore: number;
+    // Effect queue fields
+    effectQueue: IEffectQueueItem[];
+    isPlayingEffect: boolean;
+    showEffectOverlay: boolean;
+    currentEffectType: 'stamp_death' | 'beg_emoji' | '';
 }
 
 Page({
@@ -94,7 +103,6 @@ Page({
         showSecretModal: false,
         actionRemainingCount: 5,
         actionCooldown: false,
-        leaveWaiting: false,
         headerAnimation: {} as AnimResult,
         section2Animation: {} as AnimResult,
         section3Animation: {} as AnimResult,
@@ -106,18 +114,22 @@ Page({
         hostPercentDisplay: 0,
         guestPercentDisplay: 0,
         summaryDisplayText: '',
-        currentEffect: '',
         saving: false,
         mySecretReport: { title: '', advice: '' },
         myTopDimension: '',
         myTopScore: 0,
+        effectQueue: [] as IEffectQueueItem[],
+        isPlayingEffect: false,
+        showEffectOverlay: false,
+        currentEffectType: '' as 'stamp_death' | 'beg_emoji' | '',
     } as IVerdictPageData,
 
     // Timer references (not in data)
     _percentTimer: null as number | null,
     _summaryTimer: null as number | null,
     _cooldownTimer: null as number | null,
-    _effectTimer: null as number | null,
+    _effectPlayTimer: null as number | null,
+    _effectGapTimer: null as number | null,
     _animTimers: [] as number[],
     _roomId: '' as string,
 
@@ -126,17 +138,8 @@ Page({
         const currentRole: 'host' | 'guest' =
             (options.role as 'host' | 'guest') ?? 'host';
 
-        // Try to get verdict from service cache or globalData
-        let verdict: IVerdictResult | null = verdictService.getResult();
-
-        if (!verdict) {
-            // Try from globalData
-            const app = getApp<IAppOption>();
-            const gd = app.globalData as Record<string, unknown>;
-            if (gd.verdictResult) {
-                verdict = gd.verdictResult as IVerdictResult;
-            }
-        }
+        // Try to get verdict from service cache
+        const verdict: IVerdictResult | null = verdictService.getResult();
 
         if (verdict) {
             this.initWithVerdict(verdict, currentRole);
@@ -157,22 +160,19 @@ Page({
                 });
         }
 
-        // Setup post-game service
+        // Setup post-game service with queue-based effect handling
         postGameService.initialize();
         postGameService.onEffect((payload: IPostGameEffectPayload) => {
-            this.onEffectReceived(payload);
-        });
-        postGameService.onLeaveAck((payload: ILeaveTogetherAckPayload) => {
-            if (payload.allReady) {
-                void wx.showToast({
-                    title: '双方已退堂',
-                    icon: 'success',
-                });
-                setTimeout(() => {
-                    void wx.redirectTo({
-                        url: '/pages/welcome/index',
-                    });
-                }, 1500);
+            const queue: IEffectQueueItem[] = [
+                ...this.data.effectQueue,
+                {
+                    effect: payload.effect,
+                    fromUserId: payload.fromUserId,
+                },
+            ];
+            this.setData({ effectQueue: queue });
+            if (!this.data.isPlayingEffect) {
+                this._playNextEffect();
             }
         });
     },
@@ -377,9 +377,13 @@ Page({
             clearTimeout(this._cooldownTimer);
             this._cooldownTimer = null;
         }
-        if (this._effectTimer !== null) {
-            clearTimeout(this._effectTimer);
-            this._effectTimer = null;
+        if (this._effectPlayTimer !== null) {
+            clearTimeout(this._effectPlayTimer);
+            this._effectPlayTimer = null;
+        }
+        if (this._effectGapTimer !== null) {
+            clearTimeout(this._effectGapTimer);
+            this._effectGapTimer = null;
         }
         for (const t of this._animTimers) {
             clearTimeout(t);
@@ -583,9 +587,13 @@ Page({
     },
 
     /**
-     * Execute punishment (winner action)
+     * Unified post-game action handler (execute_punishment or beg_for_mercy)
+     * Sends WS message; animation triggers when server broadcasts back.
      */
-    onExecutePunishment(): void {
+    onPostGameAction(e: WechatMiniprogram.TouchEvent): void {
+        const action = e.currentTarget.dataset.action as
+            | 'execute_punishment'
+            | 'beg_for_mercy';
         if (this.data.actionCooldown || this.data.actionRemainingCount <= 0) {
             return;
         }
@@ -596,11 +604,7 @@ Page({
             actionCooldown: true,
         });
 
-        postGameService.sendAction(
-            this._roomId,
-            'execute_punishment',
-            remaining
-        );
+        postGameService.sendAction(this._roomId, action, remaining);
 
         this._cooldownTimer = setTimeout(() => {
             this.setData({ actionCooldown: false });
@@ -609,50 +613,53 @@ Page({
     },
 
     /**
-     * Beg for mercy (loser action)
+     * Leave room immediately
      */
-    onBegForMercy(): void {
-        if (this.data.actionCooldown || this.data.actionRemainingCount <= 0) {
+    onLeaveRoom(): void {
+        wsManager.send({
+            type: EWSMessageType.LeaveRoom,
+            data: {
+                roomId: this._roomId,
+            },
+            timestamp: Date.now(),
+        });
+        // Delay navigation to let WS message send before page teardown
+        void wx.reLaunch({
+            url: '/pages/welcome/index',
+        });
+    },
+
+    /**
+     * Play next effect from queue (serial playback)
+     */
+    _playNextEffect(): void {
+        const queue: IEffectQueueItem[] = this.data.effectQueue;
+        if (queue.length === 0) {
+            this.setData({
+                isPlayingEffect: false,
+                showEffectOverlay: false,
+                currentEffectType: '',
+            });
             return;
         }
 
-        const remaining: number = this.data.actionRemainingCount - 1;
+        const [current, ...rest] = queue;
         this.setData({
-            actionRemainingCount: remaining,
-            actionCooldown: true,
+            effectQueue: rest,
+            isPlayingEffect: true,
+            showEffectOverlay: true,
+            currentEffectType: current.effect,
         });
 
-        postGameService.sendAction(this._roomId, 'beg_for_mercy', remaining);
-
-        this._cooldownTimer = setTimeout(() => {
-            this.setData({ actionCooldown: false });
-            this._cooldownTimer = null;
-        }, TIMING.ACTION_COOLDOWN) as unknown as number;
-    },
-
-    /**
-     * Request leave together
-     */
-    onLeaveTogether(): void {
-        if (this.data.leaveWaiting) return;
-
-        this.setData({ leaveWaiting: true });
-        postGameService.sendLeaveTogether(this._roomId);
-    },
-
-    /**
-     * Handle incoming post-game effect
-     */
-    onEffectReceived(payload: IPostGameEffectPayload): void {
-        this.setData({ currentEffect: payload.effect });
-
-        // Clear after duration
-        if (this._effectTimer !== null) {
-            clearTimeout(this._effectTimer);
-        }
-        this._effectTimer = setTimeout(() => {
-            this.setData({ currentEffect: '' });
-            this._effectTimer = null;
+        // Hide after display duration, then play next after a gap
+        this._effectPlayTimer = setTimeout(() => {
+            this.setData({
+                showEffectOverlay: false,
+                currentEffectType: '',
+            });
+            this._effectGapTimer = setTimeout(() => {
+                this._playNextEffect();
+            }, 150) as unknown as number;
         }, TIMING.EFFECT_CLEAR_DELAY) as unknown as number;
     },
 });

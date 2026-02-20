@@ -8,21 +8,16 @@
  * - Callback-based event handling
  */
 
-import type {
-    IPostGameEffectPayload,
-    ILeaveTogetherAckPayload,
-} from '../types/verdict';
+import type { IPostGameEffectPayload } from '../types/verdict';
 import { EWSMessageType } from '../types/websocket-common';
 import type { IWSMessage } from '../types/websocket-common';
 
 import { wsManager } from './websocket-manager';
 
 type EffectCallback = (effect: IPostGameEffectPayload) => void;
-type LeaveAckCallback = (payload: ILeaveTogetherAckPayload) => void;
 
 class PostGameService {
     private effectCallback: EffectCallback | null = null;
-    private leaveAckCallback: LeaveAckCallback | null = null;
 
     /**
      * Send post-game action (execute_punishment or beg_for_mercy)
@@ -44,30 +39,10 @@ class PostGameService {
     }
 
     /**
-     * Send leave-together request
-     */
-    sendLeaveTogether(roomId: string): void {
-        wsManager.send({
-            type: EWSMessageType.LeaveTogether,
-            data: {
-                roomId,
-            },
-            timestamp: Date.now(),
-        });
-    }
-
-    /**
      * Register effect callback
      */
     onEffect(callback: EffectCallback): void {
         this.effectCallback = callback;
-    }
-
-    /**
-     * Register leave-together ack callback
-     */
-    onLeaveAck(callback: LeaveAckCallback): void {
-        this.leaveAckCallback = callback;
     }
 
     /**
@@ -98,13 +73,6 @@ class PostGameService {
                 }
                 break;
             }
-            case EWSMessageType.LeaveTogetherAck: {
-                const leavePayload = message.data as ILeaveTogetherAckPayload;
-                if (this.leaveAckCallback) {
-                    this.leaveAckCallback(leavePayload);
-                }
-                break;
-            }
             default:
                 break;
         }
@@ -115,7 +83,6 @@ class PostGameService {
      */
     destroy(): void {
         this.effectCallback = null;
-        this.leaveAckCallback = null;
     }
 }
 

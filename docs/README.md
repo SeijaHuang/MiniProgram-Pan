@@ -97,6 +97,7 @@ docs/
 
 #### Verdict Waiting（判决等待页）
 
+- **文件**: (无独立文档，功能说明见下方)
 - **页面路径**: `packageB/pages/verdict-waiting/index`
 - **功能**: LLM 判决生成期间的等待页面，通过 WebSocket 接收判决结果
 - **核心特性**:

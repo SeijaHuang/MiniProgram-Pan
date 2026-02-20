@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-**用户流程**: 欢迎页 → 等待房间 → 震天鼓抢麦 (10秒点击竞争) → 对簿公堂 (轮流语音)
+**用户流程**: 欢迎页 → 等待房间 → 震天鼓抢麦 (10秒点击竞争) → 对簿公堂 (轮流语音) → 等待判决 (AI分析loading) → 判决书展示
 
 ## 技术栈
 
@@ -12,6 +12,8 @@
 | ------------ | ------------------------------------------- |
 | **前端**     | 微信小程序原生框架 (TypeScript, WXML, WXSS) |
 | **后端**     | Node.js + Express + WebSocket (ws)          |
+| **语音识别** | 腾讯云 ASR (客户端直连)                     |
+| **AI 判决**  | OpenAI gpt-4o                               |
 | **实时通信** | WebSocket                                   |
 | **代码规范** | ESLint + Prettier + Husky                   |
 
@@ -20,9 +22,11 @@
 ```
 .
 ├── miniprogram/          # 小程序前端
-│   ├── pages/            # 页面 (welcome, waiting-room, drum, chat-room)
-│   ├── components/       # 组件 (styled-button, styled-title, countdown)
-│   ├── services/         # 业务服务 (WebSocket, Room, Drum, Chat)
+│   ├── pages/            # 主包页面 (welcome)
+│   ├── packageA/pages/   # 分包A (waiting-room, drum-room)
+│   ├── packageB/pages/   # 分包B (chat-room, verdict-waiting, verdict)
+│   ├── components/       # 组件 (styled-button, styled-title, countdown, avatar, radar-chart, secret-modal, post-game-effect)
+│   ├── services/         # 业务服务 (WebSocket, Room, Drum, ASR, STS, Verdict, PostGame)
 │   ├── models/           # 领域模型
 │   ├── types/            # 类型定义
 │   ├── constants/        # 常量配置
@@ -97,7 +101,7 @@ npm run lint       # ESLint 检查
 
 ### 房间系统
 
-- **HTTP**: `POST /room/create` 创建房间，返回 6 位房间码
+- **HTTP**: `POST /v1/rooms` 创建房间，返回 6 位房间码
 - **WebSocket**: `JOIN_ROOM` 加入房间
 - **状态机**: WAITING (1人) → READY (2人) → CLOSED
 
@@ -110,24 +114,55 @@ npm run lint       # ESLint 检查
 
 ### 聊天系统 (Chat Room)
 
-- 轮流语音申冤
+- 轮流语音申冤 (ASR 实时语音转文字)
 - 表情互动系统
 - 倒计时控制
+- 发言轮次管理 (SPEECH_TURN_END → SPEECH_TURN_SWITCH → CHAT_COMPLETE)
+
+### 等待判决 (Verdict Waiting)
+
+- LLM 判决生成期间的等待页面
+- WebSocket 监听判决结果 (VERDICT_RESULT / VERDICT_FAILED)
+- 多组并行动画 + 随机加载文案轮播
+- 90 秒超时处理 + 失败重试机制 (最多 3 次)
+
+### 判决书 (Verdict)
+
+- AI 判决结果可视化 (长滚动卡片)
+- 责任分布 (双方百分比 + 第三方因素)
+- 六维战力雷达图 (Canvas 2D)
+- 大老爷赠言 (打字机效果) + 惩罚令牌 (盖章动画)
+- 密折弹窗 (私密反馈)
+- 赛后互动 (赢家惩戒 / 输家求饶 / 平局退堂)
 
 ## WebSocket 消息类型
 
-| 类型           | 方向 | 说明     |
-| -------------- | ---- | -------- |
-| `JOIN_ROOM`    | C→S  | 加入房间 |
-| `JOIN_ACK`     | S→C  | 加入确认 |
-| `DRUM_READY`   | S→C  | 游戏就绪 |
-| `DRUM_START`   | S→C  | 游戏开始 |
-| `DRUM_TAP`     | 双向 | 点击事件 |
-| `DRUM_FINISH`  | S→C  | 游戏结束 |
-| `DRUM_RESULT`  | S→C  | 游戏结果 |
-| `CHAT_SEND`    | C→S  | 发送消息 |
-| `CHAT_RECEIVE` | S→C  | 接收消息 |
-| `ERROR`        | S→C  | 错误消息 |
+| 类型                 | 方向 | 说明             |
+| -------------------- | ---- | ---------------- |
+| `JOIN_ROOM`          | C→S  | 加入房间         |
+| `JOIN_ACK`           | S→C  | 加入确认（广播） |
+| `CHAT_SEND`          | C→S  | 发送文本消息     |
+| `CHAT_RECEIVE`       | S→C  | 接收消息（广播） |
+| `EMOJI_SEND`         | C→S  | 发送表情         |
+| `EMOJI_RECEIVE`      | S→C  | 接收表情（广播） |
+| `ASR_TEXT_PUSH`      | C→S  | 推送识别文本     |
+| `ASR_TEXT`           | S→C  | 广播识别文本     |
+| `DRUM_READY`         | S→C  | 游戏就绪         |
+| `DRUM_START`         | S→C  | 游戏开始         |
+| `DRUM_TAP`           | 双向 | 点击事件         |
+| `DRUM_FINISH`        | S→C  | 游戏结束         |
+| `DRUM_RESULT`        | S→C  | 游戏结果         |
+| `SPEECH_TURN_END`    | C→S  | 发言轮次结束     |
+| `SPEECH_TURN_SWITCH` | S→C  | 切换发言轮次     |
+| `CHAT_COMPLETE`      | S→C  | 双方发言完毕     |
+| `VERDICT_RESULT`     | S→C  | 判决结果推送     |
+| `VERDICT_FAILED`     | S→C  | 判决生成失败     |
+| `VERDICT_RETRY`      | C→S  | 请求重试判决     |
+| `POST_GAME_ACTION`   | C→S  | 赛后互动操作     |
+| `POST_GAME_EFFECT`   | S→C  | 赛后互动特效     |
+| `LEAVE_ROOM`         | C→S  | 离开房间         |
+| `LEAVE_ROOM_ACK`     | S→C  | 离开房间确认     |
+| `ERROR`              | S→C  | 错误消息         |
 
 ## 开发规范
 

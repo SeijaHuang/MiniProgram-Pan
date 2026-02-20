@@ -35,8 +35,10 @@ export enum EWSMessageType {
     // Post-Game
     PostGameAction = 'POST_GAME_ACTION',
     PostGameEffect = 'POST_GAME_EFFECT',
-    LeaveTogether = 'LEAVE_TOGETHER',
-    LeaveTogetherAck = 'LEAVE_TOGETHER_ACK',
+
+    // Leave Room
+    LeaveRoom = 'LEAVE_ROOM',
+    LeaveRoomAck = 'LEAVE_ROOM_ACK',
 }
 
 /**

@@ -153,74 +153,67 @@
 
         <!-- 区域8: 赛后互动 -->
         <view
-            class="verdict-section"
+            class="verdict__post-game"
             animation="{{ section8Animation }}"
         >
-            <view class="post-game">
-                <!-- Winner: execute punishment -->
-                <view
-                    wx:if="{{ isWinner }}"
-                    class="post-game__action"
-                >
-                    <styled-button
-                        icon="⚡"
-                        text="执行惩戒"
-                        color="red"
-                        disabled="{{ actionCooldown }}"
-                        bind:tap="onExecutePunishment"
-                    ></styled-button>
-                    <text class="post-game__remaining">
-                        剩余 {{ actionRemainingCount }} 次
-                    </text>
-                </view>
-
-                <!-- Loser: beg for mercy -->
-                <view
-                    wx:if="{{ !isWinner && !isDraw }}"
-                    class="post-game__action"
-                >
-                    <styled-button
-                        icon="🙏"
-                        text="跪地求饶"
-                        color="blue"
-                        disabled="{{ actionCooldown }}"
-                        bind:tap="onBegForMercy"
-                    ></styled-button>
-                    <text class="post-game__remaining">
-                        剩余 {{ actionRemainingCount }} 次
-                    </text>
-                </view>
-
-                <!-- Leave together -->
-                <view class="post-game__leave">
-                    <styled-button
-                        text="{{ leaveWaiting ? '等待对方确认...' : '共同退堂' }}"
-                        color="grey"
-                        disabled="{{ leaveWaiting }}"
-                        bind:tap="onLeaveTogether"
-                    ></styled-button>
-                </view>
-                </view>
+            <!-- 赢家：执行惩戒 -->
+            <view
+                wx:if="{{ isWinner }}"
+                class="verdict__post-btn verdict__post-btn--punish {{ actionCooldown || actionRemainingCount <= 0 ? 'verdict__post-btn--disabled' : '' }}"
+                bindtap="onPostGameAction"
+                data-action="execute_punishment"
+            >
+                <text class="verdict__post-btn-icon">⚔️</text>
+                <text class="verdict__post-btn-label">执行惩戒</text>
+                <text class="verdict__post-btn-sub">
+                    剩余 {{ actionRemainingCount }}/5 次
+                </text>
             </view>
+
+            <!-- 输家：跪地求饶 -->
+            <view
+                wx:elif="{{ !isWinner && !isDraw }}"
+                class="verdict__post-btn verdict__post-btn--beg {{ actionCooldown || actionRemainingCount <= 0 ? 'verdict__post-btn--disabled' : '' }}"
+                bindtap="onPostGameAction"
+                data-action="beg_for_mercy"
+            >
+                <text class="verdict__post-btn-icon">🧎</text>
+                <text class="verdict__post-btn-label">跪地求饶</text>
+                <text class="verdict__post-btn-sub">
+                    剩余 {{ actionRemainingCount }}/5 次
+                </text>
+            </view>
+
+            <!-- 退堂 (所有情况都显示) -->
+            <styled-button
+                class="verdict__leave-btn"
+                icon="🤝"
+                text="退堂"
+                color="blue"
+                bind:tap="onLeaveRoom"
+            ></styled-button>
+        </view>
         </view>
     </block>
 
-    <!-- Secret modal -->
-    <secret-modal
-        visible="{{ showSecretModal }}"
-        title="{{ mySecretReport.title }}"
-        advice="{{ mySecretReport.advice }}"
-        topDimension="{{ myTopDimension }}"
-        topScore="{{ myTopScore }}"
-        bind:close="onSecretModalClose"
-    ></secret-modal>
-
-    <!-- Post-game effect overlay -->
-    <post-game-effect
-        effect="{{ currentEffect }}"
-    ></post-game-effect>
 
 </scroll-view>
+
+<!-- Secret modal (must be outside scroll-view for position: fixed to work) -->
+<secret-modal
+    visible="{{ showSecretModal }}"
+    title="{{ mySecretReport.title }}"
+    advice="{{ mySecretReport.advice }}"
+    topDimension="{{ myTopDimension }}"
+    topScore="{{ myTopScore }}"
+    bind:close="onSecretModalClose"
+></secret-modal>
+
+<!-- Post-game effect overlay (must be outside scroll-view for position: fixed to work) -->
+<post-game-effect
+    visible="{{ showEffectOverlay }}"
+    type="{{ currentEffectType }}"
+></post-game-effect>
 
 <!-- Hidden canvas for image generation (must be outside scroll-view for position: fixed to work) -->
 <canvas

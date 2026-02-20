@@ -179,6 +179,20 @@ export class RoomManager {
     }
 
     /**
+     * Delete a room entirely (cleanup after all participants left)
+     */
+    deleteRoom(roomId: string): void {
+        const room = this.rooms.get(roomId);
+        if (!room) {
+            return;
+        }
+        room.status = ERoomStatus.Closed;
+        this.roomCodeToId.delete(room.roomCode);
+        this.rooms.delete(roomId);
+        console.log(`[RoomManager] Room ${roomId} deleted`);
+    }
+
+    /**
      * Generate unique room ID
      */
     private generateRoomId(): string {

@@ -34,6 +34,11 @@ import {
 } from '../services/handlers/asr-text-handler';
 import { handleSpeechTurnEnd } from '../services/handlers/speech-turn-end-handler';
 import { handleVerdictRetry } from '../services/handlers/verdict-retry-handler';
+import { handleLeaveRoom } from '../services/handlers/leave-room-handler';
+import {
+    handlePostGameAction,
+    type TPostGameActionHandlerResult,
+} from '../services/handlers/post-game-handler';
 import { drumGameManager } from '../services/websocket/drum-game-manager';
 import { roomManager } from '../services/websocket/room-manager';
 import { verdictOrchestratorService } from '../services/core/verdict-orchestrator.service';
@@ -47,6 +52,8 @@ import type {
     ISpeechTurnEndMessage,
     IVerdictRetryMessage,
     IChatCompleteData,
+    ILeaveRoomMessage,
+    IPostGameActionMessage,
 } from '../types/websocket';
 import { EWSMessageType, EWSErrorCode, EGamePhase } from '../types/websocket';
 import { ERoomStatus } from '../models/entities/room';
@@ -110,6 +117,20 @@ export class WebSocketController {
                     WebSocketController.handleVerdictRetryMessage(
                         connectionId,
                         message as IVerdictRetryMessage
+                    );
+                    break;
+
+                case EWSMessageType.PostGameAction:
+                    WebSocketController.handlePostGameActionMessage(
+                        connectionId,
+                        message as IPostGameActionMessage
+                    );
+                    break;
+
+                case EWSMessageType.LeaveRoom:
+                    WebSocketController.handleLeaveRoomMessage(
+                        connectionId,
+                        message as ILeaveRoomMessage
                     );
                     break;
 
@@ -562,13 +583,129 @@ export class WebSocketController {
     }
 
     /**
+     * Handle POST_GAME_ACTION message
+     * Broadcasts effect to ALL participants (including sender)
+     */
+    private static handlePostGameActionMessage(
+        connectionId: string,
+        message: IPostGameActionMessage
+    ): void {
+        const result: TPostGameActionHandlerResult = handlePostGameAction(
+            connectionManager,
+            connectionId,
+            message
+        );
+
+        if (!result.success) {
+            WebSocketController.sendError(
+                connectionId,
+                result.code,
+                result.message
+            );
+            return;
+        }
+
+        // Broadcast POST_GAME_EFFECT to ALL participants (both sender and opponent)
+        connectionManager.broadcastToRoom(result.roomId, {
+            type: EWSMessageType.PostGameEffect,
+            data: {
+                roomId: result.roomId,
+                effect: result.effect,
+                fromUserId: result.fromUserId,
+                remainingCount: result.remainingCount,
+            },
+            timestamp: Date.now(),
+        });
+    }
+
+    /**
+     * Handle LEAVE_ROOM message
+     * Called when a user clicks "退堂" on the verdict page
+     */
+    private static handleLeaveRoomMessage(
+        connectionId: string,
+        message: ILeaveRoomMessage
+    ): void {
+        const result = handleLeaveRoom(
+            connectionManager,
+            connectionId,
+            message
+        );
+
+        if (!result.success) {
+            WebSocketController.sendError(
+                connectionId,
+                result.code,
+                result.message
+            );
+            return;
+        }
+
+        // Send ACK to the leaving user
+        connectionManager.sendToConnection(connectionId, {
+            type: EWSMessageType.LeaveRoomAck,
+            data: {
+                roomId: result.roomId,
+                allLeft: result.allLeft,
+            },
+            timestamp: Date.now(),
+        });
+
+        console.log(
+            `[WebSocketController] User left room ${result.roomId} (allLeft: ${result.allLeft})`
+        );
+
+        // If all participants have left, cleanup everything
+        if (result.allLeft) {
+            WebSocketController.cleanupRoom(result.roomId);
+        }
+    }
+
+    /**
+     * Cleanup all data for a room
+     */
+    private static cleanupRoom(roomId: string): void {
+        drumGameManager.cleanupGame(roomId);
+        connectionManager.disconnectRoom(roomId);
+        roomManager.deleteRoom(roomId);
+        console.log(`[WebSocketController] Room ${roomId} fully cleaned up`);
+    }
+
+    /**
      * Handle connection disconnect
-     * Cleans up connection and updates room state
+     * Marks participant as left, cleans up if all left
      */
     static handleDisconnect(connectionId: string): void {
         console.log(
             `[WebSocketController] Client disconnected: ${connectionId}`
         );
+
+        const connection = connectionManager.getConnection(connectionId);
+
+        if (connection?.userId && connection?.roomId) {
+            const room = roomManager.getRoomById(connection.roomId);
+            if (room) {
+                // Mark participant as left
+                const participant = room.participants.find(
+                    p => p.user.userId === connection.userId
+                );
+                if (participant && !participant.leftAt) {
+                    participant.leftAt = Date.now();
+                }
+
+                // Check if all participants have left
+                const allLeft: boolean = room.participants.every(
+                    p => p.leftAt !== undefined
+                );
+                if (allLeft) {
+                    // Clean up connection first, then room
+                    connectionManager.handleDisconnect(connectionId);
+                    WebSocketController.cleanupRoom(connection.roomId);
+                    return;
+                }
+            }
+        }
+
         connectionManager.handleDisconnect(connectionId);
     }
 

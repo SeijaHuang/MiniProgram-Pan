@@ -24,6 +24,8 @@
 - ✅ **实时聊天**: WebSocket 双向通信，消息广播
 - ✅ **语音识别（ASR）**: 客户端直连腾讯云 ASR，后端负责文本同步
 - ✅ **STS Token 服务**: 为客户端提供临时安全凭证
+- ✅ **LLM 判决系统**: OpenAI gpt-4o 生成 AI 判决（异步编排 + WebSocket 推送 + HTTP 回退）
+- ✅ **赛后互动**: 惩戒/求饶特效广播 + 共同退堂机制
 
 ### 技术特性
 
@@ -51,6 +53,8 @@
 | 🥁 [震天鼓游戏](docs/features/06-drum-game.md) | 击鼓游戏机制 | `DRUM_TAP` 消息 |
 | 🎤 [ASR 语音识别](docs/features/07-asr-real-time-speech.md) | 实时语音转文字 | `ASR_*` 消息 |
 | 🔑 [腾讯云 STS Token](docs/features/08-tencent-sts-token.md) | 获取临时安全凭证 | `GET /v1/tencent/credentials` |
+| ⚖️ [LLM 判决书生成](docs/features/09-llm-judgment.md) | AI 判决结果生成 | `VERDICT_RESULT` 消息 |
+| 😄 [表情互动消息](docs/features/10-emoji-messages.md) | 表情实时互动 | `EMOJI_SEND/RECEIVE` 消息 |
 
 ### 核心概念文档
 
@@ -162,7 +166,10 @@ backend/src/
 ├── routes/                 # HTTP 路由
 ├── controllers/            # 控制器 (HTTP/WebSocket)
 ├── services/
-│   ├── core/               # 核心业务 (RoomService)
+│   ├── core/               # 核心业务
+│   │   ├── llm-judgement.service.ts
+│   │   ├── verdict-orchestrator.service.ts
+│   │   └── verdict-mapper.service.ts
 │   ├── websocket/          # WebSocket 管理
 │   │   ├── connection-manager.ts
 │   │   ├── room-manager.ts
@@ -171,7 +178,13 @@ backend/src/
 │       ├── join-room-handler.ts
 │       ├── chat-send-handler.ts
 │       ├── drum-tap-handler.ts
-│       └── asr-text-handler.ts
+│       ├── asr-text-handler.ts
+│       ├── emoji-text-handler.ts
+│       ├── speech-turn-end-handler.ts
+│       ├── verdict-retry-handler.ts
+│       ├── post-game-handler.ts
+│       ├── leave-room-handler.ts
+│       └── handler-utils.ts
 ├── models/
 │   ├── entities/           # 领域实体 (Room, User, Message)
 │   ├── schemas/            # Zod 验证
@@ -195,9 +208,10 @@ backend/src/
 
 ```json
 {
-    "hostText": "我每天加班到很晚，非常辛苦",
-    "participantText": "我也很辛苦，而且工资更低",
-    "idempotencyKey": "room123_round1"
+    "creator": {
+        "userId": "user_alice_1738426800000",
+        "nickname": "Alice"
+    }
 }
 ```
 
@@ -207,27 +221,53 @@ backend/src/
 {
     "success": true,
     "data": {
-        "taskId": "550e8400-e29b-41d4-a716-446655440000",
-        "status": "queued"
+        "room": {
+            "roomId": "room_A1B2C3_1738426800000",
+            "roomCode": "A1B2C3",
+            "status": "WAITING",
+            "participants": [...]
+        }
     }
 }
 ```
 
-#### GET /v1/llm/tasks/:taskId
+#### POST /v1/rooms/:roomId/judgments
 
-**响应** (200 - succeeded):
+LLM 判决（直接调用）。
+
+**请求**:
 
 ```json
 {
-  "success": true,
-  "data": {
-    "room": {
-      "roomId": "room_abc123",
-      "roomCode": "123456",
-      "status": "WAITING",
-      "participants": [...]
+    "hostText": "我每天加班到很晚，非常辛苦",
+    "participantText": "我也很辛苦，而且工资更低"
+}
+```
+
+**响应** (200):
+
+```json
+{
+    "success": true,
+    "data": {
+        "verdict": "host",
+        "reasons": ["..."],
+        "suggestions": ["..."],
+        "quotes": [{ "from": "host", "text": "..." }]
     }
-  }
+}
+```
+
+#### GET /v1/rooms/:roomId/verdict
+
+获取缓存的判决结果（回退接口）。
+
+**响应** (200):
+
+```json
+{
+    "success": true,
+    "data": { ... }
 }
 ```
 
@@ -274,8 +314,10 @@ CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 
 **协议**:
 - HTTP: 创建房间 `POST /v1/rooms`
+- HTTP: LLM 判决 `POST /v1/rooms/:roomId/judgments`
+- HTTP: 获取缓存判决 `GET /v1/rooms/:roomId/verdict`
 - HTTP: 获取腾讯云 STS Token `GET /v1/tencent/credentials`
-- WebSocket: 加入房间、实时聊天、语音识别、震天鼓游戏 `ws://localhost:8080/ws`
+- WebSocket: 加入房间、实时聊天、语音识别、震天鼓游戏、判决推送、赛后互动 `ws://localhost:8080/ws`
 
 ### WebSocket 消息类型
 
@@ -294,6 +336,16 @@ CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 | `DRUM_TAP` | Bidirectional | 点击事件 |
 | `DRUM_FINISH` | Server → Client | 游戏结束 |
 | `DRUM_RESULT` | Server → Client | 最终结果 |
+| `SPEECH_TURN_END` | Client → Server | 发言轮次结束 |
+| `SPEECH_TURN_SWITCH` | Server → Client | 切换发言轮次 |
+| `CHAT_COMPLETE` | Server → Client | 双方发言完毕 |
+| `VERDICT_RESULT` | Server → Client | 判决结果推送 |
+| `VERDICT_FAILED` | Server → Client | 判决生成失败 |
+| `VERDICT_RETRY` | Client → Server | 请求重试判决 |
+| `POST_GAME_ACTION` | Client → Server | 赛后互动操作 |
+| `POST_GAME_EFFECT` | Server → Client | 赛后互动特效 |
+| `LEAVE_ROOM` | Client → Server | 离开房间 |
+| `LEAVE_ROOM_ACK` | Server → Client | 离开房间确认 |
 | `ERROR` | Server → Client | 错误通知 |
 
 ### WebSocket 消息格式详解
@@ -554,6 +606,160 @@ CREATE (HTTP) → WAITING (1人) → READY (2人) → CLOSED (删除)
 - `role`: 玩家角色，`"Organizer"` (开房者) 或 `"Joiner"` (加入者)
 - `delta`: 本次批量点击的次数
 - 游戏时长固定为 10 秒
+
+#### 7. 发言轮次管理 (SPEECH_TURN_END / SPEECH_TURN_SWITCH / CHAT_COMPLETE)
+
+**Client → Server: SPEECH_TURN_END** (发言者结束发言)
+
+```json
+{
+    "type": "SPEECH_TURN_END",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000"
+    },
+    "timestamp": 1738427000000
+}
+```
+
+**Server → Client: SPEECH_TURN_SWITCH** (通知第二位发言者开始)
+
+```json
+{
+    "type": "SPEECH_TURN_SWITCH",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "nextSpeakerId": "user_bob_1738426810000"
+    },
+    "timestamp": 1738427000100
+}
+```
+
+**Server → Client: CHAT_COMPLETE** (双方发言完毕，触发判决生成)
+
+```json
+{
+    "type": "CHAT_COMPLETE",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000"
+    },
+    "timestamp": 1738427100000
+}
+```
+
+#### 8. 判决推送 (VERDICT_RESULT / VERDICT_FAILED / VERDICT_RETRY)
+
+**Server → Client: VERDICT_RESULT** (判决成功)
+
+```json
+{
+    "type": "VERDICT_RESULT",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "verdict": {
+            "caseNumber": "SY-20260220-001",
+            "winnerId": "user_alice_1738426800000",
+            "loserId": "user_bob_1738426810000",
+            "responsibility": { "host": 35, "guest": 45, "thirdParty": { ... } },
+            "radarChart": { "host": { ... }, "guest": { ... } },
+            "verdict": "大老爷判定...",
+            "punishmentTask": { "role": "guest", "task": "..." },
+            "secretReports": [...]
+        }
+    },
+    "timestamp": 1738427130000
+}
+```
+
+**Server → Client: VERDICT_FAILED** (判决失败)
+
+```json
+{
+    "type": "VERDICT_FAILED",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "error": "LLM timeout",
+        "canRetry": true,
+        "retryCount": 1
+    },
+    "timestamp": 1738427130000
+}
+```
+
+**Client → Server: VERDICT_RETRY** (请求重试)
+
+```json
+{
+    "type": "VERDICT_RETRY",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000"
+    },
+    "timestamp": 1738427140000
+}
+```
+
+#### 9. 赛后互动 (POST_GAME_ACTION / POST_GAME_EFFECT)
+
+**Client → Server: POST_GAME_ACTION** (发送赛后操作)
+
+```json
+{
+    "type": "POST_GAME_ACTION",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "action": "execute_punishment",
+        "remainingCount": 2
+    },
+    "timestamp": 1738427200000
+}
+```
+
+**Server → Client: POST_GAME_EFFECT** (广播赛后特效)
+
+```json
+{
+    "type": "POST_GAME_EFFECT",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "effectType": "stamp_death",
+        "senderId": "user_alice_1738426800000"
+    },
+    "timestamp": 1738427200100
+}
+```
+
+**说明**:
+- `action`: `"execute_punishment"` (赢家惩戒) 或 `"beg_for_mercy"` (输家求饶)
+- `effectType`: `"stamp_death"` (惩戒盖章) 或 `"beg_emoji"` (求饶动画)
+
+#### 10. 离开房间 (LEAVE_ROOM / LEAVE_ROOM_ACK)
+
+**Client → Server: LEAVE_ROOM**
+
+```json
+{
+    "type": "LEAVE_ROOM",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000"
+    },
+    "timestamp": 1738427300000
+}
+```
+
+**Server → Client: LEAVE_ROOM_ACK**
+
+```json
+{
+    "type": "LEAVE_ROOM_ACK",
+    "data": {
+        "roomId": "room_A1B2C3_1738426800000",
+        "allReady": true
+    },
+    "timestamp": 1738427300100
+}
+```
+
+**说明**:
+- `allReady`: `true` 表示双方都已请求离开，可以退堂
 
 #### 6. 错误通知 (ERROR)
 

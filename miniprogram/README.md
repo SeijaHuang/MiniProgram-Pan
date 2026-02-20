@@ -27,23 +27,30 @@ miniprogram/
 │       ├── waiting-room/   # 等待房间 - 创建/加入房间
 │       └── drum-room/      # 震天鼓 - 10秒点击竞争
 │
-├── packageB/               # 分包 B - 聊天功能
+├── packageB/               # 分包 B - 聊天和判决
 │   └── pages/
-│       └── chat-room/      # 对簿公堂 - 轮流语音申冤
+│       ├── chat-room/      # 对簿公堂 - 轮流语音申冤
+│       ├── verdict-waiting/ # 等待判决 - AI分析loading
+│       └── verdict/        # 判决书 - AI判决结果展示
 │
 ├── components/             # 自定义组件
 │   ├── styled-button/      # 样式化按钮 (多色、动画、按压反馈)
 │   ├── styled-title/       # 样式化标题 (描边、投影)
-│   └── countdown/          # 全屏倒计时遮罩
+│   ├── countdown/          # 全屏倒计时遮罩
+│   ├── avatar/             # 圆形头像 (入场动画 + 呼吸动画)
+│   ├── radar-chart/        # 六维战力雷达图 (Canvas 2D)
+│   ├── secret-modal/       # 密折弹窗 (底部半屏面板)
+│   └── post-game-effect/   # 赛后互动特效 (全屏覆盖层)
 │
 ├── services/               # 业务服务层
 │   ├── websocket-manager.ts    # WebSocket 连接管理 (单例)
 │   ├── room-service.ts         # HTTP 房间服务
 │   ├── room-websocket-service.ts # WebSocket 房间服务
 │   ├── drum-service.ts         # 击鼓游戏服务
-│   ├── chat-service.ts         # 聊天服务
 │   ├── asr-service.ts          # ASR 语音识别服务
-│   └── sts-service.ts          # STS Token 服务
+│   ├── sts-service.ts          # STS Token 服务
+│   ├── verdict-service.ts      # AI 判决结果服务 (WS监听 + HTTP回退 + 缓存)
+│   └── post-game-service.ts    # 赛后互动服务 (特效、共同退堂)
 │
 ├── models/                 # 领域模型
 │   ├── user.ts             # IUser
@@ -54,10 +61,13 @@ miniprogram/
 │   ├── websocket-common.ts      # WebSocket 通用类型
 │   ├── room-websocket.ts        # 房间 WebSocket 类型
 │   ├── drum-websocket.ts        # 震天鼓 WebSocket 类型
-│   ├── chat-websocket.ts        # 聊天 WebSocket 类型
 │   ├── asr-websocket.ts         # ASR WebSocket 类型
+│   ├── emoji-websocket.ts       # 表情 WebSocket 类型
 │   ├── room-api.ts              # 房间 HTTP API 类型
-│   └── sts-api.ts               # STS Token API 类型
+│   ├── sts-api.ts               # STS Token API 类型
+│   ├── verdict.ts               # 判决结果前端类型
+│   ├── verdict-ws.ts            # 判决 WebSocket 类型
+│   └── verdict-waiting.ts       # 判决等待页类型
 │
 ├── constants/              # 常量配置
 │   └── config.ts           # API_URL, WS_URL 等
@@ -85,7 +95,12 @@ Drum Room (震天鼓抢麦)
     ↓ 游戏结束
 Chat Room (对簿公堂)
     ↓ 轮流语音申冤
-    ↓ 完成
+    ↓ 双方发言完毕
+Verdict Waiting (等待判决)
+    ↓ AI 分析 loading
+    ↓ 收到判决结果
+Verdict (判决书展示)
+    ↓ 赛后互动 / 退堂
 ```
 
 ## 核心功能
@@ -123,6 +138,29 @@ Chat Room (对簿公堂)
     - 客户端直连腾讯云 ASR
     - 实时语音转文字（边说边出字）
     - 通过 WebSocket 同步给对方
+
+### 5. 等待判决 (Verdict Waiting)
+
+- **WebSocket 监听**: VERDICT_RESULT / VERDICT_FAILED 判决推送
+- **多组并行动画**: 标题发光、鸭子浮动、小狗碰撞、齿轮旋转、粒子上升
+- **随机加载文案轮播**: 30 条趣味文案，每 3 秒切换
+- **超时处理**: 90 秒超时显示重试叠层
+- **失败重试**: 发送 VERDICT_RETRY，最多 3 次
+- **最小展示时间**: 5 秒防闪烁
+- 收到结果后跳转至判决展示页
+
+### 6. 判决书 (Verdict)
+
+- **数据来源优先级**: verdictService 缓存 → globalData → HTTP 回退
+- **标题区**: 红色背景 + 鸭子图标 + 案件编号
+- **责任分布**: 三列布局（双方百分比 + 第三方因素）
+- **六维战力雷达图**: Canvas 2D 绘制 + 展开动画
+- **大老爷赠言**: 打字机效果逐字显示
+- **惩罚令牌**: 盖章动画 + 震动反馈
+- **密折弹窗**: 半屏弹窗，仅显示当前用户私密反馈
+- **保存判决书图片**: 离屏 Canvas 生成 + 保存到相册
+- **赛后互动**: 赢家惩戒 / 输家求饶 / 平局退堂 (WebSocket 双向通信)
+- **入场动画序列**: 3.5s 依次展开
 
 ## 组件说明
 
@@ -163,6 +201,62 @@ Chat Room (对簿公堂)
 
 **事件**: `bind:complete` - 倒计时完成回调
 
+### avatar
+
+圆形头像组件，支持入场动画和呼吸动画。
+
+**属性**:
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `src` | string | '' | 头像图片 URL |
+| `badge` | string | '👑' | 徽标 emoji |
+| `size` | number | 220 | 头像直径 (rpx) |
+| `playEntrance` | boolean | false | 触发入场动画 |
+| `entranceDelay` | number | 0 | 入场延迟 (ms) |
+| `breathing` | boolean | true | 是否启用呼吸动画 |
+
+**动画**: 入场 (scale+fade-in) + 呼吸 (周期性 scale 振荡)，均使用 `wx.createAnimation()`
+
+### radar-chart
+
+六维战力雷达图组件，使用 Canvas 2D 绘制。
+
+**属性**:
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `hostScores` | IDimensionScores | {} | 房主六维分数 |
+| `guestScores` | IDimensionScores | {} | 嘉宾六维分数 |
+| `size` | number | 500 | Canvas 宽度 (rpx) |
+
+**公共方法**: `draw()` - 由父页面在 onReady 后调用，触发展开动画绘制
+
+### secret-modal
+
+密折弹窗组件，底部弹出的半屏面板。
+
+**属性**:
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `visible` | boolean | false | 是否显示 |
+| `title` | string | '' | 封号标题 |
+| `advice` | string | '' | 锦囊妙计内容 |
+| `topDimension` | string | '' | 最高维度名称 |
+| `topScore` | number | 0 | 最高维度分数 |
+
+**事件**: `bind:close` - 关闭弹窗回调
+
+### post-game-effect
+
+赛后互动特效组件，全屏覆盖层。
+
+**属性**:
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `visible` | boolean | false | 是否显示 |
+| `type` | string | '' | 特效类型 (`stamp_death` / `beg_emoji`) |
+
+**动画**: 惩戒 (scale+fade+震动) / 求饶 (slideUp+fade+震动)，使用 `wx.createAnimation()`
+
 ## 服务层 (Services)
 
 ### WebSocketManager (单例)
@@ -201,21 +295,6 @@ drumService.sendTap(roomId, role, delta);
 drumService.unregisterHandlers();
 ```
 
-### ChatService
-
-```typescript
-import { chatService } from './services/chat-service';
-
-// 发送文本消息
-chatService.sendTextMessage('Hello');
-
-// 发送表情反应
-chatService.sendReaction('😀');
-
-// 初始化聊天服务
-chatService.initialize(onChatReceive, onError, onReactionReceive);
-```
-
 ### ASRService
 
 ```typescript
@@ -242,6 +321,52 @@ const credentials = await stsService.getCredentials();
 //   tmpSecretKey: string,
 //   expiredTime: number
 // }
+```
+
+### VerdictService
+
+```typescript
+import { verdictService } from './services/verdict-service';
+
+// 注册 WebSocket 监听（verdict-waiting 页面 onLoad 调用）
+verdictService.startListening({
+    onResult: result => {
+        /* 处理判决结果 */
+    },
+    onError: payload => {
+        /* 处理判决失败 */
+    },
+});
+
+// 获取缓存的判决结果
+const result = verdictService.getResult();
+
+// HTTP 回退获取判决（断线重连场景）
+const verdict = await verdictService.fetchVerdict(roomId);
+
+// 清理缓存和回调
+verdictService.clear();
+```
+
+### PostGameService
+
+```typescript
+import { postGameService } from './services/post-game-service';
+
+// 初始化 WebSocket 监听
+postGameService.initialize();
+
+// 发送赛后互动操作
+postGameService.sendAction(roomId, 'execute_punishment', remainingCount);
+postGameService.sendAction(roomId, 'beg_for_mercy', remainingCount);
+
+// 注册特效回调
+postGameService.onEffect(effect => {
+    /* 播放特效动画 */
+});
+
+// 清理回调
+postGameService.destroy();
 ```
 
 ## ASR 语音识别架构
@@ -306,20 +431,32 @@ const credentials = await stsService.getCredentials();
 
 ### WebSocket 消息类型
 
-| 消息类型        | 方向            | 说明             |
-| --------------- | --------------- | ---------------- |
-| `JOIN_ROOM`     | Client → Server | 加入房间         |
-| `JOIN_ACK`      | Server → Client | 确认加入（广播） |
-| `CHAT_SEND`     | Client → Server | 发送文本消息     |
-| `CHAT_RECEIVE`  | Server → Client | 接收消息（广播） |
-| `ASR_TEXT_PUSH` | Client → Server | 推送识别文本     |
-| `ASR_TEXT`      | Server → Client | 广播识别文本     |
-| `DRUM_READY`    | Server → Client | 游戏准备         |
-| `DRUM_START`    | Server → Client | 游戏开始         |
-| `DRUM_TAP`      | Bidirectional   | 点击事件         |
-| `DRUM_FINISH`   | Server → Client | 游戏结束         |
-| `DRUM_RESULT`   | Server → Client | 最终结果         |
-| `ERROR`         | Server → Client | 错误通知         |
+| 消息类型             | 方向            | 说明             |
+| -------------------- | --------------- | ---------------- |
+| `JOIN_ROOM`          | Client → Server | 加入房间         |
+| `JOIN_ACK`           | Server → Client | 确认加入（广播） |
+| `CHAT_SEND`          | Client → Server | 发送文本消息     |
+| `CHAT_RECEIVE`       | Server → Client | 接收消息（广播） |
+| `EMOJI_SEND`         | Client → Server | 发送表情         |
+| `EMOJI_RECEIVE`      | Server → Client | 接收表情（广播） |
+| `ASR_TEXT_PUSH`      | Client → Server | 推送识别文本     |
+| `ASR_TEXT`           | Server → Client | 广播识别文本     |
+| `DRUM_READY`         | Server → Client | 游戏准备         |
+| `DRUM_START`         | Server → Client | 游戏开始         |
+| `DRUM_TAP`           | Bidirectional   | 点击事件         |
+| `DRUM_FINISH`        | Server → Client | 游戏结束         |
+| `DRUM_RESULT`        | Server → Client | 最终结果         |
+| `SPEECH_TURN_END`    | Client → Server | 发言轮次结束     |
+| `SPEECH_TURN_SWITCH` | Server → Client | 切换发言轮次     |
+| `CHAT_COMPLETE`      | Server → Client | 双方发言完毕     |
+| `VERDICT_RESULT`     | Server → Client | 判决结果推送     |
+| `VERDICT_FAILED`     | Server → Client | 判决生成失败     |
+| `VERDICT_RETRY`      | Client → Server | 请求重试判决     |
+| `POST_GAME_ACTION`   | Client → Server | 赛后互动操作     |
+| `POST_GAME_EFFECT`   | Server → Client | 赛后互动特效     |
+| `LEAVE_ROOM`         | Client → Server | 离开房间         |
+| `LEAVE_ROOM_ACK`     | Server → Client | 离开房间确认     |
+| `ERROR`              | Server → Client | 错误通知         |
 
 ---
 
@@ -463,7 +600,7 @@ manager.OnRecognitionComplete = res => {
 - [等待房间](../docs/miniprogram/waiting-room.md)
 - [震天鼓](../docs/miniprogram/drum-room.md)
 - [对簿公堂](../docs/miniprogram/chat-room.md)
-- [ASR 实时语音识别 PRD](../docs/miniprogram/chat-room-asr-prd.md)
+- [判决书](../docs/miniprogram/verdict.md)
 - [组件文档](../docs/miniprogram/components.md)
 - [服务文档](../docs/miniprogram/services.md)
 

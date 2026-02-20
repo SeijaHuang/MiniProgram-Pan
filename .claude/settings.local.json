@@ -11,7 +11,9 @@
             "Bash(node:*)",
             "Bash(dir:*)",
             "Bash(npx tsc:*)",
-            "Bash(findstr:*)"
+            "Bash(findstr:*)",
+            "Bash(npx prettier:*)",
+            "Bash(cd:*)"
         ]
     }
 }

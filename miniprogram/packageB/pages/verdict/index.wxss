@@ -237,27 +237,73 @@
    Post-Game
    ======================================== */
 
-.post-game {
+.verdict__post-game {
+    padding: 32rpx;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 24rpx;
+    opacity: 0;
 }
 
-.post-game__action {
+.verdict__post-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8rpx;
-    width: 100%;
+    justify-content: center;
+    border-radius: 20rpx;
+    padding: 28rpx 60rpx;
+    min-width: 320rpx;
 }
 
-.post-game__remaining {
-    font-size: 28rpx;
-    color: #999999;
+.verdict__post-btn--disabled {
+    opacity: 0.5;
 }
 
-.post-game__leave {
-    margin-top: 16rpx;
+.verdict__post-btn--punish {
+    background: #ff2d55;
+    border: 4rpx solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8rpx 24rpx rgba(255, 45, 85, 0.45);
+}
+
+.verdict__post-btn--beg {
+    background: #e8e8e8;
+    border: 4rpx solid #cccccc;
+    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+}
+
+.verdict__leave-btn {
     width: 70%;
+}
+
+.verdict__post-btn-icon {
+    font-size: 72rpx;
+    line-height: 1;
+    margin-bottom: 10rpx;
+}
+
+.verdict__post-btn-label {
+    font-size: 36rpx;
+    font-weight: bold;
+}
+
+.verdict__post-btn--punish .verdict__post-btn-label {
+    color: #ffffff;
+}
+
+.verdict__post-btn--beg .verdict__post-btn-label {
+    color: #555555;
+}
+
+.verdict__post-btn-sub {
+    font-size: 26rpx;
+    margin-top: 6rpx;
+}
+
+.verdict__post-btn--punish .verdict__post-btn-sub {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.verdict__post-btn--beg .verdict__post-btn-sub {
+    color: #999999;
 }
