@@ -35,6 +35,10 @@ import {
 import { handleSpeechTurnEnd } from '../services/handlers/speech-turn-end-handler';
 import { handleVerdictRetry } from '../services/handlers/verdict-retry-handler';
 import { handleLeaveRoom } from '../services/handlers/leave-room-handler';
+import {
+    handlePostGameAction,
+    type TPostGameActionHandlerResult,
+} from '../services/handlers/post-game-handler';
 import { drumGameManager } from '../services/websocket/drum-game-manager';
 import { roomManager } from '../services/websocket/room-manager';
 import { verdictOrchestratorService } from '../services/core/verdict-orchestrator.service';
@@ -49,6 +53,7 @@ import type {
     IVerdictRetryMessage,
     IChatCompleteData,
     ILeaveRoomMessage,
+    IPostGameActionMessage,
 } from '../types/websocket';
 import { EWSMessageType, EWSErrorCode, EGamePhase } from '../types/websocket';
 import { ERoomStatus } from '../models/entities/room';
@@ -112,6 +117,13 @@ export class WebSocketController {
                     WebSocketController.handleVerdictRetryMessage(
                         connectionId,
                         message as IVerdictRetryMessage
+                    );
+                    break;
+
+                case EWSMessageType.PostGameAction:
+                    WebSocketController.handlePostGameActionMessage(
+                        connectionId,
+                        message as IPostGameActionMessage
                     );
                     break;
 
@@ -568,6 +580,42 @@ export class WebSocketController {
                 `[WebSocketController] Max retries reached for room ${result.roomId}`
             );
         }
+    }
+
+    /**
+     * Handle POST_GAME_ACTION message
+     * Broadcasts effect to ALL participants (including sender)
+     */
+    private static handlePostGameActionMessage(
+        connectionId: string,
+        message: IPostGameActionMessage
+    ): void {
+        const result: TPostGameActionHandlerResult = handlePostGameAction(
+            connectionManager,
+            connectionId,
+            message
+        );
+
+        if (!result.success) {
+            WebSocketController.sendError(
+                connectionId,
+                result.code,
+                result.message
+            );
+            return;
+        }
+
+        // Broadcast POST_GAME_EFFECT to ALL participants (both sender and opponent)
+        connectionManager.broadcastToRoom(result.roomId, {
+            type: EWSMessageType.PostGameEffect,
+            data: {
+                roomId: result.roomId,
+                effect: result.effect,
+                fromUserId: result.fromUserId,
+                remainingCount: result.remainingCount,
+            },
+            timestamp: Date.now(),
+        });
     }
 
     /**

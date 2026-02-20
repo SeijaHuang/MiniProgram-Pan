@@ -1,132 +1,82 @@
 // components/post-game-effect/index.ts
 
-type AnimationResult = WechatMiniprogram.AnimationExportResult;
-
-/** Effect display duration (ms) */
-const EFFECT_DURATION: number = 2000;
-/** Animation in duration (ms) */
-const ANIM_IN_DURATION: number = 500;
-
 Component({
     properties: {
-        effect: {
+        visible: {
+            type: Boolean,
+            value: false,
+        },
+        type: {
             type: String,
             value: '',
         },
     },
 
     data: {
-        showEffect: false as boolean,
-        effectType: '' as string,
-        stampAnimation: {} as AnimationResult,
-        begAnimation: {} as AnimationResult,
-        _clearTimer: null as number | null,
+        stampAnim: {} as WechatMiniprogram.AnimationExportResult,
+        begAnim: {} as WechatMiniprogram.AnimationExportResult,
     },
 
     observers: {
-        effect(val: string): void {
-            if (val === 'stamp_death' || val === 'beg_emoji') {
-                this.playEffect(val);
-            }
-        },
-    },
-
-    lifetimes: {
-        detached(): void {
-            if (this.data._clearTimer !== null) {
-                clearTimeout(this.data._clearTimer);
+        'visible, type'(visible: boolean, type: string): void {
+            if (visible && type) {
+                // Delay to ensure wx:if has rendered the element
+                setTimeout(() => {
+                    if (type === 'stamp_death') {
+                        this._playStamp();
+                    } else if (type === 'beg_emoji') {
+                        this._playBeg();
+                    }
+                }, 50);
             }
         },
     },
 
     methods: {
         /**
-         * Play the specified effect animation
+         * Play stamp ⚔️ effect: scale up + fade in, then settle
          */
-        playEffect(type: string): void {
-            // Clear any existing effect
-            if (this.data._clearTimer !== null) {
-                clearTimeout(this.data._clearTimer);
-            }
-
-            this.setData(
-                {
-                    showEffect: true,
-                    effectType: type,
+        _playStamp(): void {
+            wx.vibrateShort({
+                type: 'heavy',
+                fail: () => {
+                    // Ignore vibration failure
                 },
-                () => {
-                    if (type === 'stamp_death') {
-                        this.playStamp();
-                    } else if (type === 'beg_emoji') {
-                        this.playBeg();
-                    }
-                }
-            );
+            });
+            const anim: WechatMiniprogram.Animation = wx.createAnimation({
+                duration: 200,
+                timingFunction: 'ease-out',
+            });
+            anim.scale(1.2).opacity(1).step();
+            this.setData({ stampAnim: anim.export() });
 
-            // Auto-hide after duration
-            this.data._clearTimer = setTimeout(() => {
-                this.setData({
-                    showEffect: false,
-                    effectType: '',
+            // Settle: scale back to 1
+            setTimeout(() => {
+                const settle: WechatMiniprogram.Animation = wx.createAnimation({
+                    duration: 100,
+                    timingFunction: 'ease-in-out',
                 });
-            }, EFFECT_DURATION) as unknown as number;
+                settle.scale(1).step();
+                this.setData({ stampAnim: settle.export() });
+            }, 200);
         },
 
         /**
-         * Play stamp "卒" effect: scale(3→1) + fade in
+         * Play beg 🧎 effect: slide up + fade in
          */
-        playStamp(): void {
-            // Initial state
-            const initAnim: WechatMiniprogram.Animation = wx.createAnimation({
-                duration: 0,
+        _playBeg(): void {
+            wx.vibrateShort({
+                type: 'medium',
+                fail: () => {
+                    // Ignore vibration failure
+                },
             });
-            initAnim.scale(3, 3).opacity(0).step();
-            this.setData({ stampAnimation: initAnim.export() }, () => {
-                // Animate in
-                const anim: WechatMiniprogram.Animation = wx.createAnimation({
-                    duration: ANIM_IN_DURATION,
-                    timingFunction: 'ease-out',
-                });
-                anim.scale(1, 1).opacity(1).step();
-                this.setData({
-                    stampAnimation: anim.export(),
-                });
-                // Vibrate
-                wx.vibrateLong({
-                    fail: () => {
-                        // Ignore vibration failure
-                    },
-                });
+            const anim: WechatMiniprogram.Animation = wx.createAnimation({
+                duration: 400,
+                timingFunction: 'ease-out',
             });
-        },
-
-        /**
-         * Play beg emoji effect: float up + fade in
-         */
-        playBeg(): void {
-            // Initial state
-            const initAnim: WechatMiniprogram.Animation = wx.createAnimation({
-                duration: 0,
-            });
-            initAnim.translateY(200).opacity(0).step();
-            this.setData({ begAnimation: initAnim.export() }, () => {
-                // Animate in
-                const anim: WechatMiniprogram.Animation = wx.createAnimation({
-                    duration: ANIM_IN_DURATION,
-                    timingFunction: 'ease-out',
-                });
-                anim.translateY(0).opacity(1).step();
-                this.setData({
-                    begAnimation: anim.export(),
-                });
-                // Short vibrate
-                wx.vibrateShort({
-                    type: 'medium',
-                    fail: () => {
-                        // Ignore vibration failure
-                    },
-                });
-            });
+            anim.translateY(0).opacity(1).step();
+            this.setData({ begAnim: anim.export() });
         },
     },
 });

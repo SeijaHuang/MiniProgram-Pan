@@ -21,4 +21,5 @@ export * from './error';
 export * from './drum';
 export * from './asr';
 export * from './emoji';
+export * from './post-game';
 export * from './verdict';

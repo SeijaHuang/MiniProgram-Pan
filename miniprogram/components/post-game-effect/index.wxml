@@ -1,24 +1,22 @@
 <!--components/post-game-effect/index.wxml-->
 <view
-    class="post-game-effect"
-    wx:if="{{ showEffect }}"
+    wx:if="{{ visible }}"
+    class="pge__overlay"
 >
-    <!-- stamp_death: Big red "卒" stamp -->
     <view
-        wx:if="{{ effectType === 'stamp_death' }}"
-        class="post-game-effect__stamp"
-        animation="{{ stampAnimation }}"
+        wx:if="{{ type === 'stamp_death' }}"
+        class="pge__content"
+        animation="{{ stampAnim }}"
     >
-        <text class="post-game-effect__stamp-text">卒</text>
+        <text class="pge__icon">⚔️</text>
+        <text class="pge__text pge__text--red">承受制裁！</text>
     </view>
-
-    <!-- beg_emoji: Floating emoji + text -->
     <view
-        wx:if="{{ effectType === 'beg_emoji' }}"
-        class="post-game-effect__beg"
-        animation="{{ begAnimation }}"
+        wx:if="{{ type === 'beg_emoji' }}"
+        class="pge__content"
+        animation="{{ begAnim }}"
     >
-        <text class="post-game-effect__beg-emoji">🥺</text>
-        <text class="post-game-effect__beg-text">求求了~</text>
+        <text class="pge__icon">🧎</text>
+        <text class="pge__text pge__text--white">求饶小命</text>
     </view>
 </view>

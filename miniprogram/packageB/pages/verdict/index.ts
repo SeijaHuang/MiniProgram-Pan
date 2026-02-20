@@ -15,56 +15,6 @@ import type {
 import { DIMENSION_LABELS, DIMENSION_KEYS } from '../../../types/verdict';
 import { EWSMessageType } from '../../../types/websocket-common';
 
-/** Mock verdict data for standalone page testing */
-const MOCK_VERDICT: IVerdictResult = {
-    caseNumber: '20260218-MOCK',
-    winnerId: 'host',
-    loserId: 'guest',
-    responsibility: {
-        host: 35,
-        guest: 55,
-        thirdParty: [
-            { reason: '水星逆行', percentage: 5, emoji: '🪐' },
-            { reason: '天气太热', percentage: 5, emoji: '☀️' },
-        ],
-    },
-    battleStats: {
-        host: {
-            mouthHard: 82,
-            oldAccountDigging: 65,
-            logicSlippery: 45,
-            charmAttack: 90,
-            survivalInstinct: 73,
-            victimActing: 58,
-        },
-        guest: {
-            mouthHard: 70,
-            oldAccountDigging: 88,
-            logicSlippery: 76,
-            charmAttack: 42,
-            survivalInstinct: 60,
-            victimActing: 85,
-        },
-    },
-    verdictSummary:
-        '本案经清汤大老爷仔细审理，双方均有过错。原告虽然嘴硬功力深厚、撒娇暴击无人能挡，但被告翻旧账技术炉火纯青、受害者演技堪称影后。综合来看，被告需承担主要责任，罚做家务三天以示惩戒。望双方日后多沟通、少翻旧账，和气生财！',
-    punishmentTask: {
-        loserId: 'guest',
-        task: '连续三天负责洗碗+拖地',
-        deadline: '2026年2月21日前完成',
-    },
-    secretReports: {
-        host: {
-            title: '撒娇暴击王',
-            advice: '你的撒娇技能已经点满，但要注意不要过度使用，否则对方会产生抗体。建议适当展示理性的一面，刚柔并济才是吵架的最高境界。',
-        },
-        guest: {
-            title: '翻旧账达人',
-            advice: '你的记忆力令人叹服，但翻旧账是一把双刃剑。建议把这份超强记忆力用在记住对方的优点上，效果会好很多哦。',
-        },
-    },
-};
-
 type AnimResult = WechatMiniprogram.AnimationExportResult;
 
 /** Subset of Canvas 2D context methods used by this page */
@@ -107,6 +57,11 @@ const TIMING = {
     EFFECT_CLEAR_DELAY: 2000,
 } as const;
 
+interface IEffectQueueItem {
+    effect: 'stamp_death' | 'beg_emoji';
+    fromUserId: string;
+}
+
 interface IVerdictPageData {
     loading: boolean;
     verdict: IVerdictResult | null;
@@ -127,11 +82,15 @@ interface IVerdictPageData {
     hostPercentDisplay: number;
     guestPercentDisplay: number;
     summaryDisplayText: string;
-    currentEffect: string;
     saving: boolean;
     mySecretReport: ISecretReport;
     myTopDimension: string;
     myTopScore: number;
+    // Effect queue fields
+    effectQueue: IEffectQueueItem[];
+    isPlayingEffect: boolean;
+    showEffectOverlay: boolean;
+    currentEffectType: 'stamp_death' | 'beg_emoji' | '';
 }
 
 Page({
@@ -155,18 +114,22 @@ Page({
         hostPercentDisplay: 0,
         guestPercentDisplay: 0,
         summaryDisplayText: '',
-        currentEffect: '',
         saving: false,
         mySecretReport: { title: '', advice: '' },
         myTopDimension: '',
         myTopScore: 0,
+        effectQueue: [] as IEffectQueueItem[],
+        isPlayingEffect: false,
+        showEffectOverlay: false,
+        currentEffectType: '' as 'stamp_death' | 'beg_emoji' | '',
     } as IVerdictPageData,
 
     // Timer references (not in data)
     _percentTimer: null as number | null,
     _summaryTimer: null as number | null,
     _cooldownTimer: null as number | null,
-    _effectTimer: null as number | null,
+    _effectPlayTimer: null as number | null,
+    _effectGapTimer: null as number | null,
     _animTimers: [] as number[],
     _roomId: '' as string,
 
@@ -175,23 +138,8 @@ Page({
         const currentRole: 'host' | 'guest' =
             (options.role as 'host' | 'guest') ?? 'host';
 
-        // Try to get verdict from service cache or globalData
-        let verdict: IVerdictResult | null = verdictService.getResult();
-
-        // if (!verdict) {
-        //     // Try from globalData
-        //     const app = getApp<IAppOption>();
-        //     const gd = app.globalData as Record<string, unknown>;
-        //     if (gd.verdictResult) {
-        //         verdict = gd.verdictResult as IVerdictResult;
-        //     }
-        // }
-
-        // [DEV] Use mock data when no real verdict is available
-        if (!verdict) {
-            console.warn('[Verdict] Using MOCK data for testing');
-            verdict = MOCK_VERDICT;
-        }
+        // Try to get verdict from service cache
+        const verdict: IVerdictResult | null = verdictService.getResult();
 
         if (verdict) {
             this.initWithVerdict(verdict, currentRole);
@@ -212,10 +160,20 @@ Page({
                 });
         }
 
-        // Setup post-game service
+        // Setup post-game service with queue-based effect handling
         postGameService.initialize();
         postGameService.onEffect((payload: IPostGameEffectPayload) => {
-            this.onEffectReceived(payload);
+            const queue: IEffectQueueItem[] = [
+                ...this.data.effectQueue,
+                {
+                    effect: payload.effect,
+                    fromUserId: payload.fromUserId,
+                },
+            ];
+            this.setData({ effectQueue: queue });
+            if (!this.data.isPlayingEffect) {
+                this._playNextEffect();
+            }
         });
     },
 
@@ -419,9 +377,13 @@ Page({
             clearTimeout(this._cooldownTimer);
             this._cooldownTimer = null;
         }
-        if (this._effectTimer !== null) {
-            clearTimeout(this._effectTimer);
-            this._effectTimer = null;
+        if (this._effectPlayTimer !== null) {
+            clearTimeout(this._effectPlayTimer);
+            this._effectPlayTimer = null;
+        }
+        if (this._effectGapTimer !== null) {
+            clearTimeout(this._effectGapTimer);
+            this._effectGapTimer = null;
         }
         for (const t of this._animTimers) {
             clearTimeout(t);
@@ -625,9 +587,13 @@ Page({
     },
 
     /**
-     * Execute punishment (winner action)
+     * Unified post-game action handler (execute_punishment or beg_for_mercy)
+     * Sends WS message; animation triggers when server broadcasts back.
      */
-    onExecutePunishment(): void {
+    onPostGameAction(e: WechatMiniprogram.TouchEvent): void {
+        const action = e.currentTarget.dataset.action as
+            | 'execute_punishment'
+            | 'beg_for_mercy';
         if (this.data.actionCooldown || this.data.actionRemainingCount <= 0) {
             return;
         }
@@ -638,33 +604,7 @@ Page({
             actionCooldown: true,
         });
 
-        postGameService.sendAction(
-            this._roomId,
-            'execute_punishment',
-            remaining
-        );
-
-        this._cooldownTimer = setTimeout(() => {
-            this.setData({ actionCooldown: false });
-            this._cooldownTimer = null;
-        }, TIMING.ACTION_COOLDOWN) as unknown as number;
-    },
-
-    /**
-     * Beg for mercy (loser action)
-     */
-    onBegForMercy(): void {
-        if (this.data.actionCooldown || this.data.actionRemainingCount <= 0) {
-            return;
-        }
-
-        const remaining: number = this.data.actionRemainingCount - 1;
-        this.setData({
-            actionRemainingCount: remaining,
-            actionCooldown: true,
-        });
-
-        postGameService.sendAction(this._roomId, 'beg_for_mercy', remaining);
+        postGameService.sendAction(this._roomId, action, remaining);
 
         this._cooldownTimer = setTimeout(() => {
             this.setData({ actionCooldown: false });
@@ -683,24 +623,43 @@ Page({
             },
             timestamp: Date.now(),
         });
+        // Delay navigation to let WS message send before page teardown
         void wx.reLaunch({
             url: '/pages/welcome/index',
         });
     },
 
     /**
-     * Handle incoming post-game effect
+     * Play next effect from queue (serial playback)
      */
-    onEffectReceived(payload: IPostGameEffectPayload): void {
-        this.setData({ currentEffect: payload.effect });
-
-        // Clear after duration
-        if (this._effectTimer !== null) {
-            clearTimeout(this._effectTimer);
+    _playNextEffect(): void {
+        const queue: IEffectQueueItem[] = this.data.effectQueue;
+        if (queue.length === 0) {
+            this.setData({
+                isPlayingEffect: false,
+                showEffectOverlay: false,
+                currentEffectType: '',
+            });
+            return;
         }
-        this._effectTimer = setTimeout(() => {
-            this.setData({ currentEffect: '' });
-            this._effectTimer = null;
+
+        const [current, ...rest] = queue;
+        this.setData({
+            effectQueue: rest,
+            isPlayingEffect: true,
+            showEffectOverlay: true,
+            currentEffectType: current.effect,
+        });
+
+        // Hide after display duration, then play next after a gap
+        this._effectPlayTimer = setTimeout(() => {
+            this.setData({
+                showEffectOverlay: false,
+                currentEffectType: '',
+            });
+            this._effectGapTimer = setTimeout(() => {
+                this._playNextEffect();
+            }, 150) as unknown as number;
         }, TIMING.EFFECT_CLEAR_DELAY) as unknown as number;
     },
 });
