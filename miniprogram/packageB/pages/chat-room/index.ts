@@ -82,6 +82,8 @@ interface IChatRoomPageData {
 
     // 非发言者提示文案
     listenerHint: string;
+    // 对方昵称
+    opponentName: string;
 }
 
 type TSpeakerFinal = Pick<IChatRoomPageData, 'speakerAFinal' | 'speakerBFinal'>;
@@ -126,14 +128,19 @@ const PHASE_TRANSITION: Record<EPhase, EPhase> = {
 };
 const REACTION_LANES = [0, 1, 2];
 
-const LISTENER_HINTS: string[] = [
-    '你的冤家正在嗷嗷大叫中…',
-    '大老爷正在洗耳恭听…',
-    '对方正在声泪俱下…',
-    '冤家正在慷慨陈词中…',
-    '对面那位正在卖惨中…',
-    '请稍安勿躁，马上轮到你…',
-];
+const DEFAULT_OPPONENT_NAME = '对方';
+
+function buildListenerHints(name: string): string[] {
+    return [
+        `${name} 正在嗷嗷大叫中…`,
+        '大老爷正在洗耳恭听…',
+        `${name} 正在声泪俱下…`,
+        `${name} 正在慷慨陈词中…`,
+        `${name} 正在卖惨中…`,
+        '请稍安勿躁，马上轮到你…',
+    ];
+}
+
 const LISTENER_HINT_INTERVAL_MS = 10000;
 
 /**
@@ -184,6 +191,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 非发言者提示文案
         listenerHint: '',
+        // 对方昵称
+        opponentName: '',
     },
 
     timerId: null,
@@ -202,6 +211,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             options.role === EPlayerRole.Joiner
                 ? EPlayerRole.Joiner
                 : EPlayerRole.Organizer;
+        const opponentName: string = options.opponentName
+            ? decodeURIComponent(options.opponentName)
+            : DEFAULT_OPPONENT_NAME;
 
         // 校验 roomCode
         if (!roomCode) {
@@ -241,7 +253,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             canReact,
             countdownClass: this.getCountdownClass(TOTAL_PER_TURN),
             emojiAnimations,
-            listenerHint: canSpeak ? '' : this.pickListenerHint(),
+            listenerHint: canSpeak ? '' : this.pickListenerHint(opponentName),
+            opponentName,
         });
 
         // 非发言者启动提示文案轮播
@@ -340,11 +353,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     /**
      * 随机选取一条不重复的非发言者提示文案
      */
-    pickListenerHint(): string {
+    pickListenerHint(nameOverride?: string): string {
+        const name: string =
+            nameOverride ?? this.data.opponentName ?? DEFAULT_OPPONENT_NAME;
+        const hints: string[] = buildListenerHints(name);
         const current: string = this.data.listenerHint;
-        const candidates: string[] = LISTENER_HINTS.filter(h => h !== current);
-        const pool: string[] =
-            candidates.length > 0 ? candidates : LISTENER_HINTS;
+        const candidates: string[] = hints.filter(h => h !== current);
+        const pool: string[] = candidates.length > 0 ? candidates : hints;
         const idx: number = Math.floor(Math.random() * pool.length);
         return pool[idx];
     },

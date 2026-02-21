@@ -40,7 +40,7 @@
                 <!-- Host card -->
                 <view class="responsibility__card responsibility__card--host">
                     <text class="responsibility__label">
-                        玩家1责任
+                        {{ hostNickName }}
                     </text>
                     <text class="responsibility__percent">
                         {{ hostPercentDisplay }}%
@@ -49,7 +49,7 @@
                 <!-- Guest card -->
                 <view class="responsibility__card responsibility__card--guest">
                     <text class="responsibility__label">
-                        玩家2责任
+                        {{ guestNickName }}
                     </text>
                     <text class="responsibility__percent">
                         {{ guestPercentDisplay }}%
