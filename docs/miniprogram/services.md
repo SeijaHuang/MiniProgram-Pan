@@ -5,6 +5,7 @@
 
 ## 总览
 
+- **Nickname Service**（`nickname-service.ts`）: 用户身份（userId / nickName）持久化管理
 - **WebSocket Manager**（`websocket-manager.ts`）: WebSocket 连接生命周期
 - **Room Service**（`room-service.ts`）: HTTP 创建房间
 - **Room WebSocket Service**（`room-websocket-service.ts`）: 加入房间与 JOIN_ACK
@@ -14,6 +15,44 @@
 - **STS Service**（`sts-service.ts`）: 腾讯云 STS 临时凭证获取
 - **Verdict Service**（`verdict-service.ts`）: AI 判决结果获取与缓存
 - **Post Game Service**（`post-game-service.ts`）: 赛后互动（特效、共同退堂）
+
+## Nickname Service
+
+**文件**: `miniprogram/services/nickname-service.ts`
+
+**职责**:
+
+- 读取/生成 `userId`（持久化到 Storage）
+- 读取/保存用户昵称 `nickName`（持久化到 Storage + globalData）
+- 校验昵称有效性（非空、非纯空白、不超过 12 字）
+
+**核心方法**:
+
+- `getUserId(): string`: 返回 globalData 中的 userId；若为空则读 Storage；若仍为空则生成并持久化
+- `getNickName(): string`: 返回 globalData 中的 nickName；若为空则读 Storage `userNickName`；若仍为空则返回默认值 `'申冤人'`
+- `saveNickName(name: string): void`: 写入 globalData.userInfo.nickName 并同步到 Storage
+- `validate(name: string): boolean`: 校验昵称（trim 后非空 + 长度 ≤ 12）
+
+**Storage 键名**:
+
+| 键名           | 说明             |
+| -------------- | ---------------- |
+| `userId`       | 用户唯一 ID      |
+| `userNickName` | 用户昵称（持久） |
+
+**导出**:
+
+```typescript
+export const DEFAULT_NICK_NAME = '申冤人';
+export const nicknameService = new NicknameService();
+```
+
+**使用方**:
+
+- `pages/welcome/index.ts`: `onLoad` 初始化 ID；昵称弹窗保存时调用 `saveNickName`
+- `packageA/pages/waiting-room/index.ts`: `initUser()` 调用 `getUserId()` + `getNickName()`
+
+---
 
 ## WebSocket Manager
 

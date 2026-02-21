@@ -324,12 +324,14 @@ onClick() {
 
 Waiting Room 使用以下服务层：
 
+- **昵称服务**: `miniprogram/services/nickname-service.ts`
+    - 职责：读取当前用户的 `userId` 和 `nickName`，用于构造加入房间的 `IUser` 对象
 - **WebSocket 管理器**: `miniprogram/services/websocket-manager.ts`
     - 职责：维护 WebSocket 连接、心跳、重连
 - **房间服务（HTTP）**: `miniprogram/services/room-service.ts`
     - 职责：创建房间（POST /v1/rooms）
 - **房间 WebSocket 服务**: `miniprogram/services/room-websocket-service.ts`
-    - 职责：发送 JOIN_ROOM、接收 JOIN_ACK
+    - 职责：发送 JOIN_ROOM（携带 userId + nickname）、接收 JOIN_ACK
 
 ### 9.2 消息监听
 
@@ -375,6 +377,7 @@ roomWebSocketService.initialize((room: IRoom) => {
 
 - 房间状态：`room.status === ERoomStatus.Ready`
 - 房间人数：`room.participants.length >= 2`
+- 从 `room.participants` 中提取双方昵称，写入 `globalData.participants`（供 verdict 页使用）
 - 触发倒计时：`this.startCountdown()`
 
 ### 9.4 生命周期管理
@@ -444,6 +447,7 @@ roomWebSocketService.initialize((room: IRoom) => {
     - 样式化按钮：`miniprogram/components/styled-button/`
     - 样式化标题：`miniprogram/components/styled-title/`
 - **服务层**：
+    - 昵称服务：`miniprogram/services/nickname-service.ts`
     - WebSocket 管理：`miniprogram/services/websocket-manager.ts`
     - 房间服务（HTTP）：`miniprogram/services/room-service.ts`
     - 房间 WebSocket 服务：`miniprogram/services/room-websocket-service.ts`

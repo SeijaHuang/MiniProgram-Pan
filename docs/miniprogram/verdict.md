@@ -60,6 +60,10 @@
 
 通过页面路由 `options` 传入 `roomId`，页面加载时从后端获取完整判决数据。
 
+**昵称来源**: 页面 `onLoad` 时从 `getApp<IAppOption>().globalData.participants` 读取
+`hostNickName` / `guestNickName`，由 waiting-room 在双方就位时写入；若字段缺失则
+fallback 为 `'玩家1'` / `'玩家2'`。
+
 ### 4.2 后端 API
 
 **Endpoint**: `POST /v1/rooms/:roomId/judgments`
@@ -269,14 +273,14 @@ interface ISecretReport {
 
 #### 6.2.3 玩家责任卡片
 
-| 元素         | 样式                                                                      |
-| ------------ | ------------------------------------------------------------------------- |
-| **卡片容器** | `width: 210rpx`，`border-radius: 16rpx`，`border: 2rpx solid #E8E8E8`     |
-| **背景色**   | 玩家1 → `#DCE9F5`（淡蓝），玩家2 → `#F5DCE9`（淡粉）                      |
-| **头像**     | 圆形 `100rpx × 100rpx`，居中，使用 `avatar` 组件                          |
-| **头像边框** | 玩家1 → `4rpx solid #4D96FF`，玩家2 → `4rpx solid #FF69B4`                |
-| **角色文字** | "玩家1责任" / "玩家2责任"，`font-size: 22rpx`，`color: #666`，居中        |
-| **百分比**   | `font-size: 64rpx`，`font-weight: bold`，`color: #D4380D`，`%` 为 `36rpx` |
+| 元素         | 样式                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------- |
+| **卡片容器** | `width: 210rpx`，`border-radius: 16rpx`，`border: 2rpx solid #E8E8E8`                 |
+| **背景色**   | 玩家1 → `#DCE9F5`（淡蓝），玩家2 → `#F5DCE9`（淡粉）                                  |
+| **头像**     | 圆形 `100rpx × 100rpx`，居中，使用 `avatar` 组件                                      |
+| **头像边框** | 玩家1 → `4rpx solid #4D96FF`，玩家2 → `4rpx solid #FF69B4`                            |
+| **角色文字** | `hostNickName` / `guestNickName`（真实昵称），`font-size: 22rpx`，`color: #666`，居中 |
+| **百分比**   | `font-size: 64rpx`，`font-weight: bold`，`color: #D4380D`，`%` 为 `36rpx`             |
 
 #### 6.2.4 第三方因素卡片
 
@@ -789,6 +793,12 @@ interface IVerdictPageData {
 
     /** 当前用户角色 */
     currentRole: 'host' | 'guest';
+
+    /** 房主昵称（来自 globalData.participants，fallback '玩家1'） */
+    hostNickName: string;
+
+    /** 访客昵称（来自 globalData.participants，fallback '玩家2'） */
+    guestNickName: string;
 
     /** 当前用户是否为赢家 */
     isWinner: boolean;

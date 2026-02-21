@@ -324,9 +324,19 @@ type ChatRoomState =
 
 ### 9.2 生命周期管理
 
-- **onLoad**: 初始化 WebSocket 连接，注册消息监听
+- **onLoad**: 解析 URL 参数（`roomCode`、`role`、`opponentName`），初始化 WebSocket 连接，注册消息监听
 - **onShow**: 恢复页面状态，检查连接状态
 - **onUnload**: 取消 WebSocket 监听，关闭连接
+
+**URL 参数说明**:
+
+| 参数           | 类型     | 说明                                                     |
+| -------------- | -------- | -------------------------------------------------------- |
+| `roomCode`     | `string` | 房间 ID（来自 drum-room 跳转）                           |
+| `role`         | `string` | 当前用户角色（`host` / `guest`）                         |
+| `opponentName` | `string` | 对手昵称（`encodeURIComponent` 编码，由 drum-room 传入） |
+
+`opponentName` 用于 `buildListenerHints(name)` 生成含对方姓名的监听提示文案（如「静听{对方}发言中…」），替代原先的静态文案数组。
 
 ---
 
@@ -520,6 +530,7 @@ this.initSpeechRecognitionCallbacks();
 - **服务层**:
     - WebSocket 管理: `miniprogram/services/websocket-manager.ts`
     - Chat 服务: `miniprogram/services/chat-service.ts`
+    - ASR 服务: `miniprogram/services/asr-service.ts`
 - **类型定义**:
     - 消息模型: `miniprogram/models/message.ts`
     - Chat WebSocket: `miniprogram/types/chat-websocket.ts`
