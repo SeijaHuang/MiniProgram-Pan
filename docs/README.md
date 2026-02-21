@@ -46,9 +46,9 @@ docs/
 - **功能**: 用户进入小程序后的第一个页面，负责建立整体第一印象，并作为进入玩法的主入口
 - **核心特性**:
     - 清汤大老爷角色展示
-    - 完整的入场动画序列（5 个阶段）
+    - 完整的入场动画序列（4 个阶段）
     - 主 CTA 按钮「我要申冤！」
-    - 底部功能区（设置、规则、反馈）
+    - 昵称设置弹窗（底部上滑面板，`type="nickname"` 输入 + 确认/跳过）
     - 使用 `styled-title` 和 `styled-button` 组件
 
 #### 等待页（Waiting Room）
@@ -162,6 +162,7 @@ docs/
 - **文件**: `miniprogram/services.md`
 - **功能**: `miniprogram/services` 目录下的业务服务层说明
 - **包含服务**:
+    - **Nickname Service** (`nickname-service.ts`) - 用户 ID 生成与昵称持久化
     - **WebSocket Manager** (`websocket-manager.ts`) - WebSocket 连接与重连管理
     - **Room Service** (`room-service.ts`) - HTTP 创建房间
     - **Room WebSocket Service** (`room-websocket-service.ts`) - WebSocket 加入房间与 JOIN_ACK

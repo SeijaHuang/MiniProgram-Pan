@@ -1,12 +1,19 @@
 // pages/welcome/index.ts
+import { nicknameService } from '../../services/nickname-service';
+
 interface WelcomePageData {
     // 入场动画状态
     titleAnimation: AnimationResult;
     taglineAnimation: AnimationResult;
     ctaAnimation: AnimationResult;
-    footerAnimation: AnimationResult;
     // 控制初始隐藏状态
     isEntranceReady: boolean;
+    // 昵称弹窗
+    showNicknameModal: boolean;
+    nicknameInput: string;
+    nicknameCharCount: number;
+    isNicknameConfirmDisabled: boolean;
+    nicknameModalAnimation: WechatMiniprogram.AnimationExportResult;
 }
 
 // 动画时序配置（毫秒）
@@ -20,9 +27,6 @@ const TIMING = {
     // 阶段 4：CTA 按钮
     CTA_DELAY: 1300,
     CTA_DURATION: 500,
-    // 阶段 5：底部导航
-    FOOTER_DELAY: 1600,
-    FOOTER_DURATION: 400,
 } as const;
 
 Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
@@ -30,13 +34,26 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
         titleAnimation: {} as AnimationResult,
         taglineAnimation: {} as AnimationResult,
         ctaAnimation: {} as AnimationResult,
-        footerAnimation: {} as AnimationResult,
         isEntranceReady: false,
+        // 昵称弹窗
+        showNicknameModal: false,
+        nicknameInput: '',
+        nicknameCharCount: 0,
+        isNicknameConfirmDisabled: true,
+        nicknameModalAnimation: {} as WechatMiniprogram.AnimationExportResult,
     },
 
     hasPlayedEntrance: false,
 
     onLoad(): void {
+        // 初始化用户 ID 和昵称
+        nicknameService.getUserId();
+        const storedNick: string = wx.getStorageSync('userNickName') || '';
+        if (storedNick) {
+            const app = getApp<IAppOption>();
+            app.globalData.userInfo.nickName = storedNick;
+        }
+
         // 入场动画只播放一次
         if (!this.hasPlayedEntrance) {
             this.hasPlayedEntrance = true;
@@ -68,11 +85,6 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
         setTimeout(() => {
             this.animateCTA();
         }, TIMING.CTA_DELAY);
-
-        // 阶段 5：底部导航入场（淡入）
-        setTimeout(() => {
-            this.animateFooter();
-        }, TIMING.FOOTER_DELAY);
     },
 
     /**
@@ -134,35 +146,95 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
     },
 
     /**
-     * 阶段 5：底部导航动画
-     * 效果：简单淡入
+     * 「我要申冤！」点击处理
+     * 有昵称 → 直接跳转；无昵称 → 弹出昵称设置弹窗
      */
-    animateFooter(): void {
-        const animation = wx.createAnimation({
-            duration: TIMING.FOOTER_DURATION,
-            timingFunction: 'ease-out',
+    handleStartJudge(): void {
+        const app = getApp<IAppOption>();
+        const nickName: string = app.globalData.userInfo.nickName;
+
+        if (nickName) {
+            // 已有昵称，直接跳转
+            setTimeout(() => {
+                void wx.navigateTo({
+                    url: '/packageA/pages/waiting-room/index',
+                });
+            }, 250);
+        } else {
+            // 无昵称，弹出昵称设置弹窗
+            this.openNicknameModal();
+        }
+    },
+
+    /**
+     * 打开昵称弹窗并播放上滑动画
+     */
+    openNicknameModal(): void {
+        this.setData({
+            showNicknameModal: true,
+            nicknameInput: '',
+            nicknameCharCount: 0,
+            isNicknameConfirmDisabled: true,
         });
 
-        animation.opacity(1).step();
-
-        this.setData({ footerAnimation: animation.export() });
+        // 弹窗上滑入场动画
+        const anim = wx.createAnimation({
+            duration: 350,
+            timingFunction: 'ease-out',
+        });
+        anim.translateY(0).step();
+        this.setData({ nicknameModalAnimation: anim.export() });
     },
 
-    handleStartJudge(): void {
-        setTimeout(() => {
-            void wx.navigateTo({ url: '/packageA/pages/waiting-room/index' });
-        }, 250);
+    /**
+     * 昵称输入框变化
+     */
+    onNicknameInput(e: WechatMiniprogram.Input): void {
+        const value: string = e.detail.value;
+        this.setData({
+            nicknameInput: value,
+            nicknameCharCount: value.length,
+            isNicknameConfirmDisabled: !nicknameService.validate(value),
+        });
     },
 
-    handleSettings(): void {
-        // TODO: Navigate to settings page
+    /**
+     * 「击鼓申冤！」确认按钮
+     */
+    onNicknameConfirm(): void {
+        const { nicknameInput } = this.data;
+        if (!nicknameService.validate(nicknameInput)) {
+            return;
+        }
+
+        nicknameService.saveNickName(nicknameInput);
+
+        this.setData({ showNicknameModal: false });
+
+        void wx.navigateTo({
+            url: '/packageA/pages/waiting-room/index',
+        });
     },
 
-    handleRules(): void {
-        // TODO: Navigate to rules page or show rules popup
+    /**
+     * 「稍后再说」次级按钮
+     * 使用默认值「申冤人」进入，不保存缓存
+     */
+    onNicknameSkip(): void {
+        const app = getApp<IAppOption>();
+        app.globalData.userInfo.nickName = '申冤人';
+
+        this.setData({ showNicknameModal: false });
+
+        void wx.navigateTo({
+            url: '/packageA/pages/waiting-room/index',
+        });
     },
 
-    handleFeedback(): void {
-        // TODO: Navigate to feedback page or open feedback channel
+    /**
+     * 点击遮罩关闭弹窗（不保存）
+     */
+    onNicknameModalMaskTap(): void {
+        this.setData({ showNicknameModal: false });
     },
 });

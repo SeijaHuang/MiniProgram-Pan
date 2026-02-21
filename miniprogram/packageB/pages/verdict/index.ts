@@ -86,6 +86,9 @@ interface IVerdictPageData {
     mySecretReport: ISecretReport;
     myTopDimension: string;
     myTopScore: number;
+    // 双方昵称
+    hostNickName: string;
+    guestNickName: string;
     // Effect queue fields
     effectQueue: IEffectQueueItem[];
     isPlayingEffect: boolean;
@@ -118,6 +121,8 @@ Page({
         mySecretReport: { title: '', advice: '' },
         myTopDimension: '',
         myTopScore: 0,
+        hostNickName: '玩家1',
+        guestNickName: '玩家2',
         effectQueue: [] as IEffectQueueItem[],
         isPlayingEffect: false,
         showEffectOverlay: false,
@@ -219,6 +224,13 @@ Page({
             }
         }
 
+        // Read participant nicknames from globalData (populated in waiting-room)
+        const app = getApp<IAppOption>();
+        const hostNickName: string =
+            app.globalData.participants?.hostNickName || '玩家1';
+        const guestNickName: string =
+            app.globalData.participants?.guestNickName || '玩家2';
+
         this.setData({
             loading: false,
             verdict,
@@ -228,6 +240,8 @@ Page({
             mySecretReport,
             myTopDimension: DIMENSION_LABELS[topKey],
             myTopScore: topVal,
+            hostNickName,
+            guestNickName,
         });
 
         // Start entrance animations
@@ -479,10 +493,15 @@ Page({
         y += 60;
         ctx.font = 'bold 48px sans-serif';
         ctx.fillStyle = '#333333';
+        const { hostNickName, guestNickName } = this.data;
         ctx.textAlign = 'left';
-        ctx.fillText(`玩家1: ${verdict.responsibility.host}%`, 80, y);
+        ctx.fillText(`${hostNickName}: ${verdict.responsibility.host}%`, 80, y);
         ctx.textAlign = 'right';
-        ctx.fillText(`玩家2: ${verdict.responsibility.guest}%`, width - 80, y);
+        ctx.fillText(
+            `${guestNickName}: ${verdict.responsibility.guest}%`,
+            width - 80,
+            y
+        );
 
         // Third party factors
         y += 50;

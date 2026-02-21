@@ -368,13 +368,19 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Navigate to chat room after delay
         this._resultTimer = setTimeout(() => {
-            const { roomId, selfRole } = this.data;
+            const { roomId, selfRole, organizerName, joinerName } = this.data;
             // Winner speaks first (Organizer), loser speaks second (Joiner)
             const chatRole: EPlayerRole =
                 selfRole === winnerRole
                     ? EPlayerRole.Organizer
                     : EPlayerRole.Joiner;
-            const url: string = `/packageB/pages/chat-room/index?roomCode=${roomId}&role=${chatRole}`;
+            // Opponent in drum = the other player
+            const opponentName: string =
+                selfRole === EPlayerRole.Organizer ? joinerName : organizerName;
+            const url: string =
+                `/packageB/pages/chat-room/index?roomCode=${roomId}` +
+                `&role=${chatRole}` +
+                `&opponentName=${encodeURIComponent(opponentName)}`;
             wx.redirectTo({
                 url,
                 fail: (err: WechatMiniprogram.GeneralCallbackResult) => {

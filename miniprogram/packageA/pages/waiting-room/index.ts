@@ -1,10 +1,13 @@
 // pages/waiting-room/index.ts
 
-import { DEFAULT_USER_NAME } from '../../../constants/defaultValue';
 import type { IRoom } from '../../../models/room';
 import { ERoomStatus } from '../../../models/room';
 import type { IUser } from '../../../models/user';
 import { drumService } from '../../../services/drum-service';
+import {
+    nicknameService,
+    DEFAULT_NICK_NAME,
+} from '../../../services/nickname-service';
 import { roomService } from '../../../services/room-service';
 import { roomWebSocketService } from '../../../services/room-websocket-service';
 import { wsManager } from '../../../services/websocket-manager';
@@ -49,6 +52,8 @@ interface IWaitingRoomPageData {
     // 用户和房间信息
     currentUser: IUser | null;
     currentRoom: IRoom | null;
+    // 双方昵称（房间满员后显示）
+    roomParticipants: Array<{ nickname: string; isMe: boolean }>;
 }
 
 /**
@@ -109,6 +114,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         // 用户和房间信息
         currentUser: null,
         currentRoom: null,
+        roomParticipants: [],
     },
 
     // 定时器引用
@@ -165,27 +171,16 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     },
 
     /**
-     * 初始化用户信息
+     * 初始化用户信息（从 globalData / Storage 读取）
      */
     initUser(): void {
-        const userId = wx.getStorageSync('userId') || this.generateUserId();
-        const nickname = wx.getStorageSync('nickname') || DEFAULT_USER_NAME;
-
-        if (!wx.getStorageSync('userId')) {
-            wx.setStorageSync('userId', userId);
-            wx.setStorageSync('nickname', nickname);
-        }
+        const userId: string = nicknameService.getUserId();
+        const nickname: string =
+            nicknameService.getNickName() || DEFAULT_NICK_NAME;
 
         this.setData({
             currentUser: { userId, nickname },
         });
-    },
-
-    /**
-     * 生成用户 ID
-     */
-    generateUserId(): string {
-        return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     },
 
     /**
@@ -524,6 +519,29 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             room.participants.length >= 2 &&
             room.status === ERoomStatus.Ready
         ) {
+            // 将双方昵称存入 globalData 供后续页面使用
+            const selfUserId: string = this.data.currentUser?.userId ?? '';
+            const hostParticipant = room.participants.find(
+                p => p.user.userId === room.hostUserId
+            );
+            const guestParticipant = room.participants.find(
+                p => p.user.userId !== room.hostUserId
+            );
+            const app = getApp<IAppOption>();
+            app.globalData.participants = {
+                hostNickName:
+                    hostParticipant?.user.nickname || DEFAULT_NICK_NAME,
+                guestNickName:
+                    guestParticipant?.user.nickname || DEFAULT_NICK_NAME,
+            };
+
+            // 构建页面展示用的参与者列表
+            const roomParticipants = room.participants.map(p => ({
+                nickname: p.user.nickname || DEFAULT_NICK_NAME,
+                isMe: p.user.userId === selfUserId,
+            }));
+            this.setData({ roomParticipants });
+
             // Start listening for drum messages BEFORE countdown
             // This queues DRUM_READY and DRUM_START messages
             drumService.startListening();

@@ -64,8 +64,30 @@
                 </view>
             </view>
 
-            <!-- 等待文案 -->
-            <view class="waiting-room__waiting-text">
+            <!-- 双方昵称（满员后显示） -->
+            <view
+                wx:if="{{ roomParticipants.length >= 2 }}"
+                class="waiting-room__participants"
+            >
+                <text class="waiting-room__participants-label">双方已就位</text>
+                <view class="waiting-room__participants-list">
+                    <view
+                        wx:for="{{ roomParticipants }}"
+                        wx:key="nickname"
+                        class="waiting-room__participant"
+                    >
+                        <text class="waiting-room__participant-name {{ item.isMe ? 'waiting-room__participant-name--me' : '' }}">
+                            {{ item.nickname }}{{ item.isMe ? '（你）' : '' }}
+                        </text>
+                    </view>
+                </view>
+            </view>
+
+            <!-- 等待文案（满员前显示） -->
+            <view
+                wx:if="{{ roomParticipants.length < 2 }}"
+                class="waiting-room__waiting-text"
+            >
                 <text>{{ currentWaitingText }}</text>
             </view>
 
@@ -100,7 +122,30 @@
                         class="waiting-room__room-digit waiting-room__room-digit--small"
                     >{{ item }}</text>
                 </view>
-                <text class="waiting-room__guest-waiting">等待开庭...</text>
+
+                <!-- 双方昵称（满员后显示） -->
+                <view
+                    wx:if="{{ roomParticipants.length >= 2 }}"
+                    class="waiting-room__participants"
+                >
+                    <text class="waiting-room__participants-label">双方已就位</text>
+                    <view class="waiting-room__participants-list">
+                        <view
+                            wx:for="{{ roomParticipants }}"
+                            wx:key="nickname"
+                            class="waiting-room__participant"
+                        >
+                            <text class="waiting-room__participant-name {{ item.isMe ? 'waiting-room__participant-name--me' : '' }}">
+                                {{ item.nickname }}{{ item.isMe ? '（你）' : '' }}
+                            </text>
+                        </view>
+                    </view>
+                </view>
+
+                <text
+                    wx:if="{{ roomParticipants.length < 2 }}"
+                    class="waiting-room__guest-waiting"
+                >等待开庭...</text>
             </view>
         </view>
     </block>
