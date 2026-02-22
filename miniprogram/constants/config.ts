@@ -1,46 +1,78 @@
 /**
  * Application Configuration
- * Centralized configuration for the mini program
+ * Single source of truth for all runtime config.
+ *
+ * Environments:
+ *   develop + DevTools    → http://localhost:8080,          DEBUG on
+ *   develop + real device → http://<LAN_IP>:8080,          DEBUG on
+ *   trial                 → https://panleme.fun,            DEBUG on
+ *   release               → https://panleme.fun,            DEBUG off
+ *
+ * No manual switching needed — auto-detected at runtime.
  */
 
-/**
- * 判断是否为真机环境
- * 真机环境无法访问 localhost，需要使用局域网 IP
- */
+type EnvVersion = WechatMiniprogram.AccountInfo['miniProgram']['envVersion'];
+
+interface IEnvConfig {
+    apiBaseUrl: string;
+    wsUrl: string;
+    debug: boolean;
+}
+
+/** LAN IP for real device testing in develop mode */
+const LAN_IP: string = '192.168.31.204';
+
+const ENV_CONFIGS = {
+    devtools: {
+        apiBaseUrl: 'http://localhost:8080',
+        wsUrl: 'ws://localhost:8080/ws',
+        debug: true,
+    },
+    realDevice: {
+        apiBaseUrl: `http://${LAN_IP}:8080`,
+        wsUrl: `ws://${LAN_IP}:8080/ws`,
+        debug: true,
+    },
+    trial: {
+        apiBaseUrl: 'https://panleme.fun',
+        wsUrl: 'wss://panleme.fun/ws',
+        debug: true,
+    },
+    release: {
+        apiBaseUrl: 'https://panleme.fun',
+        wsUrl: 'wss://panleme.fun/ws',
+        debug: false,
+    },
+} as const;
+
 function isRealDevice(): boolean {
     try {
-        const systemInfo = wx.getSystemInfoSync();
-        // 微信开发者工具的 platform 为 'devtools'
-        return systemInfo.platform !== 'devtools';
+        return wx.getSystemInfoSync().platform !== 'devtools';
     } catch {
         return false;
     }
 }
 
-/**
- * Backend Server Configuration
- * IMPORTANT: Update these values based on your environment
- */
-const ENV_CONFIG = {
-    // 开发者工具环境：使用 localhost
-    devtools: {
-        HTTP_BASE_URL: 'http://localhost:8080',
-        WS_BASE_URL: 'ws://localhost:8080',
-    },
-    // 真机测试环境：使用局域网 IP
-    realDevice: {
-        HTTP_BASE_URL: 'http://192.168.31.204:8080',
-        WS_BASE_URL: 'ws://192.168.31.204:8080',
-    },
-} as const;
+function resolveEnv(): EnvVersion {
+    try {
+        return wx.getAccountInfoSync().miniProgram.envVersion;
+    } catch {
+        return 'release';
+    }
+}
 
-const currentEnv = isRealDevice() ? ENV_CONFIG.realDevice : ENV_CONFIG.devtools;
+function resolveConfig(envVersion: EnvVersion): IEnvConfig {
+    if (envVersion === 'develop') {
+        return isRealDevice() ? ENV_CONFIGS.realDevice : ENV_CONFIGS.devtools;
+    }
+    return ENV_CONFIGS[envVersion];
+}
 
-export const BACKEND_CONFIG = {
-    HTTP_BASE_URL: currentEnv.HTTP_BASE_URL,
-    WS_BASE_URL: currentEnv.WS_BASE_URL,
-    WS_PATH: '/ws',
-} as const;
+export const ENV: EnvVersion = resolveEnv();
+export const config: IEnvConfig = resolveConfig(ENV);
+export const API_BASE_URL: string = config.apiBaseUrl;
+export const WS_URL: string = config.wsUrl;
+export const DEBUG: boolean = config.debug;
 
 /**
  * WebSocket Configuration

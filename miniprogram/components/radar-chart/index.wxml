@@ -12,14 +12,14 @@
                 class="radar-chart__legend-color"
                 style="background-color: #666666;"
             ></view>
-            <text class="radar-chart__legend-text">玩家1</text>
+            <text class="radar-chart__legend-text">{{ hostName }}</text>
         </view>
         <view class="radar-chart__legend-item">
             <view
                 class="radar-chart__legend-color"
                 style="background-color: #D4380D;"
             ></view>
-            <text class="radar-chart__legend-text">玩家2</text>
+            <text class="radar-chart__legend-text">{{ guestName }}</text>
         </view>
     </view>
 </view>

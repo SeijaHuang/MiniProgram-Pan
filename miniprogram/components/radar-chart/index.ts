@@ -63,6 +63,14 @@ Component({
             type: Number,
             value: 500,
         },
+        hostName: {
+            type: String,
+            value: '玩家1',
+        },
+        guestName: {
+            type: String,
+            value: '玩家2',
+        },
     },
 
     data: {
