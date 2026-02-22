@@ -19,6 +19,7 @@ import type {
     IVerdictResultData,
     IVerdictFailedData,
 } from '../../types/websocket/verdict';
+import { logger } from '../../utils/logger';
 
 export class VerdictOrchestratorService {
     /**
@@ -36,7 +37,7 @@ export class VerdictOrchestratorService {
             // 1. Get room
             const room = roomManager.getRoomById(roomId);
             if (!room) {
-                console.error(`[VerdictOrchestrator] Room ${roomId} not found`);
+                logger.error('VerdictOrchestrator', `Room ${roomId} not found`);
                 return;
             }
 
@@ -47,8 +48,9 @@ export class VerdictOrchestratorService {
 
             // 3. Check if already processing (prevent race condition)
             if (room.verdictStatus === 'processing') {
-                console.log(
-                    `[VerdictOrchestrator] Verdict already processing for room ${roomId}`
+                logger.log(
+                    'VerdictOrchestrator',
+                    `Verdict already processing for room ${roomId}`
                 );
                 return;
             }
@@ -58,8 +60,9 @@ export class VerdictOrchestratorService {
 
             // 5. Get retry count
             const retryCount = room.verdictRetryCount || 0;
-            console.log(
-                `[VerdictOrchestrator] Generating verdict for room ${roomId} (attempt ${retryCount + 1}/${VERDICT_CONFIG.MAX_RETRIES})`
+            logger.log(
+                'VerdictOrchestrator',
+                `Generating verdict for room ${roomId} (attempt ${retryCount + 1}/${VERDICT_CONFIG.MAX_RETRIES})`
             );
 
             // 6. Validate speeches are not empty
@@ -88,8 +91,9 @@ export class VerdictOrchestratorService {
             room.verdictResult = verdict;
             room.verdictStatus = 'completed';
 
-            console.log(
-                `[VerdictOrchestrator] Verdict generated successfully for room ${roomId}, winner: ${verdict.winnerId}`
+            logger.log(
+                'VerdictOrchestrator',
+                `Verdict generated successfully for room ${roomId}, winner: ${verdict.winnerId}`
             );
 
             // 10. Broadcast VERDICT_RESULT
@@ -151,8 +155,9 @@ export class VerdictOrchestratorService {
         const errorMessage =
             error instanceof Error ? error.message : 'Unknown error';
 
-        console.error(
-            `[VerdictOrchestrator] Verdict generation failed for room ${roomId}: ${errorMessage}`
+        logger.error(
+            'VerdictOrchestrator',
+            `Verdict generation failed for room ${roomId}: ${errorMessage}`
         );
 
         // Check if can retry
@@ -173,8 +178,9 @@ export class VerdictOrchestratorService {
         });
 
         if (!canRetry) {
-            console.error(
-                `[VerdictOrchestrator] Max retries reached for room ${roomId}, fallback to HTTP endpoint`
+            logger.error(
+                'VerdictOrchestrator',
+                `Max retries reached for room ${roomId}, fallback to HTTP endpoint`
             );
         }
     }

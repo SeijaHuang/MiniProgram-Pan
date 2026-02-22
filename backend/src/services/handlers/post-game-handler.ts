@@ -17,6 +17,7 @@ import {
     validateConnection,
     validateRoomParticipant,
 } from './handler-utils';
+import { logger } from '../../utils/logger';
 
 /** Map client action names to broadcast effect types */
 const ACTION_TO_EFFECT: Record<string, 'stamp_death' | 'beg_emoji'> = {
@@ -72,8 +73,9 @@ export function handlePostGameAction(
 
     const effect = ACTION_TO_EFFECT[action];
 
-    console.log(
-        `[POST_GAME] ${conn.userId} triggered ${action} → ${effect} in room ${roomId}`
+    logger.log(
+        'PostGame',
+        `${conn.userId} triggered ${action} → ${effect} in room ${roomId}`
     );
 
     return {

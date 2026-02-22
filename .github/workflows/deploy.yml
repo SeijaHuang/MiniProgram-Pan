@@ -1,17 +1,22 @@
 name: Deploy Backend to Tencent Cloud
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '选择部署环境'
+        required: true
+        default: 'trial'
+        type: choice
+        options:
+          - trial
+          - release
 
 jobs:
   deploy:
-    name: Deploy to Server
+    name: Deploy to ${{ github.event.inputs.environment }}
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
 
     steps:
       - name: Checkout code
@@ -27,30 +32,13 @@ jobs:
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
       - name: Write .env file
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          TENCENT_SECRET_ID: ${{ secrets.TENCENT_SECRET_ID }}
-          TENCENT_SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
         run: |
-          ssh -p ${{ secrets.SERVER_PORT }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cat > /var/www/panleme/MiniProgram-Pan/backend/.env" << EOF
-          NODE_ENV=production
-          PORT=8080
-          LOG_LEVEL=info
-          WS_PATH=/ws
-          WS_HEARTBEAT_INTERVAL=30000
-          WS_CLIENT_TIMEOUT=60000
-          WS_MAX_RECONNECT=5
-          GAME_ROOM_TIMEOUT=300000
-          GAME_MOVE_TIMEOUT=30000
-          OPENAI_API_KEY=${OPENAI_API_KEY}
-          OPENAI_MODEL=gpt-4o
-          LLM_WORKER_POLL_INTERVAL_MS=500
-          LLM_WORKER_LOCK_TIMEOUT_MS=60000
-          LLM_MAX_RETRIES=3
-          TENCENT_SECRET_ID=${TENCENT_SECRET_ID}
-          TENCENT_SECRET_KEY=${TENCENT_SECRET_KEY}
-          TENCENT_REGION=ap-guangzhou
+          cat > /tmp/.env << EOF
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          TENCENT_SECRET_ID=${{ secrets.TENCENT_SECRET_ID }}
+          TENCENT_SECRET_KEY=${{ secrets.TENCENT_SECRET_KEY }}
           EOF
+          scp -P ${{ secrets.SERVER_PORT }} /tmp/.env ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/panleme/MiniProgram-Pan/backend/.env
 
       - name: Deploy to server
         run: |
@@ -68,7 +56,7 @@ jobs:
             npm run build
 
             echo "=== 重启服务 ==="
-            pm2 reload ecosystem.config.js --env production
+            pm2 reload ecosystem.config.js --env ${{ github.event.inputs.environment }}
 
             echo "=== 部署完成 ==="
             pm2 status

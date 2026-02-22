@@ -19,6 +19,7 @@ import { llmJudgementService } from '../services/core/llm-judgement.service';
 import type { IBaseResponse } from '../types/http';
 import { EHttpErrorCode } from '../types/http';
 import type { IJudgmentResponse } from '../types/llm';
+import { logger } from '../utils/logger';
 
 export class LlmJudgementController {
     /**
@@ -82,8 +83,9 @@ export class LlmJudgementController {
             };
             res.status(200).json(response);
         } catch (error: unknown) {
-            console.error(
-                '[LlmJudgementController]' + ' createJudgment failed:',
+            logger.error(
+                'LlmController',
+                'createJudgment failed:',
                 error instanceof Error ? error.message : String(error)
             );
 

@@ -17,6 +17,7 @@ import { EMessageType } from '../../models/entities/message';
 import type { ConnectionManager } from '../websocket/connection-manager';
 import { ChatSendDataSchema } from '../../models/schemas/ws-message.schema';
 import { validatePayload, validateRoomContext } from './handler-utils';
+import { logger } from '../../utils/logger';
 
 export interface IChatSendResult {
     success: true;
@@ -60,8 +61,9 @@ export function handleChatSend(
         createdAt: Date.now(),
     };
 
-    console.log(
-        `[CHAT_SEND] Message from ${userId} in room ${roomId}: "${content.text}"`
+    logger.log(
+        'ChatSend',
+        `Message from ${userId} in room ${roomId}: "${content.text}"`
     );
 
     return {

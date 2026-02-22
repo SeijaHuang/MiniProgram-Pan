@@ -7,6 +7,7 @@ import {
     GetFederationTokenResponse,
 } from 'tencentcloud-sdk-nodejs-sts/tencentcloud/services/sts/v20180813/sts_models';
 import { TENCENT_CONFIG } from '../constants/config';
+import { logger } from '../utils/logger';
 
 const StsClient = sts.v20180813.Client;
 
@@ -38,7 +39,7 @@ export class TencentController {
             res.status(200).json(response);
             return;
         } catch (error: unknown) {
-            console.error('[TencentController] Get STS token failed:', error);
+            logger.error('TencentController', 'Get STS token failed:', error);
             const response: IBaseResponse<never> = {
                 success: false,
                 error: {
@@ -57,12 +58,12 @@ export class TencentController {
     private static async _getSTSTokenWithCache(): Promise<GetFederationTokenResponse> {
         // Check if cached token exists and is still valid
         if (cachedToken && this._isTokenValid(cachedToken)) {
-            console.log('[TencentController] Using cached STS token');
+            logger.log('TencentController', 'Using cached STS token');
             return cachedToken;
         }
 
         // Fetch new token
-        console.log('[TencentController] Fetching new STS token');
+        logger.log('TencentController', 'Fetching new STS token');
         const newToken = await this._fetchSTSToken();
         cachedToken = newToken;
         return newToken;

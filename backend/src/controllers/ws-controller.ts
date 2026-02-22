@@ -58,6 +58,7 @@ import type {
 import { EWSMessageType, EWSErrorCode, EGamePhase } from '../types/websocket';
 import { ERoomStatus } from '../models/entities/room';
 import { DRUM_CONFIG, WAITING_ROOM_CONFIG } from '../constants/config';
+import { logger } from '../utils/logger';
 
 export class WebSocketController {
     /**
@@ -142,10 +143,7 @@ export class WebSocketController {
                     );
             }
         } catch (error) {
-            console.error(
-                '[WebSocketController] Message handling error:',
-                error
-            );
+            logger.error('WSController', 'Message handling error:', error);
             WebSocketController.sendError(
                 connectionId,
                 EWSErrorCode.InternalError,
@@ -369,7 +367,7 @@ export class WebSocketController {
     private static startDrumGame(roomId: string): void {
         const room = roomManager.getRoomById(roomId);
         if (!room) {
-            console.error(`[WebSocketController] Room ${roomId} not found`);
+            logger.error('WSController', `Room ${roomId} not found`);
             return;
         }
 
@@ -422,7 +420,7 @@ export class WebSocketController {
         // Schedule game start (running phase)
         setTimeout(() => {
             drumGameManager.setPhase(roomId, EGamePhase.Running);
-            console.log(`[WebSocketController] Game ${roomId} is now RUNNING`);
+            logger.log('WSController', `Game ${roomId} is now RUNNING`);
         }, DRUM_CONFIG.COUNTDOWN_MS);
 
         // Schedule game finish
@@ -430,8 +428,9 @@ export class WebSocketController {
             WebSocketController.finishDrumGame(roomId, endAtMs);
         }, DRUM_CONFIG.COUNTDOWN_MS + DRUM_CONFIG.GAME_DURATION_MS);
 
-        console.log(
-            `[WebSocketController] Started drum game ${roomId} (start: ${startAtMs}, end: ${endAtMs})`
+        logger.log(
+            'WSController',
+            `Started drum game ${roomId} (start: ${startAtMs}, end: ${endAtMs})`
         );
     }
 
@@ -452,9 +451,7 @@ export class WebSocketController {
         // Calculate result
         const result = drumGameManager.calculateResult(roomId);
         if (!result) {
-            console.error(
-                `[WebSocketController] Game ${roomId} not found for result`
-            );
+            logger.error('WSController', `Game ${roomId} not found for result`);
             return;
         }
 
@@ -473,8 +470,9 @@ export class WebSocketController {
         // Cleanup game state
         drumGameManager.cleanupGame(roomId);
 
-        console.log(
-            `[WebSocketController] Game ${roomId} finished: ${result.winnerRole} wins (${result.organizerScore} vs ${result.joinerScore})`
+        logger.log(
+            'WSController',
+            `Game ${roomId} finished: ${result.winnerRole} wins (${result.organizerScore} vs ${result.joinerScore})`
         );
     }
 
@@ -498,14 +496,16 @@ export class WebSocketController {
             return;
         }
 
-        console.log(
-            `[WebSocketController] Speech turn end for user ${result.userId} in room ${result.roomId}`
+        logger.log(
+            'WSController',
+            `Speech turn end for user ${result.userId} in room ${result.roomId}`
         );
 
         if (result.bothFinished) {
             // Both players finished, broadcast CHAT_COMPLETE and trigger verdict
-            console.log(
-                `[WebSocketController] Chat complete, triggering verdict generation for room ${result.roomId}`
+            logger.log(
+                'WSController',
+                `Chat complete, triggering verdict generation for room ${result.roomId}`
             );
 
             const chatCompleteData: IChatCompleteData = {
@@ -522,14 +522,16 @@ export class WebSocketController {
             verdictOrchestratorService
                 .generateVerdict(result.roomId, connectionManager)
                 .catch(error => {
-                    console.error(
-                        `[WebSocketController] Verdict generation error: ${error}`
+                    logger.error(
+                        'WSController',
+                        `Verdict generation error: ${error}`
                     );
                 });
         } else {
             // First speaker finished, broadcast SPEECH_TURN_SWITCH
-            console.log(
-                `[WebSocketController] Speech turn switch in room ${result.roomId}`
+            logger.log(
+                'WSController',
+                `Speech turn switch in room ${result.roomId}`
             );
 
             connectionManager.broadcastToRoom(result.roomId, {
@@ -562,8 +564,9 @@ export class WebSocketController {
             return;
         }
 
-        console.log(
-            `[WebSocketController] Verdict retry requested by user ${result.userId} in room ${result.roomId}`
+        logger.log(
+            'WSController',
+            `Verdict retry requested by user ${result.userId} in room ${result.roomId}`
         );
 
         // If can retry, trigger verdict generation again
@@ -571,13 +574,15 @@ export class WebSocketController {
             verdictOrchestratorService
                 .generateVerdict(result.roomId, connectionManager)
                 .catch(error => {
-                    console.error(
-                        `[WebSocketController] Verdict retry error: ${error}`
+                    logger.error(
+                        'WSController',
+                        `Verdict retry error: ${error}`
                     );
                 });
         } else {
-            console.log(
-                `[WebSocketController] Max retries reached for room ${result.roomId}`
+            logger.log(
+                'WSController',
+                `Max retries reached for room ${result.roomId}`
             );
         }
     }
@@ -651,8 +656,9 @@ export class WebSocketController {
             timestamp: Date.now(),
         });
 
-        console.log(
-            `[WebSocketController] User left room ${result.roomId} (allLeft: ${result.allLeft})`
+        logger.log(
+            'WSController',
+            `User left room ${result.roomId} (allLeft: ${result.allLeft})`
         );
 
         // If all participants have left, cleanup everything
@@ -668,7 +674,7 @@ export class WebSocketController {
         drumGameManager.cleanupGame(roomId);
         connectionManager.disconnectRoom(roomId);
         roomManager.deleteRoom(roomId);
-        console.log(`[WebSocketController] Room ${roomId} fully cleaned up`);
+        logger.log('WSController', `Room ${roomId} fully cleaned up`);
     }
 
     /**
@@ -676,9 +682,7 @@ export class WebSocketController {
      * Marks participant as left, cleans up if all left
      */
     static handleDisconnect(connectionId: string): void {
-        console.log(
-            `[WebSocketController] Client disconnected: ${connectionId}`
-        );
+        logger.log('WSController', `Client disconnected: ${connectionId}`);
 
         const connection = connectionManager.getConnection(connectionId);
 

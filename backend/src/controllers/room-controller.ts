@@ -15,6 +15,7 @@ import { EHttpErrorCode } from '../types/http';
 import { roomService } from '../services/core/room/room.service';
 import { CreateRoomRequestSchema } from '../models/schemas/http-request.schema';
 import type { ICreateRoomDto } from '../models/dto/request/create-room.dto';
+import { logger } from '../utils/logger';
 
 export class RoomController {
     /**
@@ -53,7 +54,7 @@ export class RoomController {
 
             res.status(201).json(response);
         } catch (error: unknown) {
-            console.error('[RoomController] Room creation failed:', error);
+            logger.error('RoomController', 'Room creation failed:', error);
 
             const errorMessage =
                 error instanceof Error ? error.message : 'Unknown error';

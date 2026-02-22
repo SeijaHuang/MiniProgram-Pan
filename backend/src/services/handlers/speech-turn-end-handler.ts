@@ -7,6 +7,7 @@ import { EWSErrorCode } from '../../types/websocket';
 import type { ISpeechTurnEndMessage } from '../../types/websocket/verdict';
 import { SpeechTurnEndDataSchema } from '../../models/schemas/verdict-message.schema';
 import { validatePayload, validateRoomParticipant } from './handler-utils';
+import { logger } from '../../utils/logger';
 
 /**
  * Handler result type
@@ -64,10 +65,9 @@ export function handleSpeechTurnEnd(
         room.speechState.guestFinished = true;
     }
 
-    console.log(
-        `[SPEECH_TURN_END] ` +
-            `${isHost ? 'Host' : 'Guest'} finished ` +
-            `speaking in room ${roomId}`
+    logger.log(
+        'SpeechTurnEnd',
+        `${isHost ? 'Host' : 'Guest'} finished speaking in room ${roomId}`
     );
 
     // 5. Check if both finished
@@ -75,9 +75,7 @@ export function handleSpeechTurnEnd(
         room.speechState.hostFinished && room.speechState.guestFinished;
 
     if (bothFinished) {
-        console.log(
-            `[SPEECH_TURN_END] Both players ` + `finished in room ${roomId}`
-        );
+        logger.log('SpeechTurnEnd', `Both players finished in room ${roomId}`);
     }
 
     return {

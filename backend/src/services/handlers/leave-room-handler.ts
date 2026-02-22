@@ -9,6 +9,7 @@ import { LeaveRoomDataSchema } from '../../models/schemas/verdict-message.schema
 import type { ConnectionManager } from '../websocket/connection-manager';
 import { validatePayload, validateConnection } from './handler-utils';
 import { roomManager } from '../websocket/room-manager';
+import { logger } from '../../utils/logger';
 
 /**
  * Handler result type
@@ -73,7 +74,7 @@ export function handleLeaveRoom(
 
     participant.leftAt = Date.now();
 
-    console.log(`[LEAVE_ROOM] User ${connResult.userId} left room ${roomId}`);
+    logger.log('LeaveRoom', `User ${connResult.userId} left room ${roomId}`);
 
     // 5. Check if all participants have left
     const allLeft: boolean = room.participants.every(
@@ -81,7 +82,7 @@ export function handleLeaveRoom(
     );
 
     if (allLeft) {
-        console.log(`[LEAVE_ROOM] All participants left room ${roomId}`);
+        logger.log('LeaveRoom', `All participants left room ${roomId}`);
     }
 
     return {

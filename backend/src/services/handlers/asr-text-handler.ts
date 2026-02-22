@@ -20,6 +20,7 @@ import {
     validateConnection,
     validateReadyRoomParticipant,
 } from './handler-utils';
+import { logger } from '../../utils/logger';
 
 /**
  * ASR session state per speaker in a room
@@ -163,9 +164,9 @@ export function handleASRTextPush(
 
     // 7. Check if final was already received (ignore subsequent messages)
     if (state.finalReceived && seq <= state.lastSeq) {
-        console.log(
-            `[ASR_TEXT_PUSH] Ignoring message after final ` +
-                `(seq: ${seq}, lastSeq: ${state.lastSeq})`
+        logger.log(
+            'ASR',
+            `Ignoring message after final (seq: ${seq}, lastSeq: ${state.lastSeq})`
         );
         return {
             success: true,
@@ -180,9 +181,9 @@ export function handleASRTextPush(
 
     // 8. Seq deduplication: only process if seq > lastSeq
     if (seq <= state.lastSeq) {
-        console.log(
-            `[ASR_TEXT_PUSH] Deduplicating message ` +
-                `(seq: ${seq}, lastSeq: ${state.lastSeq})`
+        logger.log(
+            'ASR',
+            `Deduplicating message (seq: ${seq}, lastSeq: ${state.lastSeq})`
         );
         return {
             success: true,
@@ -210,9 +211,9 @@ export function handleASRTextPush(
         }
         state.pendingPartial = null;
 
-        console.log(
-            `[ASR_TEXT_PUSH] Final from ${speakerId} ` +
-                `in room ${roomId}: "${text}"`
+        logger.log(
+            'ASR',
+            `Final from ${speakerId} in room ${roomId}: "${text}"`
         );
 
         // Accumulate final text into room's speech state
@@ -234,10 +235,9 @@ export function handleASRTextPush(
                 room.speechState.guestText += text.trim() + ' ';
             }
 
-            console.log(
-                `[ASR] Accumulated ` +
-                    `${isHost ? 'host' : 'guest'} speech: ` +
-                    `${isHost ? room.speechState.hostText.length : room.speechState.guestText.length} chars`
+            logger.log(
+                'ASR',
+                `Accumulated ${isHost ? 'host' : 'guest'} speech: ${isHost ? room.speechState.hostText.length : room.speechState.guestText.length} chars`
             );
         }
 
@@ -269,10 +269,9 @@ export function handleASRTextPush(
 
                 if (pendingMessage && onThrottledBroadcast) {
                     const pendingData = pendingMessage.data;
-                    console.log(
-                        `[ASR_TEXT_PUSH] Throttled partial ` +
-                            `from ${pendingData.speakerId}: ` +
-                            `"${pendingData.text}"`
+                    logger.log(
+                        'ASR',
+                        `Throttled partial from ${pendingData.speakerId}: "${pendingData.text}"`
                     );
                     onThrottledBroadcast({
                         success: true,
@@ -286,16 +285,14 @@ export function handleASRTextPush(
                 }
             }, PARTIAL_THROTTLE_MS);
 
-            console.log(
-                `[ASR_TEXT_PUSH] Partial from ` +
-                    `${speakerId} queued for ` +
-                    `throttle: "${text}"`
+            logger.log(
+                'ASR',
+                `Partial from ${speakerId} queued for throttle: "${text}"`
             );
         } else {
-            console.log(
-                `[ASR_TEXT_PUSH] Partial from ` +
-                    `${speakerId} updated ` +
-                    `pending: "${text}"`
+            logger.log(
+                'ASR',
+                `Partial from ${speakerId} updated pending: "${text}"`
             );
         }
 

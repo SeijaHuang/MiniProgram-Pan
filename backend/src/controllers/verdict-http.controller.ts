@@ -11,6 +11,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { roomManager } from '../services/websocket/room-manager';
+import { logger } from '../utils/logger';
 
 /**
  * Path parameter validation schema
@@ -68,7 +69,7 @@ export class VerdictHttpController {
                 data: room.verdictResult,
             });
         } catch (error) {
-            console.error('[VerdictHttpController] Error:', error);
+            logger.error('VerdictHttp', 'Error:', error);
             res.status(500).json({
                 success: false,
                 error: 'Internal server error',

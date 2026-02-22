@@ -7,6 +7,7 @@ import {
     validateConnection,
     validateReadyRoomParticipant,
 } from './handler-utils';
+import { logger } from '../../utils/logger';
 
 export interface IEmojiTextResult {
     success: true;
@@ -65,8 +66,9 @@ export function handleEmojiText(
         emoji,
     };
 
-    console.log(
-        `[EMOJI_TEXT] Message from ${senderId} in room ${roomId}: "${emoji}"`
+    logger.log(
+        'EmojiText',
+        `Message from ${senderId} in room ${roomId}: "${emoji}"`
     );
 
     return {

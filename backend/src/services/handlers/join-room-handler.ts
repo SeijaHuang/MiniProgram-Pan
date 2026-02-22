@@ -16,6 +16,7 @@ import type { ConnectionManager } from '../websocket/connection-manager';
 import type { IRoom } from '../../models/entities/room';
 import { JoinRoomDataSchema } from '../../models/schemas/ws-message.schema';
 import { validatePayload } from './handler-utils';
+import { logger } from '../../utils/logger';
 
 export interface IJoinRoomResult {
     success: true;
@@ -59,10 +60,9 @@ export function handleJoinRoom(
 
     if (isAlreadyParticipant) {
         // User is already a participant, just bind the WebSocket connection
-        console.log(
-            `[JOIN_ROOM] User ${user.userId} is ` +
-                `already a participant, binding ` +
-                `WebSocket connection`
+        logger.log(
+            'JoinRoom',
+            `User ${user.userId} is already a participant, binding WebSocket connection`
         );
     } else {
         // User is not a participant, try to join
@@ -97,10 +97,9 @@ export function handleJoinRoom(
         finalRoom.roomId
     );
 
-    console.log(
-        `[JOIN_ROOM] User ${user.userId} connected ` +
-            `to room ${finalRoom.roomId} ` +
-            `(${finalRoom.participants.length}/2)`
+    logger.log(
+        'JoinRoom',
+        `User ${user.userId} connected to room ${finalRoom.roomId} (${finalRoom.participants.length}/2)`
     );
 
     return {
