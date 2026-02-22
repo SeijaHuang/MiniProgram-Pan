@@ -23,7 +23,7 @@
                 清汤大老爷判决书
             </text>
             <text class="verdict-header__case-no">
-                案件编号: NO.{{ verdict.caseNumber }}
+                案件编号: {{ verdict.caseNumber }}
             </text>
         </view>
 
@@ -85,12 +85,14 @@
             animation="{{ section3Animation }}"
         >
             <text class="verdict-section__title">
-                双方六维战力图
+                {{ hostNickName }} vs {{ guestNickName }} 六维战力图
             </text>
             <radar-chart
                 id="radarChart"
                 hostScores="{{ verdict.battleStats.host }}"
                 guestScores="{{ verdict.battleStats.guest }}"
+                hostName="{{ hostNickName }}"
+                guestName="{{ guestNickName }}"
                 size="{{ 500 }}"
             ></radar-chart>
         </view>
