@@ -58,7 +58,7 @@ jobs:
             set -e
             echo "=== 拉取最新代码 ==="
             cd /var/www/panleme/MiniProgram-Pan
-            git pull origin main
+            git pull origin master
 
             echo "=== 安装依赖 ==="
             cd backend
