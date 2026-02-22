@@ -6,7 +6,7 @@
  * 这些凭证有时效性，默认 7200 秒（2小时）后过期
  */
 
-import { BACKEND_CONFIG } from '../constants/config';
+import { API_BASE_URL } from '../constants/env';
 import type { ISTSCredentials, ISTSResponse } from '../types/sts-api';
 
 /** 凭证提前刷新时间（秒），在过期前 5 分钟刷新 */
@@ -116,7 +116,7 @@ class STSService {
     }> {
         return new Promise((resolve, reject) => {
             wx.request({
-                url: `${BACKEND_CONFIG.HTTP_BASE_URL}/v1/tencent/credentials`,
+                url: `${API_BASE_URL}/v1/tencent/credentials`,
                 method: 'GET',
                 header: {
                     'content-type': 'application/json',

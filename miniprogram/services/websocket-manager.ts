@@ -9,7 +9,8 @@
  * - Connection state tracking
  */
 
-import { BACKEND_CONFIG, WS_CONFIG } from '../constants/config';
+import { WS_CONFIG } from '../constants/config';
+import { WS_URL } from '../constants/env';
 
 type ConnectionState =
     | 'DISCONNECTED'
@@ -48,7 +49,7 @@ class WebSocketManager {
         this.callbacks = callbacks;
         this.state = 'CONNECTING';
 
-        const url = `${BACKEND_CONFIG.WS_BASE_URL}${BACKEND_CONFIG.WS_PATH}`;
+        const url = WS_URL;
         console.log(`[WebSocketManager] Connecting to ${url}`);
 
         this.socketTask = wx.connectSocket({

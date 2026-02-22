@@ -3,7 +3,7 @@
  * Handles room creation via HTTP API
  */
 
-import { BACKEND_CONFIG } from '../constants/config';
+import { API_BASE_URL } from '../constants/env';
 import type { IRoom } from '../models/room';
 import type { ICreateRoomResponse } from '../types/room-api';
 
@@ -19,7 +19,7 @@ class RoomService {
     }): Promise<IRoom> {
         return new Promise<IRoom>((resolve, reject) => {
             wx.request({
-                url: `${BACKEND_CONFIG.HTTP_BASE_URL}/v1/rooms`,
+                url: `${API_BASE_URL}/v1/rooms`,
                 method: 'POST',
                 header: {
                     'content-type': 'application/json',

@@ -9,7 +9,7 @@
  * - HTTP fallback to fetch verdict
  */
 
-import { BACKEND_CONFIG } from '../constants/config';
+import { API_BASE_URL } from '../constants/env';
 import type { IVerdictResult, IDimensionScores } from '../types/verdict';
 import type {
     IBackendVerdictResult,
@@ -157,9 +157,7 @@ class VerdictService {
     async fetchVerdict(roomId: string): Promise<IVerdictResult> {
         return new Promise<IVerdictResult>((resolve, reject) => {
             wx.request({
-                url:
-                    `${BACKEND_CONFIG.HTTP_BASE_URL}` +
-                    `/v1/rooms/${roomId}/judgments`,
+                url: `${API_BASE_URL}/v1/rooms/${roomId}/judgments`,
                 method: 'POST',
                 header: {
                     'content-type': 'application/json',
