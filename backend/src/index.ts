@@ -8,7 +8,6 @@ async function bootstrap() {
     loadEnv();
     validateEnv();
 
-    // 动态 import：确保 env 已经就位
     const { default: app } = await import('./app');
     const { initWebSocket } = await import('./ws');
     const { APP_CONFIG } = await import('./constants/config');
