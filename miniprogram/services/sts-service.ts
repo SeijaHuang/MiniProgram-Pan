@@ -8,6 +8,7 @@
 
 import { API_BASE_URL } from '../constants/env';
 import type { ISTSCredentials, ISTSResponse } from '../types/sts-api';
+import { logger } from '../utils/logger';
 
 /** 凭证提前刷新时间（秒），在过期前 5 分钟刷新 */
 const REFRESH_BUFFER_SECONDS = 300;
@@ -38,13 +39,13 @@ class STSService {
     async getCredentials(): Promise<ISTSCredentials> {
         // 检查缓存是否有效
         if (this.isCredentialsValid()) {
-            console.log('[STSService] Using cached credentials');
+            logger.log('STS', 'Using cached credentials');
             return this.cachedCredentials!.credentials;
         }
 
         // 如果正在获取，加入等待队列
         if (this.isFetching) {
-            console.log('[STSService] Waiting for pending fetch');
+            logger.log('STS', 'Waiting for pending fetch');
             return new Promise<ISTSCredentials>((resolve, reject) => {
                 this.pendingPromises.push({ resolve, reject });
             });
@@ -52,7 +53,7 @@ class STSService {
 
         // 开始获取新凭证
         this.isFetching = true;
-        console.log('[STSService] Fetching new credentials');
+        logger.log('STS', 'Fetching new credentials');
 
         try {
             const data = await this.fetchCredentials();
@@ -67,8 +68,9 @@ class STSService {
             });
             this.pendingPromises = [];
 
-            console.log(
-                '[STSService] Credentials fetched, expires at:',
+            logger.log(
+                'STS',
+                'Credentials fetched, expires at:',
                 new Date(data.expiredTime * 1000).toLocaleString()
             );
 

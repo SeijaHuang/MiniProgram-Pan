@@ -16,6 +16,7 @@ import {
     createTapMessage,
     type TDrumMessage,
 } from '../types/drum-websocket';
+import { logger } from '../utils/logger';
 
 import { wsManager } from './websocket-manager';
 
@@ -98,7 +99,7 @@ class DrumService {
             },
         });
 
-        console.log('[DrumService] Started listening for drum messages');
+        logger.log('Drum', 'Started listening for drum messages');
     }
 
     /**
@@ -124,7 +125,7 @@ class DrumService {
             });
         }
 
-        console.log('[DrumService] Initialized for room:', options.roomId);
+        logger.log('Drum', 'Initialized for room:', options.roomId);
 
         // Process any queued messages
         this.processQueuedMessages();
@@ -152,7 +153,7 @@ class DrumService {
             onMessage: undefined,
         });
 
-        console.log('[DrumService] Cleaned up');
+        logger.log('Drum', 'Cleaned up');
     }
 
     /**
@@ -165,8 +166,9 @@ class DrumService {
             return;
         }
 
-        console.log(
-            '[DrumService] Processing queued messages:',
+        logger.log(
+            'Drum',
+            'Processing queued messages:',
             this.messageQueue.length
         );
 
@@ -207,7 +209,7 @@ class DrumService {
         this.clearTapTimer();
 
         if (!wsManager.isConnected()) {
-            console.error('[DrumService] Not connected, cannot send taps');
+            logger.error('Drum', 'Not connected, cannot send taps');
             return;
         }
 
@@ -218,7 +220,7 @@ class DrumService {
         );
         wsManager.send(tapMessage);
 
-        console.log('[DrumService] Sent taps:', delta);
+        logger.log('Drum', 'Sent taps:', delta);
     }
 
     /**
@@ -231,7 +233,7 @@ class DrumService {
             return;
         }
 
-        console.log('[DrumService] Message received:', message.type);
+        logger.log('Drum', 'Message received:', message.type);
 
         // If handlers aren't ready, queue DRUM_READY and DRUM_START messages
         // Record receive time for accurate time sync
@@ -240,8 +242,9 @@ class DrumService {
                 message.type === EDrumMessageType.DrumReady ||
                 message.type === EDrumMessageType.DrumStart
             ) {
-                console.log(
-                    '[DrumService] Queuing message:',
+                logger.log(
+                    'Drum',
+                    'Queuing message:',
                     message.type,
                     'receivedAtMs:',
                     Date.now()

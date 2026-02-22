@@ -3,6 +3,8 @@
  * Vibration feedback for drum room interactions
  */
 
+import { logger } from './logger';
+
 /**
  * Trigger short vibration (15ms)
  * Used for tap feedback
@@ -11,7 +13,7 @@ export function vibrateShort(): void {
     wx.vibrateShort({
         type: 'medium',
         fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
-            console.warn('[Haptic] vibrateShort failed:', err.errMsg);
+            logger.warn('Haptic', 'vibrateShort failed:', err.errMsg);
         },
     });
 }
@@ -23,7 +25,7 @@ export function vibrateShort(): void {
 export function vibrateLong(): void {
     wx.vibrateLong({
         fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
-            console.warn('[Haptic] vibrateLong failed:', err.errMsg);
+            logger.warn('Haptic', 'vibrateLong failed:', err.errMsg);
         },
     });
 }

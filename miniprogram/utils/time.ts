@@ -3,6 +3,8 @@
  * Countdown and server time offset calculation utilities
  */
 
+import { logger } from './logger';
+
 /** Server time offset in milliseconds (serverTime - localTime) */
 let serverTimeOffsetMs: number = 0;
 
@@ -19,8 +21,9 @@ export function setServerTimeOffset(
 ): void {
     const clientTimeMs: number = receivedAtMs ?? Date.now();
     serverTimeOffsetMs = serverTimeMs - clientTimeMs;
-    console.log(
-        `[Time] Server offset set to ${serverTimeOffsetMs}ms (serverTime: ${serverTimeMs}, clientTime: ${clientTimeMs})`
+    logger.log(
+        'Time',
+        `Server offset set to ${serverTimeOffsetMs}ms (serverTime: ${serverTimeMs}, clientTime: ${clientTimeMs})`
     );
 }
 

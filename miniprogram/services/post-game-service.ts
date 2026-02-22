@@ -11,6 +11,7 @@
 import type { IPostGameEffectPayload } from '../types/verdict';
 import { EWSMessageType } from '../types/websocket-common';
 import type { IWSMessage } from '../types/websocket-common';
+import { logger } from '../utils/logger';
 
 import { wsManager } from './websocket-manager';
 
@@ -55,7 +56,7 @@ class PostGameService {
                     const message = JSON.parse(data) as IWSMessage;
                     this.handleMessage(message);
                 } catch (error: unknown) {
-                    console.error('[PostGameService] Parse error:', error);
+                    logger.error('PostGame', 'Parse error:', error);
                 }
             },
         });

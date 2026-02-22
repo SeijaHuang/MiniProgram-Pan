@@ -18,6 +18,7 @@ import type {
 } from '../types/verdict-ws';
 import { EWSMessageType } from '../types/websocket-common';
 import type { IWSMessage } from '../types/websocket-common';
+import { logger } from '../utils/logger';
 
 import { wsManager } from './websocket-manager';
 
@@ -119,16 +120,18 @@ class VerdictService {
                         const payload = message.data as IVerdictResultPayload;
                         const mapped = this.mapVerdictResult(payload.verdict);
                         this.cachedResult = mapped;
-                        console.log(
-                            '[VerdictService] Verdict received and cached'
+                        logger.log(
+                            'VerdictService',
+                            'Verdict received and cached'
                         );
                         if (this.resultHandler) {
                             this.resultHandler(mapped);
                         }
                     } else if (message.type === EWSMessageType.VerdictFailed) {
                         const payload = message.data as IVerdictFailedPayload;
-                        console.warn(
-                            '[VerdictService] Verdict failed:',
+                        logger.warn(
+                            'VerdictService',
+                            'Verdict failed:',
                             payload.error
                         );
                         if (this.errorHandler) {
@@ -136,12 +139,12 @@ class VerdictService {
                         }
                     }
                 } catch (error: unknown) {
-                    console.error('[VerdictService] Parse error:', error);
+                    logger.error('VerdictService', 'Parse error:', error);
                 }
             },
         });
 
-        console.log('[VerdictService] Listening for verdict messages');
+        logger.log('VerdictService', 'Listening for verdict messages');
     }
 
     /**

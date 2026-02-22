@@ -19,6 +19,7 @@ import { drumService } from '../../../services/drum-service';
 import { EPlayerRole } from '../../../types/websocket-common';
 import { playDrumSound, destroyAudioPool } from '../../../utils/audio';
 import { vibrateShort, vibrateLong } from '../../../utils/haptic';
+import { logger } from '../../../utils/logger';
 import {
     getRandomFlyText,
     getRandomTrajectory,
@@ -162,7 +163,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Page lifecycle: onLoad
      */
     onLoad(options: IDrumPageOptions): void {
-        console.log('[DrumRoom] onLoad', options);
+        logger.log('DrumRoom', 'onLoad', options);
 
         // TODO：Initialize audio pool
         // initAudioPool();
@@ -229,7 +230,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
                 this._handleServerResult(winnerRole);
             },
             onError: (message: string) => {
-                console.error('[DrumRoom] Service error:', message);
+                logger.error('DrumRoom', 'Service error:', message);
             },
         });
     },
@@ -238,7 +239,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Page lifecycle: onUnload
      */
     onUnload(): void {
-        console.log('[DrumRoom] onUnload');
+        logger.log('DrumRoom', 'onUnload');
         this._clearAllTimers();
         destroyAudioPool();
 
@@ -250,7 +251,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Start game flow - Wait for server messages
      */
     _startGame(): void {
-        console.log('[DrumRoom] Waiting for DRUM_READY from server...');
+        logger.log('DrumRoom', 'Waiting for DRUM_READY from server...');
 
         // Set initial phase
         this.setData({
@@ -262,7 +263,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Handle countdown complete event
      */
     onCountdownComplete(): void {
-        console.log('[DrumRoom] Countdown complete at:', {
+        logger.log('DrumRoom', 'Countdown complete at:', {
             nowServerMs: nowServerMs(),
             timeSinceStart: nowServerMs() - this._startAtMs,
             remainingToEnd: getTimeRemainingMs(this._endAtMs),
@@ -275,7 +276,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      */
     _startRunningPhase(): void {
         this._clearAllTimers();
-        console.log('[DrumRoom] Running phase start:', {
+        logger.log('DrumRoom', 'Running phase start:', {
             nowServerMs: nowServerMs(),
             endAtMs: this._endAtMs,
             remaining: getTimeRemainingMs(this._endAtMs),
@@ -325,7 +326,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Server should send DRUM_FINISH, this is fallback
      */
     _endRunningPhase(): void {
-        console.log('[DrumRoom] Local timer ended (fallback)');
+        logger.log('DrumRoom', 'Local timer ended (fallback)');
 
         this._clearAllTimers();
 
@@ -338,14 +339,14 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         drumService.flushPendingTaps();
 
         // Wait for server DRUM_RESULT (don't calculate locally)
-        console.log('[DrumRoom] Waiting for server result...');
+        logger.log('DrumRoom', 'Waiting for server result...');
     },
 
     /**
      * Show result overlay and navigate to chat room
      */
     _showResult(winnerRole: EPlayerRole): void {
-        console.log('[DrumRoom] Showing result, winner:', winnerRole);
+        logger.log('DrumRoom', 'Showing result, winner:', winnerRole);
 
         const isSelfWinner: boolean = winnerRole === this.data.selfRole;
 
@@ -384,7 +385,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             wx.redirectTo({
                 url,
                 fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
-                    console.error('[DrumRoom] Navigate failed:', err);
+                    logger.error('DrumRoom', 'Navigate failed:', err);
                 },
             });
         }, RESULT_DISPLAY_MS);
@@ -585,7 +586,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         joinerName: string,
         receivedAtMs: number
     ): void {
-        console.log('[DrumRoom] DRUM_READY received', {
+        logger.log('DrumRoom', 'DRUM_READY received', {
             serverTimeMs,
             hostRole,
             organizerName,
@@ -605,7 +606,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             phase: 'PREPARE_COUNTDOWN',
         });
 
-        console.log('[DrumRoom] Server time synced, waiting for DRUM_START...');
+        logger.log('DrumRoom', 'Server time synced, waiting for DRUM_START...');
     },
 
     /**
@@ -613,7 +614,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Starts countdown and game timer based on server timing
      */
     _handleDrumStart(startAtMs: number): void {
-        console.log('[DrumRoom] Time values:', {
+        logger.log('DrumRoom', 'Time values:', {
             startAtMs,
             endAtMs: this._endAtMs,
             nowServerMs: nowServerMs(),
@@ -631,7 +632,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             countdown.start();
         }
 
-        console.log('[DrumRoom] Game scheduled:', {
+        logger.log('DrumRoom', 'Game scheduled:', {
             startAtMs,
             endAtMs: this._endAtMs,
             nowServerMs: nowServerMs(),
@@ -643,7 +644,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Stops game and waits for result
      */
     _handleDrumFinish(): void {
-        console.log('[DrumRoom] DRUM_FINISH received', Date.now());
+        logger.log('DrumRoom', 'DRUM_FINISH received', Date.now());
 
         // Clear timers
         this._clearAllTimers();
@@ -657,7 +658,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         // Flush any pending taps
         drumService.flushPendingTaps();
 
-        console.log('[DrumRoom] Game finished, waiting for DRUM_RESULT...');
+        logger.log('DrumRoom', 'Game finished, waiting for DRUM_RESULT...');
     },
 
     /**
@@ -679,7 +680,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Handle DRUM_RESULT message from server
      */
     _handleServerResult(winnerRole: EPlayerRole): void {
-        console.log('[DrumRoom] DRUM_RESULT received, winner:', winnerRole);
+        logger.log('DrumRoom', 'DRUM_RESULT received, winner:', winnerRole);
 
         // Clear timers
         this._clearAllTimers();

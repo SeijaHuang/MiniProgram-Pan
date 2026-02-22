@@ -3,6 +3,8 @@
  * Sound effects management for drum room
  */
 
+import { logger } from './logger';
+
 /** Audio context pool for drum sounds */
 const AUDIO_POOL_SIZE: number = 5;
 let audioPool: WechatMiniprogram.InnerAudioContext[] = [];
@@ -26,12 +28,13 @@ export function initAudioPool(): void {
         ctx.volume = 0.8;
         ctx.onError(
             (err: WechatMiniprogram.InnerAudioContextOnErrorListenerResult) => {
-                console.warn(`[Audio] Pool ${i} error:`, err.errMsg);
+                logger.warn('Audio', `Pool ${i} error:`, err.errMsg);
                 // Disable audio if file not found
                 if (err.errCode === 10001 || err.errCode === -1) {
                     audioEnabled = false;
-                    console.warn(
-                        '[Audio] Drum sound not found, audio disabled'
+                    logger.warn(
+                        'Audio',
+                        'Drum sound not found, audio disabled'
                     );
                 }
             }
@@ -39,7 +42,7 @@ export function initAudioPool(): void {
         audioPool.push(ctx);
     }
 
-    console.log('[Audio] Pool initialized with', AUDIO_POOL_SIZE, 'contexts');
+    logger.log('Audio', 'Pool initialized with', AUDIO_POOL_SIZE, 'contexts');
 }
 
 /**

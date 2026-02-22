@@ -15,6 +15,7 @@ import type {
     IJoinAckMessage,
 } from '../types/room-websocket';
 import { EWSMessageType } from '../types/websocket-common';
+import { logger } from '../utils/logger';
 
 import { wsManager } from './websocket-manager';
 
@@ -36,7 +37,7 @@ class RoomWebSocketService {
                 this.handleMessage(data);
             },
             onConnect: () => {
-                console.log('[RoomWebSocketService] Connected');
+                logger.log('RoomWS', 'Connected');
                 // Rejoin room if reconnecting
                 if (this.currentRoomCode && this.currentUser) {
                     this.joinRoom(this.currentRoomCode, this.currentUser);
@@ -50,7 +51,7 @@ class RoomWebSocketService {
      */
     joinRoom(roomCode: string, user: IUser): void {
         if (!wsManager.isConnected()) {
-            console.error('[RoomWebSocketService] Not connected');
+            logger.error('RoomWS', 'Not connected');
             return;
         }
 
@@ -67,7 +68,7 @@ class RoomWebSocketService {
         };
 
         wsManager.send(message);
-        console.log(`[RoomWebSocketService] Sent JOIN_ROOM for ${roomCode}`);
+        logger.log('RoomWS', `Sent JOIN_ROOM for ${roomCode}`);
     }
 
     /**
@@ -82,10 +83,7 @@ class RoomWebSocketService {
             }
             // Other message types will be handled by other services
         } catch (error) {
-            console.error(
-                '[RoomWebSocketService] Failed to parse message:',
-                error
-            );
+            logger.error('RoomWS', 'Failed to parse message:', error);
         }
     }
 
@@ -93,7 +91,7 @@ class RoomWebSocketService {
      * Handle JOIN_ACK message
      */
     private handleJoinAck(message: IJoinAckMessage): void {
-        console.log('[RoomWebSocketService] JOIN_ACK received:', message.data);
+        logger.log('RoomWS', 'JOIN_ACK received:', message.data);
 
         if (this.joinAckHandler) {
             this.joinAckHandler(message.data.room);

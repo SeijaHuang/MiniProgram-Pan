@@ -14,6 +14,7 @@ import type {
 } from '../../../types/verdict';
 import { DIMENSION_LABELS, DIMENSION_KEYS } from '../../../types/verdict';
 import { EWSMessageType } from '../../../types/websocket-common';
+import { logger } from '../../../utils/logger';
 
 type AnimResult = WechatMiniprogram.AnimationExportResult;
 
@@ -157,7 +158,7 @@ Page({
                     this.initWithVerdict(result, currentRole);
                 })
                 .catch((error: Error) => {
-                    console.error('[Verdict] Failed to load:', error);
+                    logger.error('Verdict', 'Failed to load:', error);
                     void wx.showToast({
                         title: '加载判决书失败',
                         icon: 'none',
