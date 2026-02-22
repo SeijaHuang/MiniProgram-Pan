@@ -3,7 +3,7 @@ import http from 'http';
 
 import { loadEnv, validateEnv } from './utils/env-loader';
 let server: http.Server;
-// Load environment variables
+
 async function bootstrap() {
     loadEnv();
     validateEnv();
