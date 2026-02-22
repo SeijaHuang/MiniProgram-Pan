@@ -9,6 +9,7 @@
 import type { IRoom } from '../../models/entities/room';
 import type { IUser } from '../../models/entities/user';
 import { EPlayerRole, EGamePhase } from '../../types/websocket/drum';
+import { logger } from '../../utils/logger';
 
 /**
  * Drum Game State
@@ -80,8 +81,9 @@ export class DrumGameManager {
 
         this.games.set(roomId, game);
 
-        console.log(
-            `[DrumGameManager] Game initialized: ${roomId} (Organizer: ${game.organizer.nickname}, Joiner: ${game.joiner.nickname})`
+        logger.log(
+            'DrumGameManager',
+            `Game initialized: ${roomId} (Organizer: ${game.organizer.nickname}, Joiner: ${game.joiner.nickname})`
         );
 
         return game;
@@ -104,7 +106,7 @@ export class DrumGameManager {
         }
 
         game.phase = phase;
-        console.log(`[DrumGameManager] Game ${roomId} phase: ${phase}`);
+        logger.log('DrumGameManager', `Game ${roomId} phase: ${phase}`);
 
         return game;
     }
@@ -142,8 +144,9 @@ export class DrumGameManager {
         }
 
         if (game.phase !== EGamePhase.Running) {
-            console.warn(
-                `[DrumGameManager] Ignoring tap for game ${roomId} - not running`
+            logger.warn(
+                'DrumGameManager',
+                `Ignoring tap for game ${roomId} - not running`
             );
             return game;
         }
@@ -154,8 +157,9 @@ export class DrumGameManager {
             game.joinerScore += delta;
         }
 
-        console.log(
-            `[DrumGameManager] Game ${roomId} tap: ${role} +${delta} (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
+        logger.log(
+            'DrumGameManager',
+            `Game ${roomId} tap: ${role} +${delta} (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
         );
 
         return game;
@@ -184,8 +188,9 @@ export class DrumGameManager {
 
         game.phase = EGamePhase.Finished;
 
-        console.log(
-            `[DrumGameManager] Game ${roomId} result: ${winnerRole} wins (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
+        logger.log(
+            'DrumGameManager',
+            `Game ${roomId} result: ${winnerRole} wins (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
         );
 
         return {
@@ -202,7 +207,7 @@ export class DrumGameManager {
         const game = this.games.get(roomId);
         if (game) {
             this.games.delete(roomId);
-            console.log(`[DrumGameManager] Game ${roomId} cleaned up`);
+            logger.log('DrumGameManager', `Game ${roomId} cleaned up`);
         }
     }
 }

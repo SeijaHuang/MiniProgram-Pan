@@ -29,6 +29,7 @@ import type {
 } from '../../../types/verdict-waiting';
 import type { IVerdictFailedPayload } from '../../../types/verdict-ws';
 import { EWSMessageType } from '../../../types/websocket-common';
+import { logger } from '../../../utils/logger';
 
 import {
     createAnimationManager,
@@ -201,7 +202,7 @@ Page({
             },
         });
 
-        console.log('[VerdictWaiting] WebSocket listening started');
+        logger.log('VerdictWaiting', 'WebSocket listening started');
     },
 
     /**
@@ -211,7 +212,7 @@ Page({
     _handleVerdictResult(result: IVerdictResult): void {
         if (this._hasNavigated) return;
 
-        console.log('[VerdictWaiting] Verdict result received');
+        logger.log('VerdictWaiting', 'Verdict result received');
 
         // Clear timeout timer
         if (this._timeoutTimer !== null) {
@@ -240,7 +241,7 @@ Page({
     _handleVerdictError(payload: IVerdictFailedPayload): void {
         if (this._hasNavigated) return;
 
-        console.warn('[VerdictWaiting] Verdict failed:', payload.error);
+        logger.warn('VerdictWaiting', 'Verdict failed:', payload.error);
 
         // Clear timeout timer
         if (this._timeoutTimer !== null) {
@@ -494,8 +495,9 @@ Page({
         const userId: string = wx.getStorageSync('userId') ?? '';
 
         if (!roomId || !userId) {
-            console.warn(
-                '[VerdictWaiting] Cannot retry: missing roomId or userId'
+            logger.warn(
+                'VerdictWaiting',
+                'Cannot retry: missing roomId or userId'
             );
             this._cleanup();
             void wx.redirectTo({ url: '/pages/welcome/index' });
@@ -520,7 +522,7 @@ Page({
             timestamp: Date.now(),
         });
 
-        console.log('[VerdictWaiting] Sent VERDICT_RETRY');
+        logger.log('VerdictWaiting', 'Sent VERDICT_RETRY');
 
         // Restart animations and listening
         this._startVerdictListening();

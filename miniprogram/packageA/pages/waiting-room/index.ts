@@ -12,6 +12,7 @@ import { roomService } from '../../../services/room-service';
 import { roomWebSocketService } from '../../../services/room-websocket-service';
 import { wsManager } from '../../../services/websocket-manager';
 import { EPlayerRole } from '../../../types/websocket-common';
+import { logger } from '../../../utils/logger';
 
 /**
  * 视图模式类型
@@ -153,14 +154,14 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     initWebSocket(): void {
         wsManager.connect({
             onConnect: () => {
-                console.log('[WaitingRoom] WebSocket connected');
+                logger.log('WaitingRoom', 'WebSocket connected');
             },
             onDisconnect: () => {
-                console.log('[WaitingRoom] WebSocket disconnected');
+                logger.log('WaitingRoom', 'WebSocket disconnected');
                 void wx.showToast({ title: '连接已断开', icon: 'error' });
             },
             onError: error => {
-                console.error('[WaitingRoom] WebSocket error:', error);
+                logger.error('WaitingRoom', 'WebSocket error:', error);
                 void wx.showToast({ title: '连接错误', icon: 'error' });
             },
         });
@@ -293,7 +294,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     async createRoom(): Promise<void> {
         // 防止重复请求
         if (this.isCreatingRoom) {
-            console.warn('[WaitingRoom] Room creation already in progress');
+            logger.warn('WaitingRoom', 'Room creation already in progress');
             return;
         }
 
@@ -321,8 +322,9 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
             this.startWaitingTextCarousel();
 
-            console.log(
-                `[WaitingRoom] Room created - Code: ${room.roomCode}, Host: ${currentUser.userId}`
+            logger.log(
+                'WaitingRoom',
+                `Room created - Code: ${room.roomCode}, Host: ${currentUser.userId}`
             );
 
             // CRITICAL: 房主创建房间后立即通过 WebSocket 加入
@@ -330,7 +332,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             roomWebSocketService.joinRoom(room.roomCode, currentUser);
         } catch (error) {
             void wx.hideLoading();
-            console.error('[WaitingRoom] Create room failed:', error);
+            logger.error('WaitingRoom', 'Create room failed:', error);
             void wx.showToast({
                 title: error instanceof Error ? error.message : '创建房间失败',
                 icon: 'error',
@@ -415,7 +417,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     onConfirmJoin(): void {
         // 防止重复请求
         if (this.isJoiningRoom) {
-            console.warn('[WaitingRoom] Join request already in progress');
+            logger.warn('WaitingRoom', 'Join request already in progress');
             return;
         }
 
@@ -495,7 +497,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      * 处理房间加入成功
      */
     handleRoomJoined(room: IRoom): void {
-        console.log(room);
+        logger.log('WaitingRoom', room);
         void wx.hideLoading();
 
         // 释放加入房间的请求锁
@@ -619,7 +621,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             void wx.navigateTo({
                 url,
                 fail: err => {
-                    console.error('跳转失败:', err);
+                    logger.error('WaitingRoom', '跳转失败:', err);
                     void wx.showToast({
                         title: '跳转失败',
                         icon: 'error',

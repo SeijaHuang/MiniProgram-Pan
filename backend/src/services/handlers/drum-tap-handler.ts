@@ -16,6 +16,7 @@ import { EGamePhase } from '../../types/websocket/drum';
 import { drumGameManager } from '../websocket/drum-game-manager';
 import { DrumTapDataSchema } from '../../models/schemas/drum-message.schema';
 import { validatePayload } from './handler-utils';
+import { logger } from '../../utils/logger';
 
 export interface IDrumTapResult {
     success: true;
@@ -61,10 +62,9 @@ export function handleDrumTap(message: IDrumTapMessage): TDrumTapHandlerResult {
     // Record tap
     drumGameManager.recordTap(roomId, role, delta);
 
-    console.log(
-        `[DRUM_TAP] Room ${roomId}: ${role} +${delta} ` +
-            `(Organizer: ${game.organizerScore}, ` +
-            `Joiner: ${game.joinerScore})`
+    logger.log(
+        'DrumTap',
+        `Room ${roomId}: ${role} +${delta} (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
     );
 
     return {

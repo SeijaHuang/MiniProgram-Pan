@@ -16,6 +16,7 @@ import type {
     IASRTextMessage,
 } from '../types/asr-websocket';
 import { EWSMessageType, type IErrorMessage } from '../types/websocket-common';
+import { logger } from '../utils/logger';
 
 import { wsManager } from './websocket-manager';
 
@@ -90,8 +91,9 @@ class ASRService {
             },
         });
 
-        console.log(
-            `[ASRService] Initialized for room ${options.roomId}, speaker ${options.speakerId}`
+        logger.log(
+            'ASR',
+            `Initialized for room ${options.roomId}, speaker ${options.speakerId}`
         );
     }
 
@@ -102,7 +104,7 @@ class ASRService {
      */
     sendPartial(text: string): void {
         if (!this.isReady()) {
-            console.warn('[ASRService] Not ready, cannot send partial');
+            logger.warn('ASR', 'Not ready, cannot send partial');
             return;
         }
 
@@ -123,7 +125,7 @@ class ASRService {
      */
     sendFinal(text: string): void {
         if (!this.isReady()) {
-            console.warn('[ASRService] Not ready, cannot send final');
+            logger.warn('ASR', 'Not ready, cannot send final');
             return;
         }
 
@@ -137,7 +139,7 @@ class ASRService {
         // Send immediately
         this.sendASRTextPush(text, true);
 
-        console.log(`[ASRService] Sent final: "${text}"`);
+        logger.log('ASR', `Sent final: "${text}"`);
     }
 
     /**
@@ -150,7 +152,7 @@ class ASRService {
             clearTimeout(this.state.throttleTimer);
             this.state.throttleTimer = null;
         }
-        console.log('[ASRService] Sequence reset');
+        logger.log('ASR', 'Sequence reset');
     }
 
     /**
@@ -169,7 +171,7 @@ class ASRService {
         this.asrErrorHandler = null;
         this.unhandledMessageHandler = null;
 
-        console.log('[ASRService] Cleaned up');
+        logger.log('ASR', 'Cleaned up');
     }
 
     /**
@@ -193,7 +195,7 @@ class ASRService {
             const text = this.state.pendingPartial;
             this.state.pendingPartial = null;
             this.sendASRTextPush(text, false);
-            console.log(`[ASRService] Sent throttled partial: "${text}"`);
+            logger.log('ASR', `Sent throttled partial: "${text}"`);
         }
     }
 
@@ -235,7 +237,7 @@ class ASRService {
                 this.unhandledMessageHandler(data);
             }
         } catch (error) {
-            console.error('[ASRService] Failed to parse message:', error);
+            logger.error('ASR', 'Failed to parse message:', error);
         }
     }
 
@@ -245,8 +247,9 @@ class ASRService {
     private handleASRText(message: IASRTextMessage): void {
         const { speakerId, text, isFinal, seq } = message.data;
 
-        console.log(
-            `[ASRService] Received ASR_TEXT from ${speakerId}: "${text}" (final: ${isFinal}, seq: ${seq})`
+        logger.log(
+            'ASR',
+            `Received ASR_TEXT from ${speakerId}: "${text}" (final: ${isFinal}, seq: ${seq})`
         );
 
         if (this.asrTextReceiveHandler) {
@@ -258,7 +261,7 @@ class ASRService {
      * Handle ERROR message
      */
     private handleError(message: IErrorMessage): void {
-        console.error('[ASRService] Error from server:', message.data);
+        logger.error('ASR', 'Error from server:', message.data);
 
         if (this.asrErrorHandler) {
             this.asrErrorHandler(message.data.message);

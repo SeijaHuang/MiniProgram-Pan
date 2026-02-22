@@ -2,6 +2,7 @@
 import http from 'http';
 
 import { loadEnv, validateEnv } from './utils/env-loader';
+import { logger } from './utils/logger';
 let server: http.Server;
 
 async function bootstrap() {
@@ -16,21 +17,21 @@ async function bootstrap() {
     initWebSocket(server);
 
     server.listen(APP_CONFIG.PORT, () => {
-        console.log(`Server listening on port ${APP_CONFIG.PORT}`);
-        console.log(`Environment: ${APP_CONFIG.NODE_ENV}`);
+        logger.log('Server', `Server listening on port ${APP_CONFIG.PORT}`);
+        logger.log('Server', `Environment: ${APP_CONFIG.NODE_ENV}`);
     });
 }
 
 bootstrap().catch(e => {
-    console.error('Bootstrap failed:', e);
+    logger.error('Server', 'Bootstrap failed:', e);
     process.exit(1);
 });
 
 // Graceful shutdown handler
 function handleShutdown(signal: string): void {
-    console.log(`\n${signal} received. Shutting down gracefully...`);
+    logger.log('Server', `\n${signal} received. Shutting down gracefully...`);
     server.close(() => {
-        console.log('Server closed');
+        logger.log('Server', 'Server closed');
         process.exit(0);
     });
 }

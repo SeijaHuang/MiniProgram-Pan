@@ -1,4 +1,6 @@
 // app.ts
+import { logger } from './utils/logger';
+
 App<IAppOption>({
     globalData: {
         userInfo: {
@@ -15,7 +17,7 @@ App<IAppOption>({
         // 登录
         wx.login({
             success: res => {
-                console.log(res.code);
+                logger.log('App', res.code);
                 // 发送 res.code 到后台换取 openId, sessionKey, unionId
             },
         });

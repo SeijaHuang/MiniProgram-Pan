@@ -2,6 +2,7 @@
 
 import { DIMENSION_LABELS, DIMENSION_KEYS } from '../../types/verdict';
 import type { IDimensionScores } from '../../types/verdict';
+import { logger } from '../../utils/logger';
 
 /** Subset of Canvas 2D context methods used by this component */
 interface ICanvas2DContext {
@@ -101,7 +102,7 @@ Component({
                 .fields({ node: true, size: true }, res => {
                     const result = res as ICanvasNodeResult;
                     if (!result || !result.node) {
-                        console.error('[RadarChart] Canvas not found');
+                        logger.error('RadarChart', 'Canvas not found');
                         return;
                     }
                     const canvas: WechatMiniprogram.Canvas = result.node;

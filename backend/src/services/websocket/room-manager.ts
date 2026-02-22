@@ -12,6 +12,7 @@ import type { IRoom, IParticipant } from '../../models/entities/room';
 import type { IUser } from '../../models/entities/user';
 import { ERoomStatus } from '../../models/entities/room';
 import { EWSErrorCode } from '../../types/websocket';
+import { logger } from '../../utils/logger';
 
 export class RoomManager {
     private static instance: RoomManager;
@@ -50,8 +51,9 @@ export class RoomManager {
         this.rooms.set(roomId, room);
         this.roomCodeToId.set(roomCode, roomId);
 
-        console.log(
-            `[RoomManager] Room created: ${roomId} (code: ${roomCode}, host: ${hostUserId}) - waiting for participants`
+        logger.log(
+            'RoomManager',
+            `Room created: ${roomId} (code: ${roomCode}, host: ${hostUserId}) - waiting for participants`
         );
 
         return room;
@@ -128,12 +130,14 @@ export class RoomManager {
         // State transition: WAITING → READY (when 2nd user joins)
         if (room.participants.length === 2) {
             room.status = ERoomStatus.Ready;
-            console.log(
-                `[RoomManager] Room ${room.roomId} is now READY (2 participants)`
+            logger.log(
+                'RoomManager',
+                `Room ${room.roomId} is now READY (2 participants)`
             );
         } else {
-            console.log(
-                `[RoomManager] User ${user.userId} joined room ${room.roomId} (${room.participants.length}/2)`
+            logger.log(
+                'RoomManager',
+                `User ${user.userId} joined room ${room.roomId} (${room.participants.length}/2)`
             );
         }
 
@@ -160,8 +164,9 @@ export class RoomManager {
             p => p.user.userId !== userId
         );
 
-        console.log(
-            `[RoomManager] User ${userId} left room ${roomId} (${room.participants.length} remaining)`
+        logger.log(
+            'RoomManager',
+            `User ${userId} left room ${roomId} (${room.participants.length} remaining)`
         );
 
         // If room becomes empty, close it
@@ -169,8 +174,9 @@ export class RoomManager {
             room.status = ERoomStatus.Closed;
             this.rooms.delete(roomId);
             this.roomCodeToId.delete(room.roomCode);
-            console.log(
-                `[RoomManager] Room ${roomId} CLOSED (no participants)`
+            logger.log(
+                'RoomManager',
+                `Room ${roomId} CLOSED (no participants)`
             );
             return null;
         }
@@ -189,7 +195,7 @@ export class RoomManager {
         room.status = ERoomStatus.Closed;
         this.roomCodeToId.delete(room.roomCode);
         this.rooms.delete(roomId);
-        console.log(`[RoomManager] Room ${roomId} deleted`);
+        logger.log('RoomManager', `Room ${roomId} deleted`);
     }
 
     /**

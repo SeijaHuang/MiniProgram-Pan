@@ -12,6 +12,7 @@ import type {
     ISpeechTurnSwitchPayload,
 } from '../../../types/verdict-ws';
 import { EWSMessageType, EPlayerRole } from '../../../types/websocket-common';
+import { logger } from '../../../utils/logger';
 
 // 引入腾讯云语音识别插件
 const QCloudAIVoicePlugin = requirePlugin('QCloudAIVoice');
@@ -395,8 +396,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const userId: string | null = wx.getStorageSync('userId');
 
         if (!roomCode || !userId) {
-            console.warn(
-                '[ChatRoom] Cannot init ASR service: missing roomCode or userId'
+            logger.warn(
+                'ChatRoom',
+                'Cannot init ASR service: missing roomCode or userId'
             );
             return;
         }
@@ -413,14 +415,14 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 this.handleOpponentASRText(text, isFinal);
             },
             onError: (errorMessage: string) => {
-                console.error('[ChatRoom] ASR service error:', errorMessage);
+                logger.error('ChatRoom', 'ASR service error:', errorMessage);
             },
             onUnhandledMessage: (data: string) => {
                 this.handleUnhandledWsMessage(data);
             },
         });
 
-        console.log('[ChatRoom] ASR service initialized');
+        logger.log('ChatRoom', 'ASR service initialized');
     },
 
     /**
@@ -468,7 +470,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 [finalKey]: newFinal,
                 [liveKey]: '',
             });
-            console.log('[ChatRoom] Opponent final text:', newFinal);
+            logger.log('ChatRoom', 'Opponent final text:', newFinal);
         } else {
             this.setData({ [liveKey]: text });
         }
@@ -487,9 +489,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             // 注册回调函数
             this.initAsrCallbacks();
 
-            console.log('[ChatRoom] ASR manager initialized');
+            logger.log('ChatRoom', 'ASR manager initialized');
         } catch (err) {
-            console.error('[ChatRoom] Failed to initialize ASR manager:', err);
+            logger.error('ChatRoom', 'Failed to initialize ASR manager:', err);
             this.setData({
                 recognizeError: '语音识别初始化失败',
             });
@@ -508,7 +510,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     initAsrCallbacks(): void {
         // 空值检查：确保 asrManager 已初始化
         if (!this.asrManager) {
-            console.error('[ASR] Cannot init callbacks: asrManager is null');
+            logger.error(
+                'ChatRoom',
+                'Cannot init callbacks: asrManager is null'
+            );
             return;
         }
 
@@ -516,7 +521,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 1. 开始识别
         manager.OnRecognitionStart = (res: unknown) => {
-            console.log('[ASR] 开始识别', res);
+            logger.log('ChatRoom', '开始识别', res);
             this.setData({
                 isRecognizing: true,
                 recognizeError: null,
@@ -525,7 +530,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 3. 识别变化时（发送 partial，节流后）
         manager.OnRecognitionResultChange = (res: unknown) => {
-            console.log('[ASR] 识别变化时', res);
+            logger.log('ChatRoom', '识别变化时', res);
             const result = res as {
                 result?: { voice_text_str?: string };
             } | null;
@@ -539,7 +544,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 4. 一句话结束 — 立即累积到本地 final 并发送给对方
         manager.OnSentenceEnd = (res: unknown) => {
-            console.log('[ASR] 一句话结束', res);
+            logger.log('ChatRoom', '一句话结束', res);
             const result = res as {
                 result?: { voice_text_str?: string };
             } | null;
@@ -562,7 +567,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 5. 识别结束 — 仅处理未被 OnSentenceEnd 捕获的残余文本
         manager.OnRecognitionComplete = (res: unknown) => {
-            console.log('[ASR] 识别结束', res);
+            logger.log('ChatRoom', '识别结束', res);
             const { finalKey, liveKey } = this.getLocalSpeechKeys();
             const liveText: string = this.data[liveKey as keyof TSpeakerLive];
 
@@ -590,16 +595,16 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 6. 识别错误
         manager.OnError = (res: unknown) => {
-            console.log('[ASR] 识别失败', res);
+            logger.log('ChatRoom', '识别失败', res);
             this.handleRecognizeError('语音识别失败');
         };
 
         // 7. 录音结束（最长10分钟）时回调
         manager.OnRecorderStop = (res: unknown) => {
-            console.log('[ASR] 录音结束', res);
+            logger.log('ChatRoom', '录音结束', res);
         };
 
-        console.log('[ASR] All callbacks registered');
+        logger.log('ChatRoom', 'All callbacks registered');
     },
 
     /**
@@ -609,7 +614,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      */
     handleRecognizeError(errorMessage: string): void {
         // 1. 记录错误日志
-        console.error('[ASR] 识别错误', errorMessage);
+        logger.error('ChatRoom', '识别错误', errorMessage);
 
         // 2. 更新状态
         const { liveKey } = this.getLocalSpeechKeys();
@@ -833,8 +838,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const userId: string = wx.getStorageSync('userId') ?? '';
 
         if (!roomId || !userId) {
-            console.warn(
-                '[ChatRoom] Cannot send SPEECH_TURN_END: missing roomId or userId'
+            logger.warn(
+                'ChatRoom',
+                'Cannot send SPEECH_TURN_END: missing roomId or userId'
             );
             return;
         }
@@ -845,7 +851,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             timestamp: Date.now(),
         });
 
-        console.log('[ChatRoom] Sent SPEECH_TURN_END');
+        logger.log('ChatRoom', 'Sent SPEECH_TURN_END');
     },
 
     /**
@@ -858,11 +864,11 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 已经不在 SpeakerA 阶段，忽略
         if (phase !== EPhase.SpeakerA) {
-            console.log('[ChatRoom] SPEECH_TURN_SWITCH ignored');
+            logger.log('ChatRoom', 'SPEECH_TURN_SWITCH ignored');
             return;
         }
 
-        console.log('[ChatRoom] SPEECH_TURN_SWITCH → SpeakerB');
+        logger.log('ChatRoom', 'SPEECH_TURN_SWITCH → SpeakerB');
 
         const nextCanSpeak: boolean = this.computeCanSpeak(
             EPhase.SpeakerB,
@@ -900,7 +906,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        console.log('[ChatRoom] CHAT_COMPLETE received');
+        logger.log('ChatRoom', 'CHAT_COMPLETE received');
 
         // 停止所有录音/识别
         this.stopRecording();
@@ -980,7 +986,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         }
 
         if (!this.asrManager) {
-            console.error('[ASR] asrManager is not initialized');
+            logger.error('ChatRoom', 'asrManager is not initialized');
             void wx.showToast({
                 title: '语音识别未初始化',
                 icon: 'error',
@@ -1013,7 +1019,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             const credentials = await stsService.getCredentials();
             this.stsCredentials = credentials;
 
-            console.log('[ASR] Got STS credentials');
+            logger.log('ChatRoom', 'Got STS credentials');
 
             // 使用临时凭证启动 ASR
             if (this.asrManager) {
@@ -1029,10 +1035,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 // 设置录音状态
                 // 注意：isRecognizing 会在 OnRecognitionStart 回调中设置
                 this.setData({ isRecording: true });
-                console.log('[ASR] Recording started with STS credentials');
+                logger.log(
+                    'ChatRoom',
+                    'Recording started with STS credentials'
+                );
             }
         } catch (error) {
-            console.error('[ASR] Failed to get STS credentials:', error);
+            logger.error('ChatRoom', 'Failed to get STS credentials:', error);
             this.handleRecognizeError('获取凭证失败');
         }
     },
@@ -1046,7 +1055,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             // 使用 ASR 插件的 stop 方法（同时停止录音和识别）
             this.asrManager.stop();
 
-            console.log('[ASR] 已调用 stop 方法');
+            logger.log('ChatRoom', '已调用 stop 方法');
 
             // 设置录音状态为 false
             // 注意：isRecognizing 会在 OnRecognitionComplete 回调中设置为 false
@@ -1109,7 +1118,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      */
     sendEmojiViaWs(emoji: string): void {
         if (!wsManager.isConnected()) {
-            console.error('[ChatRoom] WebSocket not connected');
+            logger.error('ChatRoom', 'WebSocket not connected');
             return;
         }
 
@@ -1126,7 +1135,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             timestamp: Date.now(),
         });
 
-        console.log('[ChatRoom] Sent emoji:', emoji);
+        logger.log('ChatRoom', 'Sent emoji:', emoji);
     },
 
     /**
@@ -1160,8 +1169,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                     break;
             }
         } catch (error) {
-            console.error(
-                '[ChatRoom] Failed to parse unhandled message:',
+            logger.error(
+                'ChatRoom',
+                'Failed to parse unhandled message:',
                 error
             );
         }
@@ -1176,7 +1186,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        console.log('[ChatRoom] Received emoji from opponent:', emoji);
+        logger.log('ChatRoom', 'Received emoji from opponent:', emoji);
 
         this.addReaction(EReactionSource.Opponent, emoji);
     },

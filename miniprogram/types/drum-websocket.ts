@@ -3,6 +3,8 @@
  * Message protocols for drum room real-time communication
  */
 
+import { logger } from '../utils/logger';
+
 import { EPlayerRole } from './websocket-common';
 
 // Re-export EPlayerRole for convenience
@@ -137,7 +139,7 @@ export function parseDrumMessage(rawData: string): TDrumMessage | null {
         }
         return null;
     } catch (e) {
-        console.error('[DrumWS] Failed to parse message:', e);
+        logger.error('DrumWS', 'Failed to parse message:', e);
         return null;
     }
 }

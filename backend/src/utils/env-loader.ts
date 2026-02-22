@@ -6,6 +6,8 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
 
+import { logger } from './logger';
+
 /**
  * Load environment variables from .env file
  */
@@ -14,9 +16,12 @@ export function loadEnv(): void {
     const result = config({ path: envPath });
 
     if (result.error) {
-        console.warn('Warning: .env file not found, using default values');
+        logger.warn(
+            'EnvLoader',
+            'Warning: .env file not found, using default values'
+        );
     } else {
-        console.log('Environment variables loaded successfully');
+        logger.log('EnvLoader', 'Environment variables loaded successfully');
     }
 }
 
@@ -26,5 +31,5 @@ export function loadEnv(): void {
  */
 export function validateEnv(): void {
     // No strict validation needed
-    console.log('Environment variables loaded');
+    logger.log('EnvLoader', 'Environment variables loaded');
 }

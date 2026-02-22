@@ -9,6 +9,7 @@
 
 import type { WebSocket } from 'ws';
 import { roomManager } from './room-manager';
+import { logger } from '../../utils/logger';
 
 interface IConnectionData {
     connectionId: string;
@@ -39,8 +40,9 @@ export class ConnectionManager {
             connectionId,
             socket,
         });
-        console.log(
-            `[ConnectionManager] Registered connection: ${connectionId} (Total: ${this.connections.size})`
+        logger.log(
+            'ConnectionManager',
+            `Registered connection: ${connectionId} (Total: ${this.connections.size})`
         );
     }
 
@@ -58,8 +60,9 @@ export class ConnectionManager {
         connection.roomId = roomId;
         this.userToConnection.set(userId, connectionId);
 
-        console.log(
-            `[ConnectionManager] Bound connection ${connectionId} to user ${userId} in room ${roomId}`
+        logger.log(
+            'ConnectionManager',
+            `Bound connection ${connectionId} to user ${userId} in room ${roomId}`
         );
     }
 
@@ -76,8 +79,9 @@ export class ConnectionManager {
     sendToConnection(connectionId: string, message: unknown): void {
         const connection = this.connections.get(connectionId);
         if (!connection) {
-            console.warn(
-                `[ConnectionManager] Connection ${connectionId} not found, cannot send message`
+            logger.warn(
+                'ConnectionManager',
+                `Connection ${connectionId} not found, cannot send message`
             );
             return;
         }
@@ -86,8 +90,9 @@ export class ConnectionManager {
             // WebSocket.OPEN
             connection.socket.send(JSON.stringify(message));
         } else {
-            console.warn(
-                `[ConnectionManager] Connection ${connectionId} is not open, cannot send message`
+            logger.warn(
+                'ConnectionManager',
+                `Connection ${connectionId} is not open, cannot send message`
             );
         }
     }
@@ -99,8 +104,9 @@ export class ConnectionManager {
     broadcastToRoom(roomId: string, message: unknown): void {
         const room = roomManager.getRoomById(roomId);
         if (!room) {
-            console.warn(
-                `[ConnectionManager] Room ${roomId} not found, cannot broadcast`
+            logger.warn(
+                'ConnectionManager',
+                `Room ${roomId} not found, cannot broadcast`
             );
             return;
         }
@@ -115,8 +121,9 @@ export class ConnectionManager {
             }
         }
 
-        console.log(
-            `[ConnectionManager] Broadcast to room ${roomId} (${room.participants.length} participants)`
+        logger.log(
+            'ConnectionManager',
+            `Broadcast to room ${roomId} (${room.participants.length} participants)`
         );
     }
 
@@ -131,8 +138,9 @@ export class ConnectionManager {
     ): void {
         const room = roomManager.getRoomById(roomId);
         if (!room) {
-            console.warn(
-                `[ConnectionManager] Room ${roomId} not found, cannot broadcast`
+            logger.warn(
+                'ConnectionManager',
+                `Room ${roomId} not found, cannot broadcast`
             );
             return;
         }
@@ -147,8 +155,9 @@ export class ConnectionManager {
             }
         }
 
-        console.log(
-            `[ConnectionManager] Broadcast to room ${roomId} (excluding ${excludeConnectionId})`
+        logger.log(
+            'ConnectionManager',
+            `Broadcast to room ${roomId} (excluding ${excludeConnectionId})`
         );
     }
 
@@ -163,8 +172,9 @@ export class ConnectionManager {
             return;
         }
 
-        console.log(
-            `[ConnectionManager] Handling disconnect for ${connectionId}`
+        logger.log(
+            'ConnectionManager',
+            `Handling disconnect for ${connectionId}`
         );
 
         // Clean up user-to-connection mapping
@@ -174,8 +184,9 @@ export class ConnectionManager {
 
         // Remove connection
         this.connections.delete(connectionId);
-        console.log(
-            `[ConnectionManager] Removed connection ${connectionId} (Total: ${this.connections.size})`
+        logger.log(
+            'ConnectionManager',
+            `Removed connection ${connectionId} (Total: ${this.connections.size})`
         );
     }
 
@@ -203,8 +214,9 @@ export class ConnectionManager {
             }
         }
 
-        console.log(
-            `[ConnectionManager] Disconnected all connections for room ${roomId}`
+        logger.log(
+            'ConnectionManager',
+            `Disconnected all connections for room ${roomId}`
         );
     }
 

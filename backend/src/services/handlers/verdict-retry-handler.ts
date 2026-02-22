@@ -8,6 +8,7 @@ import { EWSErrorCode } from '../../types/websocket';
 import type { IVerdictRetryMessage } from '../../types/websocket/verdict';
 import { VerdictRetryDataSchema } from '../../models/schemas/verdict-message.schema';
 import { validatePayload, validateRoomParticipant } from './handler-utils';
+import { logger } from '../../utils/logger';
 
 /**
  * Handler result type
@@ -50,9 +51,7 @@ export function handleVerdictRetry(
     // 3. Check retry count
     const retryCount = room.verdictRetryCount || 0;
     if (retryCount >= VERDICT_CONFIG.MAX_RETRIES) {
-        console.log(
-            `[VERDICT_RETRY] Max retries reached ` + `for room ${roomId}`
-        );
+        logger.log('VerdictRetry', `Max retries reached for room ${roomId}`);
         return {
             success: true,
             roomId,
@@ -64,10 +63,9 @@ export function handleVerdictRetry(
     // 4. Reset status to allow retry
     room.verdictStatus = 'pending';
 
-    console.log(
-        `[VERDICT_RETRY] Retry requested for ` +
-            `room ${roomId} (attempt ` +
-            `${retryCount + 1}/${VERDICT_CONFIG.MAX_RETRIES})`
+    logger.log(
+        'VerdictRetry',
+        `Retry requested for room ${roomId} (attempt ${retryCount + 1}/${VERDICT_CONFIG.MAX_RETRIES})`
     );
 
     return {

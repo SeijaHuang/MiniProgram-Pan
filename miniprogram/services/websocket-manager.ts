@@ -9,7 +9,9 @@
  * - Connection state tracking
  */
 
-import { BACKEND_CONFIG, WS_CONFIG } from '../constants/config';
+import { WS_CONFIG } from '../constants/config';
+import { WS_URL } from '../constants/env';
+import { logger } from '../utils/logger';
 
 type ConnectionState =
     | 'DISCONNECTED'
@@ -41,23 +43,23 @@ class WebSocketManager {
      */
     connect(callbacks: IWebSocketManagerCallbacks = {}): void {
         if (this.state === 'CONNECTED' || this.state === 'CONNECTING') {
-            console.log('[WebSocketManager] Already connected or connecting');
+            logger.log('WS', 'Already connected or connecting');
             return;
         }
 
         this.callbacks = callbacks;
         this.state = 'CONNECTING';
 
-        const url = `${BACKEND_CONFIG.WS_BASE_URL}${BACKEND_CONFIG.WS_PATH}`;
-        console.log(`[WebSocketManager] Connecting to ${url}`);
+        const url = WS_URL;
+        logger.log('WS', `Connecting to ${url}`);
 
         this.socketTask = wx.connectSocket({
             url,
             success: () => {
-                console.log('[WebSocketManager] Connection initiated');
+                logger.log('WS', 'Connection initiated');
             },
             fail: error => {
-                console.error('[WebSocketManager] Connection failed:', error);
+                logger.error('WS', 'Connection failed:', error);
                 this.handleConnectionError();
             },
         });
@@ -74,7 +76,7 @@ class WebSocketManager {
         }
 
         this.socketTask.onOpen(() => {
-            console.log('[WebSocketManager] Connected');
+            logger.log('WS', 'Connected');
             this.state = 'CONNECTED';
             this.reconnectAttempts = 0;
             this.startHeartbeat();
@@ -91,12 +93,12 @@ class WebSocketManager {
         });
 
         this.socketTask.onClose(() => {
-            console.log('[WebSocketManager] Connection closed');
+            logger.log('WS', 'Connection closed');
             this.handleDisconnect();
         });
 
         this.socketTask.onError(error => {
-            console.error('[WebSocketManager] Error:', error);
+            logger.error('WS', 'Error:', error);
             if (this.callbacks.onError) {
                 this.callbacks.onError(error);
             }
@@ -109,22 +111,17 @@ class WebSocketManager {
      */
     send(message: object): void {
         if (!this.socketTask || this.state !== 'CONNECTED') {
-            console.error(
-                '[WebSocketManager] Cannot send message: not connected'
-            );
+            logger.error('WS', 'Cannot send message: not connected');
             return;
         }
 
         this.socketTask.send({
             data: JSON.stringify(message),
             success: () => {
-                console.log('[WebSocketManager] Message sent');
+                logger.log('WS', 'Message sent');
             },
             fail: error => {
-                console.error(
-                    '[WebSocketManager] Failed to send message:',
-                    error
-                );
+                logger.error('WS', 'Failed to send message:', error);
             },
         });
     }
@@ -137,7 +134,7 @@ class WebSocketManager {
 
         this.heartbeatTimer = setInterval(() => {
             if (this.state === 'CONNECTED' && this.socketTask) {
-                console.log('[WebSocketManager] Heartbeat');
+                logger.log('WS', 'Heartbeat');
                 // Could send a ping message here if needed
             }
         }, WS_CONFIG.HEARTBEAT_INTERVAL) as unknown as number;
@@ -182,15 +179,16 @@ class WebSocketManager {
      */
     private attemptReconnect(): void {
         if (this.reconnectAttempts >= WS_CONFIG.MAX_RECONNECT_ATTEMPTS) {
-            console.error('[WebSocketManager] Max reconnect attempts reached');
+            logger.error('WS', 'Max reconnect attempts reached');
             return;
         }
 
         this.reconnectAttempts++;
         this.state = 'RECONNECTING';
 
-        console.log(
-            `[WebSocketManager] Reconnecting... (${this.reconnectAttempts}/${WS_CONFIG.MAX_RECONNECT_ATTEMPTS})`
+        logger.log(
+            'WS',
+            `Reconnecting... (${this.reconnectAttempts}/${WS_CONFIG.MAX_RECONNECT_ATTEMPTS})`
         );
 
         this.reconnectTimer = setTimeout(() => {
@@ -212,7 +210,7 @@ class WebSocketManager {
         if (this.socketTask) {
             this.socketTask.close({
                 success: () => {
-                    console.log('[WebSocketManager] Disconnected');
+                    logger.log('WS', 'Disconnected');
                 },
             });
             this.socketTask = null;
