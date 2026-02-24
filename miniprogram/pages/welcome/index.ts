@@ -54,6 +54,12 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
             app.globalData.userInfo.nickName = storedNick;
         }
 
+        wx.request({
+            url: 'https://panleme.fun/health',
+            success: res => console.log('HTTP OK:', res.statusCode),
+            fail: err => console.log('HTTP Failed:', err),
+        });
+
         // 入场动画只播放一次
         if (!this.hasPlayedEntrance) {
             this.hasPlayedEntrance = true;
