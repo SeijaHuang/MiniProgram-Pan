@@ -59,7 +59,7 @@ class WebSocketManager {
                 logger.log('WS', 'Connection initiated');
             },
             fail: error => {
-                logger.error('WS', 'Connection failed:', error);
+                logger.error('WS', 'Error:', JSON.stringify(error));
                 this.handleConnectionError();
             },
         });
