@@ -35,7 +35,7 @@ const ENV_CONFIGS = {
     },
     trial: {
         apiBaseUrl: 'https://panleme.fun',
-        wsUrl: 'wss://panleme.fun/ws',
+        wsUrl: 'wss://111.231.76.133/ws',
         debug: true,
     },
     release: {
