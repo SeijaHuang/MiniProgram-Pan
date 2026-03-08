@@ -12,7 +12,7 @@ import crypto from 'crypto';
 
 import OpenAI from 'openai';
 
-import { OPENAI_CONFIG } from '../constants/config';
+import { AI_CONFIG } from '../constants/config';
 import {
     JUDGMENT_SYSTEM_PROMPT,
     buildJudgmentUserContent,
@@ -30,13 +30,13 @@ const REQUEST_TIMEOUT_MS = 60_000;
  * Create a singleton OpenAI client instance
  */
 function createClient(): OpenAI {
-    if (!OPENAI_CONFIG.API_KEY) {
-        throw new Error('OPENAI_API_KEY 未配置，无法调用 LLM');
+    if (!AI_CONFIG.API_KEY) {
+        throw new Error('AI_API_KEY 未配置，无法调用 LLM');
     }
 
     return new OpenAI({
-        apiKey: OPENAI_CONFIG.API_KEY,
-        ...(OPENAI_CONFIG.BASE_URL ? { baseURL: OPENAI_CONFIG.BASE_URL } : {}),
+        apiKey: AI_CONFIG.API_KEY,
+        ...(AI_CONFIG.BASE_URL ? { baseURL: AI_CONFIG.BASE_URL } : {}),
         timeout: REQUEST_TIMEOUT_MS,
     });
 }
@@ -267,7 +267,7 @@ export async function createJudgmentVerdict(
 
     const response = await client.chat.completions.create(
         {
-            model: OPENAI_CONFIG.MODEL,
+            model: AI_CONFIG.MODEL,
             messages: [
                 {
                     role: 'system',
