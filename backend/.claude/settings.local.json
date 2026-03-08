@@ -16,7 +16,9 @@
       "Bash(fi)",
       "Bash(done)",
       "Bash(npm run format:*)",
-      "Bash(timeout 8 npm run dev:*)"
+      "Bash(timeout 8 npm run dev:*)",
+      "Bash(git -C \"C:\\\\Users\\\\Shijia Huang\\\\WeChatProjects\\\\miniprogram-2\" diff HEAD -- backend/src/constants/config.ts)",
+      "Bash(git -C \"C:\\\\Users\\\\Shijia Huang\\\\WeChatProjects\\\\miniprogram-2\" diff HEAD -- backend/src/clients/openai.client.ts)"
     ]
   }
 }

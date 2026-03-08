@@ -37,13 +37,13 @@ export const VERDICT_CONFIG = {
     MAX_RETRIES: 3,
 } as const;
 
-export const OPENAI_CONFIG = {
-    /** OpenAI API key */
-    API_KEY: process.env.OPENAI_API_KEY || '',
-    /** OpenAI model to use */
-    MODEL: process.env.OPENAI_MODEL || 'gpt-4o',
-    /** Optional base URL for OpenAI-compatible APIs */
-    BASE_URL: process.env.OPENAI_BASE_URL,
+export const AI_CONFIG = {
+    /** AI API key */
+    API_KEY: process.env.AI_API_KEY || '',
+    /** AI model to use */
+    MODEL: process.env.AI_MODEL || '',
+    /** Optional base URL for AI-compatible APIs */
+    BASE_URL: process.env.AI_BASE_URL || '',
 } as const;
 
 export const TENCENT_CONFIG = {
