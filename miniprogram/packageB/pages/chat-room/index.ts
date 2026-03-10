@@ -215,7 +215,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const opponentName: string = options.opponentName
             ? decodeURIComponent(options.opponentName)
             : DEFAULT_OPPONENT_NAME;
-
         // 校验 roomCode
         if (!roomCode) {
             void wx.showToast({ title: '房间号无效', icon: 'error' });

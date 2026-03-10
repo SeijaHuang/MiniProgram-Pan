@@ -225,7 +225,7 @@ Page({
             }
         }
 
-        // Read participant nicknames from globalData (populated in waiting-room)
+        // Read participant nicknames from globalData
         const app = getApp<IAppOption>();
         const hostNickName: string =
             app.globalData.participants?.hostNickName || '玩家1';
