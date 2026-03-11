@@ -16,7 +16,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Two-player real-time interactive WeChat Mini Program ("申冤" app) with a Node.js backend. Users create/join rooms, compete in a drum-tapping game to decide speaking order, then take turns voicing grievances with real-time ASR transcription.
 
-**User Flow**: Welcome → Waiting Room → Drum Room (10s tap competition) → Chat Room (turn-based voice chat with ASR) → Verdict Waiting (AI analysis loading) → Verdict
+**User Flow**: Welcome (nickname modal on first visit if no name set) → Waiting Room → Drum Room (10s tap competition) → Chat Room (turn-based voice chat with ASR) → Verdict Waiting (AI analysis loading) → Verdict
+
+**Welcome Page Nickname Flow**:
+
+- Returning users (nickname stored) → navigate directly to waiting room
+- First-time users → bottom-sheet modal ("堂下何人，报上名来！") with:
+    - `type="nickname"` input (WeChat nickname picker, max 12 chars)
+    - Confirm ("击鼓申冤！") — saves via `nicknameService.saveNickName()`
+    - Skip ("稍后再说") — uses default name "申冤人" without saving
 
 **Tech Stack**:
 

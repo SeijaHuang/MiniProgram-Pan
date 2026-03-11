@@ -133,6 +133,10 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         this.initAnimations();
         this.initWebSocket();
         this.initUser();
+
+        wx.enableAlertBeforeUnload({
+            message: '退出后房间将失效，确定要离开吗？',
+        });
     },
 
     onShow(): void {
@@ -629,6 +633,27 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
                 },
             });
         }
+    },
+
+    /**
+     * 触发转发好友菜单
+     */
+    async handleForwardRoom(): Promise<void> {
+        await wx.showShareMenu({
+            withShareTicket: true,
+            menus: ['shareAppMessage'],
+        });
+    },
+
+    /**
+     * 页面分享配置
+     */
+    onShareAppMessage(): WechatMiniprogram.Page.ICustomShareContent {
+        console.log('roomCode', this.data.roomCode);
+        return {
+            title: '快来公堂对簿！清汤大老爷等你很久了！',
+            path: `/pages/waiting-room/index?room_id=${this.data.roomCode}`,
+        };
     },
 
     /**

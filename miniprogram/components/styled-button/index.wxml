@@ -5,6 +5,7 @@
         class="styled-button styled-button--{{ color }} {{ disabled ? 'styled-button--disabled' : '' }}"
         hover-class="{{ disabled ? '' : 'styled-button--pressed' }}"
         bindtap="handleTap"
+        open-type="{{ openType }}"
         style="{{ buttonStyle }}"
     >
         <!-- Light sweep effect layer -->

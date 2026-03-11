@@ -58,13 +58,6 @@
     flex: 1;
 }
 
-/* 按钮包装器 - 用于动画绑定 */
-.waiting-room__button-wrapper {
-    width: 800rpx;
-    display: flex;
-    justify-content: center;
-}
-
 /* ========================================
    Styled Button 在 Waiting Room 中的样式覆盖
    使用更具体的选择器来覆盖组件默认样式
@@ -73,8 +66,19 @@
     width: 600rpx;
 }
 
-/* 取消按钮包装器 */
+/* 按钮包装器 - 用于动画绑定 */
+.waiting-room__button-wrapper {
+    width: 800rpx;
+    display: flex;
+    justify-content: center;
+}
+
+/* 转发 + 取消按钮包装器 */
 .waiting-room__cancel-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 32rpx;
     margin-top: 120rpx;
 }
 
@@ -88,7 +92,7 @@
     width: 100%;
     padding: 0 50rpx;
     box-sizing: border-box;
-    flex:1
+    flex: 1;
 }
 
 /* 房间信息 */
@@ -322,4 +326,3 @@
 .waiting-room__participant-name--me {
     color: #ffd000;
 }
-
