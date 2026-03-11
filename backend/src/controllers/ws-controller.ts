@@ -261,6 +261,17 @@ export class WebSocketController {
             },
             connectionId
         );
+
+        // Early finish: if a player reached MAX_TAPS, end the game immediately
+        const game = drumGameManager.getGame(result.roomId);
+        if (
+            game &&
+            game.phase === EGamePhase.Running &&
+            (game.organizerScore >= DRUM_CONFIG.MAX_TAPS ||
+                game.joinerScore >= DRUM_CONFIG.MAX_TAPS)
+        ) {
+            WebSocketController.finishDrumGame(result.roomId, game.endAtMs);
+        }
     }
 
     /**
@@ -438,6 +449,15 @@ export class WebSocketController {
      * Finish drum game and broadcast result
      */
     private static finishDrumGame(roomId: string, endAtMs: number): void {
+        // Guard: game may have already been finished early
+        if (!drumGameManager.getGame(roomId)) {
+            logger.log(
+                'WSController',
+                `Game ${roomId} already finished, skipping`
+            );
+            return;
+        }
+
         // Broadcast DRUM_FINISH
         connectionManager.broadcastToRoom(roomId, {
             type: EWSMessageType.DrumFinish,

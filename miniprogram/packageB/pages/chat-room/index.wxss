@@ -245,6 +245,21 @@
     width: 100%;
     padding: 0 32rpx;
     box-sizing: border-box;
+    overflow-y: scroll;
+}
+
+.chat-room__dialog::-webkit-scrollbar {
+    width: 6rpx;
+}
+
+.chat-room__dialog::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3rpx;
+}
+
+.chat-room__dialog::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 3rpx;
 }
 
 .chat-room__dialog-inner {

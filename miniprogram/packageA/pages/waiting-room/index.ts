@@ -129,7 +129,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     isCreatingRoom: false,
     isJoiningRoom: false,
 
-    onLoad(): void {
+    onLoad(options: Record<string, string | undefined>): void {
         this.initAnimations();
         this.initWebSocket();
         this.initUser();
@@ -137,6 +137,24 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         wx.enableAlertBeforeUnload({
             message: '退出后房间将失效，确定要离开吗？',
         });
+
+        const roomId = options['room_id'];
+        if (roomId) {
+            const value = roomId.replace(/\D/g, '').slice(0, 6);
+            const display: string[] = [];
+            for (let i = 0; i < 6; i++) {
+                display.push(value[i] || '');
+            }
+            this.setData({
+                showJoinModal: true,
+                roomCodeInput: value,
+                roomCodeDisplay: display,
+                inputFocus: false,
+                errorType: null,
+                errorMessage: '',
+                isJoinButtonDisabled: value.length !== 6,
+            });
+        }
     },
 
     onShow(): void {
@@ -652,7 +670,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         console.log('roomCode', this.data.roomCode);
         return {
             title: '快来公堂对簿！清汤大老爷等你很久了！',
-            path: `/pages/waiting-room/index?room_id=${this.data.roomCode}`,
+            path: `/packageA/pages/waiting-room/index?room_id=${this.data.roomCode}`,
         };
     },
 
