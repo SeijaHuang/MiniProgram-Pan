@@ -116,7 +116,7 @@ function getScoreKey(role: EPlayerRole): 'organizerScore' | 'joinerScore' {
 const RUNNING_DURATION_MS: number = 10000;
 const RESULT_DISPLAY_MS: number = 2000;
 const FLY_TEXT_DURATION_MS: number = 800;
-const MAX_TAPS: number = 30;
+const MAX_TAPS: number = 60;
 const MAX_SCORE_FOR_PROGRESS: number = MAX_TAPS;
 
 Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({

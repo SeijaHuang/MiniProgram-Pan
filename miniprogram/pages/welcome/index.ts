@@ -8,12 +8,6 @@ interface WelcomePageData {
     ctaAnimation: AnimationResult;
     // 控制初始隐藏状态
     isEntranceReady: boolean;
-    // 昵称弹窗
-    showNicknameModal: boolean;
-    nicknameInput: string;
-    nicknameCharCount: number;
-    isNicknameConfirmDisabled: boolean;
-    nicknameModalAnimation: WechatMiniprogram.AnimationExportResult;
 }
 
 // 动画时序配置（毫秒）
@@ -35,24 +29,13 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
         taglineAnimation: {} as AnimationResult,
         ctaAnimation: {} as AnimationResult,
         isEntranceReady: false,
-        // 昵称弹窗
-        showNicknameModal: false,
-        nicknameInput: '',
-        nicknameCharCount: 0,
-        isNicknameConfirmDisabled: true,
-        nicknameModalAnimation: {} as WechatMiniprogram.AnimationExportResult,
     },
 
     hasPlayedEntrance: false,
 
     onLoad(): void {
-        // 初始化用户 ID 和昵称
+        // 初始化用户 ID
         nicknameService.getUserId();
-        const storedNick: string = wx.getStorageSync('userNickName') || '';
-        if (storedNick) {
-            const app = getApp<IAppOption>();
-            app.globalData.userInfo.nickName = storedNick;
-        }
 
         wx.request({
             url: 'https://panleme.fun/health',
@@ -152,95 +135,13 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
     },
 
     /**
-     * 「我要申冤！」点击处理
-     * 有昵称 → 直接跳转；无昵称 → 弹出昵称设置弹窗
+     * 「我要申冤！」点击处理 → 直接跳转等待室（昵称在等待室处理）
      */
     handleStartJudge(): void {
-        const app = getApp<IAppOption>();
-        const nickName: string = app.globalData.userInfo.nickName;
-
-        if (nickName) {
-            // 已有昵称，直接跳转
-            setTimeout(() => {
-                void wx.navigateTo({
-                    url: '/packageA/pages/waiting-room/index',
-                });
-            }, 250);
-        } else {
-            // 无昵称，弹出昵称设置弹窗
-            this.openNicknameModal();
-        }
-    },
-
-    /**
-     * 打开昵称弹窗并播放上滑动画
-     */
-    openNicknameModal(): void {
-        this.setData({
-            showNicknameModal: true,
-            nicknameInput: '',
-            nicknameCharCount: 0,
-            isNicknameConfirmDisabled: true,
-        });
-
-        // 弹窗上滑入场动画
-        const anim = wx.createAnimation({
-            duration: 350,
-            timingFunction: 'ease-out',
-        });
-        anim.translateY(0).step();
-        this.setData({ nicknameModalAnimation: anim.export() });
-    },
-
-    /**
-     * 昵称输入框变化
-     */
-    onNicknameInput(e: WechatMiniprogram.Input): void {
-        const value: string = e.detail.value;
-        this.setData({
-            nicknameInput: value,
-            nicknameCharCount: value.length,
-            isNicknameConfirmDisabled: !nicknameService.validate(value),
-        });
-    },
-
-    /**
-     * 「击鼓申冤！」确认按钮
-     */
-    onNicknameConfirm(): void {
-        const { nicknameInput } = this.data;
-        if (!nicknameService.validate(nicknameInput)) {
-            return;
-        }
-
-        nicknameService.saveNickName(nicknameInput);
-
-        this.setData({ showNicknameModal: false });
-
-        void wx.navigateTo({
-            url: '/packageA/pages/waiting-room/index',
-        });
-    },
-
-    /**
-     * 「稍后再说」次级按钮
-     * 使用默认值「申冤人」进入，不保存缓存
-     */
-    onNicknameSkip(): void {
-        const app = getApp<IAppOption>();
-        app.globalData.userInfo.nickName = '申冤人';
-
-        this.setData({ showNicknameModal: false });
-
-        void wx.navigateTo({
-            url: '/packageA/pages/waiting-room/index',
-        });
-    },
-
-    /**
-     * 点击遮罩关闭弹窗（不保存）
-     */
-    onNicknameModalMaskTap(): void {
-        this.setData({ showNicknameModal: false });
+        setTimeout(() => {
+            void wx.navigateTo({
+                url: '/packageA/pages/waiting-room/index',
+            });
+        }, 250);
     },
 });
