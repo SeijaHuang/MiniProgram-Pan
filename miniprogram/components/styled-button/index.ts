@@ -31,6 +31,10 @@ Component({
             type: String,
             value: '',
         },
+        openType: {
+            type: String,
+            value: '',
+        },
     },
 
     methods: {

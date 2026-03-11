@@ -215,7 +215,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const opponentName: string = options.opponentName
             ? decodeURIComponent(options.opponentName)
             : DEFAULT_OPPONENT_NAME;
-
         // 校验 roomCode
         if (!roomCode) {
             void wx.showToast({ title: '房间号无效', icon: 'error' });
@@ -972,6 +971,17 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      */
     onMicTouchCancel(): void {
         this.stopRecording();
+    },
+
+    /**
+     * 提前结束发言：跳过剩余倒计时，立即切换阶段
+     */
+    onEndEarlyTap(): void {
+        if (!this.data.canSpeak) {
+            return;
+        }
+        void wx.vibrateShort({ type: 'medium' });
+        this.switchPhase();
     },
 
     /**

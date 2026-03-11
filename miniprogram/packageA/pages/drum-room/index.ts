@@ -116,7 +116,8 @@ function getScoreKey(role: EPlayerRole): 'organizerScore' | 'joinerScore' {
 const RUNNING_DURATION_MS: number = 10000;
 const RESULT_DISPLAY_MS: number = 2000;
 const FLY_TEXT_DURATION_MS: number = 800;
-const MAX_SCORE_FOR_PROGRESS: number = 100;
+const MAX_TAPS: number = 30;
+const MAX_SCORE_FOR_PROGRESS: number = MAX_TAPS;
 
 Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     data: {
@@ -403,8 +404,14 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         const scoreKey: 'organizerScore' | 'joinerScore' = getScoreKey(
             this.data.selfRole
         );
-        const newScore: number = this.data[scoreKey] + 1;
+        const currentScore: number = this.data[scoreKey];
 
+        // Ignore taps beyond the cap
+        if (currentScore >= MAX_TAPS) {
+            return;
+        }
+
+        const newScore: number = currentScore + 1;
         this._updateScore(this.data.selfRole, newScore);
 
         // Trigger feedback

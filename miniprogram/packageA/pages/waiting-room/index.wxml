@@ -91,8 +91,15 @@
                 <text>{{ currentWaitingText }}</text>
             </view>
 
-            <!-- 取消按钮 -->
+            <!-- 转发和取消按钮 -->
             <view class="waiting-room__cancel-wrapper">
+                <styled-button
+                    text="转发给好友"
+                    color="yellow"
+                    icon="📨"
+                    bindtap="handleForwardRoom"
+                    openType="share"
+                ></styled-button>
                 <styled-button
                     text="取消审判"
                     color="grey"

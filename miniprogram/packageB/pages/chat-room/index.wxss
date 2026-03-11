@@ -8,7 +8,7 @@
 .chat-room {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    height: 100vh;
     background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
     position: relative;
     overflow: hidden;
@@ -241,9 +241,25 @@
 
 .chat-room__dialog {
     flex: 1;
+    min-height: 0;
     width: 100%;
     padding: 0 32rpx;
     box-sizing: border-box;
+    overflow-y: scroll;
+}
+
+.chat-room__dialog::-webkit-scrollbar {
+    width: 6rpx;
+}
+
+.chat-room__dialog::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3rpx;
+}
+
+.chat-room__dialog::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 3rpx;
 }
 
 .chat-room__dialog-inner {
@@ -332,6 +348,14 @@
     padding-bottom: 40rpx;
 }
 
+.chat-room__mic-buttons {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 40rpx;
+}
+
 .chat-room__mic {
     width: 160rpx;
     height: 160rpx;
@@ -373,6 +397,27 @@
     margin-top: 20rpx;
     font-size: 28rpx;
     color: rgba(255, 255, 255, 0.6);
+}
+
+.chat-room__end-btn {
+    width: 160rpx;
+    height: 160rpx;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+    box-shadow: 0 8rpx 30rpx rgba(239, 68, 68, 0.4);
+}
+
+.chat-room__end-btn:active {
+    transform: scale(0.95);
+}
+
+.chat-room__end-btn-icon {
+    font-size: 56rpx;
+    color: #ffffff;
+    font-weight: bold;
 }
 
 /* ==================== Emoji Panel ==================== */
