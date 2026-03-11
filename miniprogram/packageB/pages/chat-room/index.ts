@@ -974,6 +974,17 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
+     * 提前结束发言：跳过剩余倒计时，立即切换阶段
+     */
+    onEndEarlyTap(): void {
+        if (!this.data.canSpeak) {
+            return;
+        }
+        void wx.vibrateShort({ type: 'medium' });
+        this.switchPhase();
+    },
+
+    /**
      * 开始录音和语音识别
      * 使用 QCloudAIVoice 插件的 start 方法，同时启动录音和识别
      * 凭证通过 STS 服务从后端获取

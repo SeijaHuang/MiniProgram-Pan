@@ -100,13 +100,22 @@
 
     <!-- 麦克风按钮 -->
     <view class="chat-room__mic-area">
-        <view
-            class="chat-room__mic {{canSpeak ? (isRecording ? 'chat-room__mic--recording' : 'chat-room__mic--active') : 'chat-room__mic--disabled'}}"
-            bindtouchstart="onMicTouchStart"
-            bindtouchend="onMicTouchEnd"
-            bindtouchcancel="onMicTouchCancel"
-        >
-            <text class="chat-room__mic-icon">🎤</text>
+        <view class="chat-room__mic-buttons">
+            <view
+                class="chat-room__mic {{canSpeak ? (isRecording ? 'chat-room__mic--recording' : 'chat-room__mic--active') : 'chat-room__mic--disabled'}}"
+                bindtouchstart="onMicTouchStart"
+                bindtouchend="onMicTouchEnd"
+                bindtouchcancel="onMicTouchCancel"
+            >
+                <text class="chat-room__mic-icon">🎤</text>
+            </view>
+            <view
+                wx:if="{{canSpeak}}"
+                class="chat-room__end-btn"
+                bindtap="onEndEarlyTap"
+            >
+                <text class="chat-room__end-btn-icon">✕</text>
+            </view>
         </view>
         <text class="chat-room__mic-label">
             {{isRecording ? '松开结束' : (canSpeak ? '按住说话' : '等待发言')}}
