@@ -57,8 +57,8 @@ export class VerdictMapperService {
      */
     mapJudgmentToVerdict(
         judgment: IJudgmentResponse,
-        _hostUserId: string,
-        _participants: IParticipant[]
+        hostUserId: string,
+        participants: IParticipant[]
     ): IVerdictResult {
         // 1. Map dimension scores
         const hostScores = this.mapDimensionScores(judgment.radarChart.player1);
@@ -79,19 +79,33 @@ export class VerdictMapperService {
         const winnerId = hostWins ? 'host' : 'guest';
         const loserId = hostWins ? 'guest' : 'host';
 
-        // 4. Use LLM-generated punishment task
-        const punishmentTask = {
-            role: loserId as 'host' | 'guest',
-            task: judgment.punishmentTask,
-        };
-
-        // 5. Generate secret reports
+        // 4. Generate secret reports
         const secretReports = [
             this.generateSecretReport('host', hostScores),
             this.generateSecretReport('guest', guestScores),
         ];
 
-        // 6. Build verdict result
+        // 5. Replace 玩家1/玩家2 with actual nicknames in text fields
+        const hostParticipant = participants.find(
+            p => p.user.userId === hostUserId
+        );
+        const guestParticipant = participants.find(
+            p => p.user.userId !== hostUserId
+        );
+        const hostNickName = hostParticipant?.user.nickname ?? 'player1';
+        const guestNickName = guestParticipant?.user.nickname ?? 'player2';
+        const replaceNames = (text: string): string =>
+            text
+                .replace(/玩家1/gi, hostNickName)
+                .replace(/玩家2/gi, guestNickName);
+
+        const verdictText = replaceNames(judgment.verdict);
+        const punishmentTask = {
+            role: loserId as 'host' | 'guest',
+            task: replaceNames(judgment.punishmentTask),
+        };
+
+        // 7. Build verdict result
         return {
             caseNumber: judgment.caseNumber,
             winnerId: winnerId as 'host' | 'guest',
@@ -107,7 +121,7 @@ export class VerdictMapperService {
                 host: hostScores,
                 guest: guestScores,
             },
-            verdict: judgment.verdict,
+            verdict: verdictText,
             punishmentTask,
             secretReports,
         };
