@@ -32,7 +32,13 @@ type ErrorType = 'length' | 'not_found' | 'full' | 'started' | null;
  */
 interface IWaitingRoomPageData {
     viewMode: ViewMode;
-    // 弹窗相关
+    // 昵称弹窗相关
+    showNicknameModal: boolean;
+    nicknameInput: string;
+    nicknameCharCount: number;
+    isNicknameConfirmDisabled: boolean;
+    nicknameModalAnimation: WechatMiniprogram.AnimationExportResult;
+    // 加入房间弹窗相关
     showJoinModal: boolean;
     roomCodeInput: string;
     roomCodeDisplay: string[];
@@ -68,6 +74,7 @@ interface IWaitingRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     confirmButtonAnim: WechatMiniprogram.Animation | null;
     isCreatingRoom: boolean;
     isJoiningRoom: boolean;
+    pendingRoomId: string | null;
 }
 
 /**
@@ -94,7 +101,13 @@ const WAITING_TEXTS: string[] = [
 Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     data: {
         viewMode: 'entry',
-        // 弹窗相关
+        // 昵称弹窗相关
+        showNicknameModal: false,
+        nicknameInput: '',
+        nicknameCharCount: 0,
+        isNicknameConfirmDisabled: true,
+        nicknameModalAnimation: {} as WechatMiniprogram.AnimationExportResult,
+        // 加入房间弹窗相关
         showJoinModal: false,
         roomCodeInput: '',
         roomCodeDisplay: ['', '', '', '', '', ''],
@@ -128,6 +141,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     // 请求锁
     isCreatingRoom: false,
     isJoiningRoom: false,
+    pendingRoomId: null,
 
     onLoad(options: Record<string, string | undefined>): void {
         this.initAnimations();
@@ -138,22 +152,16 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             message: '退出后房间将失效，确定要离开吗？',
         });
 
-        const roomId = options['room_id'];
-        if (roomId) {
-            const value = roomId.replace(/\D/g, '').slice(0, 6);
-            const display: string[] = [];
-            for (let i = 0; i < 6; i++) {
-                display.push(value[i] || '');
-            }
-            this.setData({
-                showJoinModal: true,
-                roomCodeInput: value,
-                roomCodeDisplay: display,
-                inputFocus: false,
-                errorType: null,
-                errorMessage: '',
-                isJoinButtonDisabled: value.length !== 6,
-            });
+        const roomId = options['room_id'] ?? null;
+        const storedNick: string = wx.getStorageSync('userNickName') || '';
+
+        if (!storedNick) {
+            // 未设置昵称：先弹昵称框，房间号暂存
+            this.pendingRoomId = roomId;
+            this.openNicknameModal();
+        } else if (roomId) {
+            // 已有昵称且是分享链接进入：直接弹加入房间框
+            this.showJoinModalWithCode(roomId);
         }
     },
 
@@ -204,6 +212,102 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         this.setData({
             currentUser: { userId, nickname },
         });
+    },
+
+    /**
+     * 预填房间号并弹出加入房间弹窗
+     */
+    showJoinModalWithCode(roomId: string): void {
+        const value = roomId.replace(/\D/g, '').slice(0, 6);
+        const display: string[] = [];
+        for (let i = 0; i < 6; i++) {
+            display.push(value[i] || '');
+        }
+        this.setData({
+            showJoinModal: true,
+            roomCodeInput: value,
+            roomCodeDisplay: display,
+            inputFocus: false,
+            errorType: null,
+            errorMessage: '',
+            isJoinButtonDisabled: value.length !== 6,
+        });
+    },
+
+    /**
+     * 打开昵称弹窗并播放上滑动画
+     */
+    openNicknameModal(): void {
+        this.setData({
+            showNicknameModal: true,
+            nicknameInput: '',
+            nicknameCharCount: 0,
+            isNicknameConfirmDisabled: true,
+        });
+
+        const anim = wx.createAnimation({
+            duration: 350,
+            timingFunction: 'ease-out',
+        });
+        anim.translateY(0).step();
+        this.setData({ nicknameModalAnimation: anim.export() });
+    },
+
+    /**
+     * 昵称输入框变化
+     */
+    onNicknameInput(e: WechatMiniprogram.Input): void {
+        const value: string = e.detail.value;
+        this.setData({
+            nicknameInput: value,
+            nicknameCharCount: value.length,
+            isNicknameConfirmDisabled: !nicknameService.validate(value),
+        });
+    },
+
+    /**
+     * 「击鼓申冤！」确认按钮
+     */
+    onNicknameConfirm(): void {
+        const { nicknameInput } = this.data;
+        if (!nicknameService.validate(nicknameInput)) {
+            return;
+        }
+
+        nicknameService.saveNickName(nicknameInput);
+        this.initUser();
+
+        this.setData({ showNicknameModal: false });
+
+        if (this.pendingRoomId) {
+            const rid = this.pendingRoomId;
+            this.pendingRoomId = null;
+            this.showJoinModalWithCode(rid);
+        }
+    },
+
+    /**
+     * 「稍后再说」次级按钮：使用默认昵称进入，不保存到 Storage
+     */
+    onNicknameSkip(): void {
+        const app = getApp<IAppOption>();
+        app.globalData.userInfo.nickName = DEFAULT_NICK_NAME;
+
+        this.setData({ showNicknameModal: false });
+
+        if (this.pendingRoomId) {
+            const rid = this.pendingRoomId;
+            this.pendingRoomId = null;
+            this.showJoinModalWithCode(rid);
+        }
+    },
+
+    /**
+     * 点击遮罩关闭昵称弹窗（不保存）
+     */
+    onNicknameModalMaskTap(): void {
+        this.setData({ showNicknameModal: false });
+        this.pendingRoomId = null;
     },
 
     /**
