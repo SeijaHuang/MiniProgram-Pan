@@ -16,6 +16,7 @@ import {
     DEFAULT_JOINER_NAME,
 } from '../../../constants/defaultValue';
 import { drumService } from '../../../services/drum-service';
+import { nicknameService } from '../../../services/nickname-service';
 import { EPlayerRole } from '../../../types/websocket-common';
 import { playDrumSound, destroyAudioPool } from '../../../utils/audio';
 import { vibrateShort, vibrateLong } from '../../../utils/haptic';
@@ -83,7 +84,18 @@ interface IDrumPageData {
     winnerRole: EPlayerRole | null;
     resultTitle: string;
     resultSubtitle: string;
+    resultScoreText: string;
     resultVisible: boolean;
+
+    // Rule notification
+    showRuleNotification: boolean;
+    selfReady: boolean;
+    readyCount: number;
+
+    // Hint notification
+    showHintNotification: boolean;
+    hintNotificationContent: string;
+    maxTaps: number;
 }
 
 /** Page options interface (from waiting-room navigation) */
@@ -102,6 +114,7 @@ interface PrivateState {
     _runningTimer: ReturnType<typeof setInterval> | null;
     _flyTextTimer: ReturnType<typeof setInterval> | null;
     _resultTimer: ReturnType<typeof setInterval> | null;
+    _hintTimer: ReturnType<typeof setTimeout> | null;
 
     _lastShakeTime: number;
 }
@@ -114,7 +127,7 @@ function getScoreKey(role: EPlayerRole): 'organizerScore' | 'joinerScore' {
 /** Game timing constants */
 // const PREPARE_DURATION_MS: number = 3000;
 const RUNNING_DURATION_MS: number = 10000;
-const RESULT_DISPLAY_MS: number = 2000;
+const RESULT_DISPLAY_MS: number = 3000;
 const FLY_TEXT_DURATION_MS: number = 800;
 const MAX_TAPS: number = 60;
 const MAX_SCORE_FOR_PROGRESS: number = MAX_TAPS;
@@ -149,7 +162,16 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         winnerRole: null,
         resultTitle: '',
         resultSubtitle: '',
+        resultScoreText: '',
         resultVisible: false,
+
+        showRuleNotification: false,
+        selfReady: false,
+        readyCount: 0,
+
+        showHintNotification: true,
+        hintNotificationContent: '等待开始...',
+        maxTaps: MAX_TAPS,
     },
 
     // Private state (not in data)
@@ -158,6 +180,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     _runningTimer: null,
     _flyTextTimer: null,
     _resultTimer: null,
+    _hintTimer: null,
     _lastShakeTime: 0,
 
     /**
@@ -165,9 +188,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      */
     onLoad(options: IDrumPageOptions): void {
         logger.log('DrumRoom', 'onLoad', options);
-
-        // TODO：Initialize audio pool
-        // initAudioPool();
 
         // Parse options from previous page (waiting-room)
         const roomId: string = options.roomId || 'room-001';
@@ -217,6 +237,9 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
                     joinerName,
                     receivedAtMs
                 );
+            },
+            onPlayerReady: (readyCount: number) => {
+                this._handlePlayerReady(readyCount);
             },
             onStart: (startAtMs: number) => {
                 this._handleDrumStart(startAtMs);
@@ -269,7 +292,42 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             timeSinceStart: nowServerMs() - this._startAtMs,
             remainingToEnd: getTimeRemainingMs(this._endAtMs),
         });
+        this.setData({ showRuleNotification: false });
         this._startRunningPhase();
+    },
+
+    onRuleNotificationClose(): void {
+        this.setData({ showRuleNotification: false });
+    },
+
+    onHintNotificationClose(): void {
+        this._clearTimer('_hintTimer');
+        this.setData({ showHintNotification: false });
+    },
+
+    onResultNotificationClose(): void {
+        // Close is ignored — navigation will happen automatically after delay
+    },
+
+    /**
+     * Handle "开始游戏" button tap in rule notification
+     * Sends DRUM_START_REQUEST; game starts when both players tap
+     */
+    onStartGameTap(): void {
+        if (this.data.selfReady) {
+            return;
+        }
+        const userId: string = nicknameService.getUserId();
+        drumService.sendStartRequest(userId);
+        this.setData({ selfReady: true });
+    },
+
+    /**
+     * Handle DRUM_PLAYER_READY broadcast from server
+     * Updates readyCount so statusText reflects how many players are ready
+     */
+    _handlePlayerReady(readyCount: number): void {
+        this.setData({ readyCount });
     },
 
     /**
@@ -291,7 +349,15 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             tapEnabled: true,
             runningLeftSec: Math.ceil(RUNNING_DURATION_MS / 1000),
             runningLeftMs: RUNNING_DURATION_MS,
+            showHintNotification: true,
+            hintNotificationContent:
+                '击鼓抢麦：在接下来的10秒内请疯狂点击！谁点得多谁先发言！',
+            maxTaps: MAX_TAPS,
         });
+
+        this._hintTimer = setTimeout(() => {
+            this.setData({ showHintNotification: false });
+        }, 2500);
 
         // Track previous second to detect changes
         let prevSec: number = Math.ceil(RUNNING_DURATION_MS / 1000);
@@ -358,6 +424,10 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             ? '你先申冤！'
             : '先听对方说吧';
 
+        const { organizerName, joinerName, organizerScore, joinerScore } =
+            this.data;
+        const resultScoreText: string = `${organizerName}: ${organizerScore} vs ${joinerName}: ${joinerScore}`;
+
         vibrateLong();
 
         this.setData({
@@ -365,6 +435,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             winnerRole,
             resultTitle,
             resultSubtitle,
+            resultScoreText,
             resultVisible: true,
         });
 
@@ -564,7 +635,11 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      * Clear a specific timer
      */
     _clearTimer(
-        timerName: '_runningTimer' | '_flyTextTimer' | '_resultTimer'
+        timerName:
+            | '_runningTimer'
+            | '_flyTextTimer'
+            | '_resultTimer'
+            | '_hintTimer'
     ): void {
         if (this[timerName] !== null) {
             clearInterval(this[timerName]);
@@ -580,6 +655,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         this._clearTimer('_runningTimer');
         this._clearTimer('_flyTextTimer');
         this._clearTimer('_resultTimer');
+        this._clearTimer('_hintTimer');
     },
 
     /**
@@ -605,12 +681,15 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         // This avoids queue delay affecting the offset calculation
         setServerTimeOffset(serverTimeMs, receivedAtMs);
 
-        // Update player info from server
+        // Update player info from server and show rule notification
         this.setData({
             hostRole,
             organizerName,
             joinerName,
             phase: 'PREPARE_COUNTDOWN',
+            showRuleNotification: true,
+            selfReady: false,
+            showHintNotification: false,
         });
 
         logger.log('DrumRoom', 'Server time synced, waiting for DRUM_START...');
@@ -631,6 +710,9 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         // Calculate end time
         this._startAtMs = startAtMs;
         this._endAtMs = startAtMs + RUNNING_DURATION_MS;
+
+        // Both players ready — close rule notification and start countdown
+        this.setData({ showRuleNotification: false });
 
         // Start countdown component
         const countdown: WechatMiniprogram.Component.TrivialInstance | null =

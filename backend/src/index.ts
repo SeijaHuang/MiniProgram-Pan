@@ -1,18 +1,15 @@
-// Now import modules that depend on environment variables
+import './bootstrap'; // Must be first — loads .env before other modules read process.env
+
 import http from 'http';
 
-import { loadEnv, validateEnv } from './utils/env-loader';
+import app from './app';
+import { APP_CONFIG } from './constants/config';
 import { logger } from './utils/logger';
+import { initWebSocket } from './ws';
+
 let server: http.Server;
 
-async function bootstrap() {
-    loadEnv();
-    validateEnv();
-
-    const { default: app } = await import('./app');
-    const { initWebSocket } = await import('./ws');
-    const { APP_CONFIG } = await import('./constants/config');
-
+function bootstrap(): void {
     server = http.createServer(app);
     initWebSocket(server);
 
@@ -22,10 +19,7 @@ async function bootstrap() {
     });
 }
 
-bootstrap().catch(e => {
-    logger.error('Server', 'Bootstrap failed:', e);
-    process.exit(1);
-});
+bootstrap();
 
 // Graceful shutdown handler
 function handleShutdown(signal: string): void {

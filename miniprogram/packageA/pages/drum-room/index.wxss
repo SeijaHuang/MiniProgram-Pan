@@ -70,7 +70,7 @@
 .drum-header__timer-value {
     font-size: 56rpx;
     font-weight: 900;
-    color: #FFE66D;
+    color: #ffe66d;
     text-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.3);
 }
 
@@ -82,7 +82,7 @@
 
 .drum-header__timer-value--urgent {
     font-size: 72rpx;
-    color: #FF3B3B;
+    color: #ff3b3b;
     text-shadow:
         0 0 20rpx rgba(255, 59, 59, 0.8),
         0 4rpx 8rpx rgba(0, 0, 0, 0.4);
@@ -97,7 +97,8 @@
     align-items: flex-start;
     justify-content: space-between;
     width: 100%;
-    padding: 0 20rpx;}
+    padding: 0 20rpx;
+}
 
 .drum-score__player {
     display: flex;
@@ -112,22 +113,6 @@
 
 .drum-score__player--right {
     align-items: flex-end;
-}
-
-.drum-score__avatar {
-    width: 80rpx;
-    height: 80rpx;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.25);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 12rpx;
-    border: 4rpx solid rgba(255, 255, 255, 0.4);
-}
-
-.drum-score__avatar-emoji {
-    font-size: 40rpx;
 }
 
 .drum-score__name {
@@ -163,11 +148,11 @@
 }
 
 .drum-score__progress-bar--a {
-    background: linear-gradient(90deg, #4D96FF, #6DB3F2);
+    background: linear-gradient(90deg, #4d96ff, #6db3f2);
 }
 
 .drum-score__progress-bar--b {
-    background: linear-gradient(90deg, #FF006E, #FF4D8D);
+    background: linear-gradient(90deg, #ff006e, #ff4d8d);
 }
 
 .drum-score__vs {
@@ -180,7 +165,7 @@
 .drum-score__vs-text {
     font-size: 36rpx;
     font-weight: 900;
-    color: #FFE66D;
+    color: #ffe66d;
     text-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.4);
 }
 
@@ -205,7 +190,7 @@
 .drum-fly-text__content {
     font-size: 36rpx;
     font-weight: 700;
-    color: #FFE66D;
+    color: #ffe66d;
     text-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.5);
 }
 
@@ -224,8 +209,13 @@
     width: 280rpx;
     height: 280rpx;
     border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, #FF5252, #FF3B3B 40%, #B80000 100%);
-    border: 10rpx solid #FFD93D;
+    background: radial-gradient(
+        circle at 30% 30%,
+        #ff5252,
+        #ff3b3b 40%,
+        #b80000 100%
+    );
+    border: 10rpx solid #ffd93d;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -247,8 +237,10 @@
 .drum-button__text {
     font-size: 96rpx;
     font-weight: 900;
-    color: #FFD93D;
-    text-shadow: 0 6rpx 0 #8B0000, 0 8rpx 16rpx rgba(0, 0, 0, 0.4);
+    color: #ffd93d;
+    text-shadow:
+        0 6rpx 0 #8b0000,
+        0 8rpx 16rpx rgba(0, 0, 0, 0.4);
 }
 
 /* ========================================
@@ -307,91 +299,8 @@
 
 .drum-overlay__hint {
     font-size: 32rpx;
-    color: #FFE66D;
+    color: #ffe66d;
     letter-spacing: 4rpx;
     margin-top: 30rpx;
     text-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.3);
-}
-
-/* ========================================
-   Result Overlay
-   ======================================== */
-.drum-result {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.65);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 200;
-    opacity: 0;
-    visibility: hidden;
-}
-
-.drum-result--visible {
-    opacity: 1;
-    visibility: visible;
-}
-
-.drum-result__card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 60rpx 80rpx;
-    background: linear-gradient(135deg, #2D2D2D 0%, #1A1A1A 100%);
-    border-radius: 32rpx;
-    border: 4rpx solid #FFD93D;
-    position: relative;
-    overflow: hidden;
-    box-shadow:
-        0 0 60rpx rgba(255, 217, 61, 0.4),
-        0 20rpx 40rpx rgba(0, 0, 0, 0.5);
-}
-
-.drum-result__glow {
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(255, 217, 61, 0.15) 0%, transparent 50%);
-    pointer-events: none;
-}
-
-.drum-result__title {
-    font-size: 48rpx;
-    font-weight: 900;
-    color: #FFD93D;
-    text-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.4);
-    margin-bottom: 16rpx;
-    z-index: 1;
-}
-
-.drum-result__subtitle {
-    font-size: 32rpx;
-    color: rgba(255, 255, 255, 0.9);
-    margin-bottom: 30rpx;
-    z-index: 1;
-}
-
-.drum-result__scores {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    z-index: 1;
-}
-
-.drum-result__score {
-    font-size: 28rpx;
-    color: rgba(255, 255, 255, 0.8);
-}
-
-.drum-result__score-divider {
-    font-size: 28rpx;
-    color: rgba(255, 255, 255, 0.5);
-    margin: 0 20rpx;
 }

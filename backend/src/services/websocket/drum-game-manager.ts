@@ -9,6 +9,7 @@
 import type { IRoom } from '../../models/entities/room';
 import type { IUser } from '../../models/entities/user';
 import { EPlayerRole, EGamePhase } from '../../types/websocket/drum';
+import { DRUM_CONFIG } from '../../constants/config';
 import { logger } from '../../utils/logger';
 
 /**
@@ -24,6 +25,8 @@ interface IDrumGameState {
     joinerScore: number;
     startAtMs: number;
     endAtMs: number;
+    readyUserIds: Set<string>;
+    firstToMaxRole?: EPlayerRole;
 }
 
 /**
@@ -77,6 +80,7 @@ export class DrumGameManager {
             joinerScore: 0,
             startAtMs: 0,
             endAtMs: 0,
+            readyUserIds: new Set<string>(),
         };
 
         this.games.set(roomId, game);
@@ -94,6 +98,36 @@ export class DrumGameManager {
      */
     getGame(roomId: string): IDrumGameState | undefined {
         return this.games.get(roomId);
+    }
+
+    /**
+     * Get the number of players who have signalled ready.
+     */
+    getReadyCount(roomId: string): number {
+        return this.games.get(roomId)?.readyUserIds.size ?? 0;
+    }
+
+    /**
+     * Mark a player as ready to start the drum game.
+     * Returns true when both players have signalled ready.
+     */
+    markPlayerReady(roomId: string, userId: string): boolean {
+        const game = this.games.get(roomId);
+        if (!game) {
+            return false;
+        }
+
+        game.readyUserIds.add(userId);
+
+        const totalPlayers: number = 2;
+        const bothReady: boolean = game.readyUserIds.size >= totalPlayers;
+
+        logger.log(
+            'DrumGameManager',
+            `Game ${roomId} ready: ${game.readyUserIds.size}/${totalPlayers} (userId: ${userId})`
+        );
+
+        return bothReady;
     }
 
     /**
@@ -157,6 +191,15 @@ export class DrumGameManager {
             game.joinerScore += delta;
         }
 
+        // Record who first reaches MAX_TAPS (only once)
+        if (game.firstToMaxRole === undefined) {
+            if (game.organizerScore >= DRUM_CONFIG.MAX_TAPS) {
+                game.firstToMaxRole = EPlayerRole.Organizer;
+            } else if (game.joinerScore >= DRUM_CONFIG.MAX_TAPS) {
+                game.firstToMaxRole = EPlayerRole.Joiner;
+            }
+        }
+
         logger.log(
             'DrumGameManager',
             `Game ${roomId} tap: ${role} +${delta} (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
@@ -177,7 +220,10 @@ export class DrumGameManager {
 
         let winnerRole: EPlayerRole;
 
-        if (game.organizerScore > game.joinerScore) {
+        if (game.firstToMaxRole !== undefined) {
+            // Someone reached MAX_TAPS — first to reach it wins
+            winnerRole = game.firstToMaxRole;
+        } else if (game.organizerScore > game.joinerScore) {
             winnerRole = EPlayerRole.Organizer;
         } else if (game.joinerScore > game.organizerScore) {
             winnerRole = EPlayerRole.Joiner;

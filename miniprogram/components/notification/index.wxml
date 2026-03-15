@@ -1,0 +1,49 @@
+<!--components/notification/index.wxml-->
+<view
+    class="notification"
+    wx:if="{{ isOpen }}"
+>
+    <view
+        class="notification__box"
+        animation="{{ boxAnimation }}"
+    >
+        <!-- Close button -->
+        <view
+            class="notification__close"
+            bind:tap="onCloseTap"
+        >
+            <text class="notification__close-icon">×</text>
+        </view>
+
+        <!-- Title -->
+        <view class="notification__title">
+            <text class="notification__title-text">{{ title }}</text>
+        </view>
+
+        <!-- Content -->
+        <view class="notification__content">
+            <text class="notification__content-text">{{ content }}</text>
+        </view>
+
+        <!-- Status text -->
+        <view
+            class="notification__status"
+            wx:if="{{ statusText }}"
+        >
+            <text class="notification__status-text">{{ statusText }}</text>
+        </view>
+
+        <!-- Action button -->
+        <view
+            class="notification__button"
+            wx:if="{{ buttonText }}"
+        >
+            <styled-button
+                text="{{ buttonText }}"
+                color="yellow"
+                disabled="{{ buttonDisabled }}"
+                bind:tap="onButtonTap"
+            />
+        </view>
+    </view>
+</view>

@@ -43,8 +43,8 @@ export const TEXT_POOL_SIZE: number = 15;
 /** 文案出现间隔（毫秒） */
 export const TEXT_INTERVAL_MS: number = 3000;
 
-/** 卡片内最大可见文案条数（大于可视区域，让旧文案自然被 overflow:hidden 裁掉） */
-export const MAX_VISIBLE_TEXTS: number = 20;
+/** 卡片内最大可见文案条数（滑动窗口：超过后移除第一条，末尾追加新条） */
+export const MAX_VISIBLE_TEXTS: number = 10;
 
 /** AI 分析超时时间（毫秒） */
 export const ANALYSIS_TIMEOUT_MS: number = 90000;

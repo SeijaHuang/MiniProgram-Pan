@@ -29,7 +29,7 @@ export const DRUM_CONFIG = {
     /** Game duration (ms) */
     GAME_DURATION_MS: 10000,
     /** Max taps to win instantly */
-    MAX_TAPS: 30,
+    MAX_TAPS: 60,
 } as const;
 
 export const VERDICT_CONFIG = {

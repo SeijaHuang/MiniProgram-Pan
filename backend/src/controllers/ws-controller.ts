@@ -47,6 +47,7 @@ import type {
     IJoinRoomMessage,
     IChatSendMessage,
     IDrumTapMessage,
+    IDrumStartRequestMessage,
     IASRTextPushMessage,
     IEmojiSendMessage,
     ISpeechTurnEndMessage,
@@ -57,7 +58,7 @@ import type {
 } from '../types/websocket';
 import { EWSMessageType, EWSErrorCode, EGamePhase } from '../types/websocket';
 import { ERoomStatus } from '../models/entities/room';
-import { DRUM_CONFIG, WAITING_ROOM_CONFIG } from '../constants/config';
+import { DRUM_CONFIG } from '../constants/config';
 import { logger } from '../utils/logger';
 
 export class WebSocketController {
@@ -90,6 +91,13 @@ export class WebSocketController {
                     WebSocketController.handleDrumTapMessage(
                         connectionId,
                         message as IDrumTapMessage
+                    );
+                    break;
+
+                case EWSMessageType.DrumStartRequest:
+                    WebSocketController.handleDrumStartRequestMessage(
+                        connectionId,
+                        message as IDrumStartRequestMessage
                     );
                     break;
 
@@ -185,11 +193,10 @@ export class WebSocketController {
             timestamp: Date.now(),
         });
 
-        // If room is ready (2 players), start drum game
+        // If room is ready (2 players), initialize drum game and wait for
+        // frontend to send DRUM_START_REQUEST before launching
         if (result.room.status === ERoomStatus.Ready) {
-            setTimeout(() => {
-                WebSocketController.startDrumGame(result.room.roomId);
-            }, WAITING_ROOM_CONFIG.COUNTDOWN_MS);
+            WebSocketController.initDrumGame(result.room.roomId);
         }
     }
 
@@ -372,10 +379,11 @@ export class WebSocketController {
     }
 
     /**
-     * Start drum game flow
-     * Called when room is ready (2 players joined)
+     * Initialize drum game state and broadcast DRUM_READY
+     * Called when room reaches READY status (2 players joined).
+     * Does NOT start the countdown — waits for DRUM_START_REQUEST from client.
      */
-    private static startDrumGame(roomId: string): void {
+    private static initDrumGame(roomId: string): void {
         const room = roomManager.getRoomById(roomId);
         if (!room) {
             logger.error('WSController', `Room ${roomId} not found`);
@@ -410,6 +418,35 @@ export class WebSocketController {
             timestamp: Date.now(),
         });
 
+        logger.log(
+            'WSController',
+            `Drum game ${roomId} initialized, waiting for DRUM_START_REQUEST`
+        );
+    }
+
+    /**
+     * Launch drum game countdown and scheduling
+     * Called when frontend sends DRUM_START_REQUEST.
+     */
+    private static launchDrumGame(roomId: string): void {
+        const game = drumGameManager.getGame(roomId);
+        if (!game) {
+            logger.error(
+                'WSController',
+                `Cannot launch: game ${roomId} not initialized`
+            );
+            return;
+        }
+
+        // Guard: only launch from Waiting phase
+        if (game.phase !== EGamePhase.Waiting) {
+            logger.log(
+                'WSController',
+                `Game ${roomId} already launched (phase: ${game.phase}), ignoring`
+            );
+            return;
+        }
+
         // Set countdown phase
         drumGameManager.setPhase(roomId, EGamePhase.Countdown);
 
@@ -441,8 +478,41 @@ export class WebSocketController {
 
         logger.log(
             'WSController',
-            `Started drum game ${roomId} (start: ${startAtMs}, end: ${endAtMs})`
+            `Launched drum game ${roomId} (start: ${startAtMs}, end: ${endAtMs})`
         );
+    }
+
+    /**
+     * Handle DRUM_START_REQUEST message
+     * Called when a player signals they are ready to start the drum game.
+     * Broadcasts DRUM_PLAYER_READY after each signal, then launches the game
+     * once both players are ready.
+     */
+    private static handleDrumStartRequestMessage(
+        _connectionId: string,
+        message: IDrumStartRequestMessage
+    ): void {
+        const { roomId, userId } = message.data;
+
+        const bothReady: boolean = drumGameManager.markPlayerReady(
+            roomId,
+            userId
+        );
+        const readyCount: number = drumGameManager.getReadyCount(roomId);
+
+        // Broadcast ready state to all participants
+        connectionManager.broadcastToRoom(roomId, {
+            type: EWSMessageType.DrumPlayerReady,
+            data: {
+                roomId,
+                readyCount,
+            },
+            timestamp: Date.now(),
+        });
+
+        if (bothReady) {
+            WebSocketController.launchDrumGame(roomId);
+        }
     }
 
     /**

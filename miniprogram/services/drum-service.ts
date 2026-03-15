@@ -13,6 +13,7 @@ import {
     EDrumMessageType,
     EPlayerRole,
     parseDrumMessage,
+    createStartRequestMessage,
     createTapMessage,
     type TDrumMessage,
 } from '../types/drum-websocket';
@@ -44,11 +45,15 @@ type DrumStartHandler = (startAtMs: number) => void;
 /** Handler for DRUM_FINISH events */
 type DrumFinishHandler = () => void;
 
+/** Handler for DRUM_PLAYER_READY events */
+type DrumPlayerReadyHandler = (readyCount: number) => void;
+
 /** Options for initializing drum service */
 interface IDrumServiceOptions {
     roomId: string;
     selfRole: EPlayerRole;
     onReady: DrumReadyHandler;
+    onPlayerReady: DrumPlayerReadyHandler;
     onStart: DrumStartHandler;
     onTap: DrumTapHandler;
     onFinish: DrumFinishHandler;
@@ -64,6 +69,7 @@ class DrumService {
     private resultHandler: DrumResultHandler | null = null;
     private errorHandler: DrumErrorHandler | null = null;
     private readyHandler: DrumReadyHandler | null = null;
+    private playerReadyHandler: DrumPlayerReadyHandler | null = null;
     private startHandler: DrumStartHandler | null = null;
     private finishHandler: DrumFinishHandler | null = null;
 
@@ -110,6 +116,7 @@ class DrumService {
         this.currentRoomId = options.roomId;
         this.currentRole = options.selfRole;
         this.readyHandler = options.onReady;
+        this.playerReadyHandler = options.onPlayerReady;
         this.startHandler = options.onStart;
         this.tapHandler = options.onTap;
         this.finishHandler = options.onFinish;
@@ -143,6 +150,7 @@ class DrumService {
         this.resultHandler = null;
         this.errorHandler = null;
         this.readyHandler = null;
+        this.playerReadyHandler = null;
         this.startHandler = null;
         this.finishHandler = null;
 
@@ -181,6 +189,20 @@ class DrumService {
                 item.receivedAtMs
             );
         }
+    }
+
+    /**
+     * Send DRUM_START_REQUEST to server
+     * Call this when the local player clicks "开始游戏"
+     */
+    sendStartRequest(userId: string): void {
+        if (!wsManager.isConnected()) {
+            logger.error('Drum', 'Not connected, cannot send start request');
+            return;
+        }
+        const msg = createStartRequestMessage(this.currentRoomId, userId);
+        wsManager.send(msg);
+        logger.log('Drum', 'Sent DRUM_START_REQUEST for user:', userId);
     }
 
     /**
@@ -287,6 +309,10 @@ class DrumService {
                 );
                 break;
 
+            case EDrumMessageType.DrumPlayerReady:
+                this.handlePlayerReady(message.data.readyCount);
+                break;
+
             case EDrumMessageType.DrumStart:
                 this.handleStart(message.data.startAtMs);
                 break;
@@ -326,6 +352,16 @@ class DrumService {
                 joinerName,
                 receivedAtMs
             );
+        }
+    }
+
+    /**
+     * Handle DRUM_PLAYER_READY event
+     */
+    private handlePlayerReady(readyCount: number): void {
+        console.log(readyCount);
+        if (this.playerReadyHandler) {
+            this.playerReadyHandler(readyCount);
         }
     }
 

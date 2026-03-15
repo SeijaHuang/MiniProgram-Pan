@@ -364,6 +364,68 @@ if (radarChart) {
 
 ---
 
+### 8. Notification（通知弹窗组件）
+
+- **文件路径**: `miniprogram/components/notification/`
+- **组件名称**: `notification`
+- **功能**: 带遮罩的居中弹窗组件，支持标题、内容、状态文案和可选操作按钮
+
+#### 属性（Properties）
+
+| 属性名               | 类型    | 默认值 | 必填 | 说明                                 |
+| -------------------- | ------- | ------ | ---- | ------------------------------------ |
+| `isOpen`             | Boolean | false  | 否   | 是否显示弹窗                         |
+| `title`              | String  | ''     | 否   | 标题文案                             |
+| `content`            | String  | ''     | 否   | 正文内容                             |
+| `statusText`         | String  | ''     | 否   | 状态提示文案（如等待信息、结果摘要） |
+| `buttonText`         | String  | ''     | 否   | 操作按钮文案；为空时不显示按钮       |
+| `disabledAfterClick` | Boolean | false  | 否   | 按钮点击后是否禁用（防重复提交）     |
+
+#### 事件（Events）
+
+| 事件名      | 说明               | 回调参数 |
+| ----------- | ------------------ | -------- |
+| `close`     | 点击关闭按钮时触发 | -        |
+| `buttonTap` | 点击操作按钮时触发 | -        |
+
+#### 动画效果
+
+- 打开：盒子从 `scale(0.9) + opacity(0)` 淡入到正常（300ms，ease-out，`wx.createAnimation`）
+- 关闭：反向淡出（300ms，ease-in）
+
+#### 使用示例
+
+```xml
+<!-- 规则说明弹窗（带操作按钮） -->
+<notification
+    isOpen="{{ showRuleNotification }}"
+    title="规则"
+    content="接下来10秒内，谁先击鼓达到{{ maxTaps }}次，谁先发言"
+    statusText="{{ readyCount === 1 ? '等待对方准备' : '等待双方准备' }}"
+    buttonText="开始游戏"
+    disabledAfterClick="{{ true }}"
+    bind:close="onRuleNotificationClose"
+    bind:buttonTap="onStartGameTap"
+/>
+
+<!-- 结果展示弹窗（无按钮） -->
+<notification
+    isOpen="{{ resultVisible }}"
+    title="{{ resultTitle }}"
+    content="{{ resultSubtitle }}"
+    statusText="{{ resultScoreText }}"
+    bind:close="onResultNotificationClose"
+/>
+```
+
+#### 使用场景
+
+- Drum Room 游戏规则说明（等待双方就绪）
+- Drum Room 游戏结果展示（5 秒后自动跳转）
+- 其他需要居中提示并可带操作按钮的场景
+
+---
+
 ## 组件开发规范
 
 ### 文件结构
@@ -421,13 +483,14 @@ Component({
     - `miniprogram/components/countdown/` - 倒计时组件
     - `miniprogram/components/styled-title/` - 样式化标题
     - `miniprogram/components/avatar/` - 头像组件
+    - `miniprogram/components/notification/` - 通知弹窗
     - `miniprogram/components/radar-chart/` - 六维战力雷达图
     - `miniprogram/components/secret-modal/` - 密折弹窗
     - `miniprogram/components/post-game-effect/` - 赛后互动特效
 - **使用示例**：
     - `miniprogram/pages/welcome/index.wxml` - 使用 styled-button、styled-title
     - `miniprogram/packageA/pages/waiting-room/index.wxml` - 使用 styled-button、countdown、avatar
-    - `miniprogram/packageA/pages/drum-room/index.wxml` - 使用 countdown
+    - `miniprogram/packageA/pages/drum-room/index.wxml` - 使用 countdown、notification
     - `miniprogram/packageB/pages/verdict/index.wxml` - 使用 styled-button、radar-chart、secret-modal、post-game-effect
 - **开发规范**：
     - `../../CLAUDE.md` - 项目开发规范

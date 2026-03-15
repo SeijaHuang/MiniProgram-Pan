@@ -73,31 +73,33 @@
         <!-- Text card -->
         <view class="card" animation="{{ cardAnimation }}">
             <!-- Loading texts -->
-            <block wx:if="{{ !showFinalText }}">
-                <view
-                    wx:for="{{ visibleTexts }}"
-                    wx:key="id"
-                    class="card__line"
-                    animation="{{ textAnimations[index] }}"
-                >
+             <view class="card__wrapper"> 
+                <block wx:if="{{ !showFinalText }}">
                     <view
-                        class="card__gear"
-                        animation="{{ gearAnimation }}"
+                        wx:for="{{ visibleTexts }}"
+                        wx:key="id"
+                        class="card__line"
+                        animation="{{ textAnimations[index] }}"
                     >
-                        <text class="card__gear-emoji">⚙️</text>
+                        <view
+                            class="card__gear"
+                            animation="{{ gearAnimation }}"
+                        >
+                            <text class="card__gear-emoji">⚙️</text>
+                        </view>
+                        <text class="card__text">{{ item.text }}{{ dots }}</text>
                     </view>
-                    <text class="card__text">{{ item.text }}{{ dots }}</text>
-                </view>
-            </block>
+                </block>
 
-            <!-- Final text -->
-            <block wx:if="{{ showFinalText }}">
-                <view class="card__line card__line--final">
-                    <text class="card__text card__text--final">
-                        🔔 判决已出！准备宣判...
-                    </text>
-                </view>
-            </block>
+                <!-- Final text -->
+                <block wx:if="{{ showFinalText }}">
+                    <view class="card__line card__line--final">
+                        <text class="card__text card__text--final">
+                            🔔 判决已出！准备宣判...
+                        </text>
+                    </view>
+                </block>
+            </view>
         </view>
 
     </view>

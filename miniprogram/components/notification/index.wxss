@@ -1,0 +1,83 @@
+/* components/notification/index.wxss */
+
+.notification {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.notification__box {
+    position: relative;
+    width: 650rpx;
+    background-color: #ffffff;
+    border-radius: 32rpx;
+    border: 8rpx solid #000000;
+    padding: 60rpx 40rpx;
+    box-sizing: border-box;
+    box-shadow: 0 10rpx 0 0 #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.notification__close {
+    position: absolute;
+    top: 20rpx;
+    right: 30rpx;
+    width: 60rpx;
+    height: 60rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification__close-icon {
+    font-size: 56rpx;
+    color: #666666;
+    font-weight: 300;
+    line-height: 1;
+}
+
+.notification__title {
+    width: 100%;
+    margin-bottom: 32rpx;
+}
+
+.notification__title-text {
+    display: block;
+    text-align: center;
+    font-size: 56rpx;
+    font-weight: 700;
+    color: #e53935;
+}
+
+.notification__content-text {
+    display: block;
+    font-size: 32rpx;
+    color: #555555;
+    line-height: 1.6;
+    text-align: center;
+}
+
+.notification__status {
+    margin-top: 24rpx;
+}
+
+.notification__status-text {
+    display: block;
+    text-align: center;
+    font-size: 28rpx;
+    color: black;
+}
+
+.notification__button {
+    margin-top: 40rpx;
+    width: 100%;
+}

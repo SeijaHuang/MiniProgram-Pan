@@ -145,6 +145,12 @@
     transform: translateY(30px);
     display: flex;
     flex-direction: column;
+    justify-content: stretch;
+    align-items: center;
+}
+
+.card__wrapper {
+    width: 100%;
 }
 
 .card__line {
