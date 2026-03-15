@@ -3,7 +3,7 @@
     Phase: SPEAKER_A -> SPEAKER_B -> DONE
 -->
 <view class="chat-room">
-    <!-- 顶部区域：倒计时 + 发言舞台 -->
+    <!-- 顶部区域：倒计时 -->
     <view class="chat-room__top-section">
         <!-- 倒计时区域：发言者显示倒计时，非发言者显示提示文案 -->
         <view class="chat-room__countdown-area">
@@ -12,26 +12,6 @@
             </view>
             <view wx:else class="chat-room__listener-hint">
                 <text class="chat-room__listener-hint-text">{{listenerHint}}</text>
-            </view>
-        </view>
-
-        <!-- 发言舞台区 -->
-        <view class="chat-room__stage">
-            <!-- 提示文案 -->
-            <view class="chat-room__stage-hint" wx:if="{{canSpeak && !isRecording}}">
-                <text>按住麦克风开始申冤</text>
-            </view>
-            <view class="chat-room__stage-hint" wx:elif="{{!canSpeak}}">
-                <text>等待对方陈述...</text>
-            </view>
-
-            <!-- 录音中显示波纹动画 -->
-            <view class="chat-room__recording-wave" wx:if="{{isRecording}}">
-                <view class="chat-room__wave-bar"></view>
-                <view class="chat-room__wave-bar"></view>
-                <view class="chat-room__wave-bar"></view>
-                <view class="chat-room__wave-bar"></view>
-                <view class="chat-room__wave-bar"></view>
             </view>
         </view>
     </view>
@@ -68,49 +48,56 @@
         scroll-with-animation="{{true}}"
     >
         <view class="chat-room__dialog-inner">
-            <!-- Phase A 气泡（原告 / Organizer） -->
+            <!-- Phase A 区（原告 / Organizer / Host） -->
             <view
                 wx:if="{{speakerAFinal || speakerALive}}"
                 id="msg-speaker-a"
-                class="chat-room__message chat-room__message--{{localRole === 'Organizer' ? 'self' : 'other'}}"
+                class="chat-room__section"
             >
-                <view class="chat-room__message-bubble">
-                    <text class="chat-room__message-text">{{speakerAFinal}}{{speakerALive}}</text>
+                <view class="chat-room__section-title">
+                    <text>{{hostName}}的诉状</text>
                 </view>
-                <view class="chat-room__message-role">
-                    <text>原告</text>
+                <view class="chat-room__section-text">
+                    <text>{{speakerAFinal}}{{speakerALive}}</text>
                 </view>
             </view>
 
-            <!-- Phase B 气泡（被告 / Joiner） -->
+            <!-- 分割线（两段都有内容时显示） -->
+            <view
+                wx:if="{{(speakerAFinal || speakerALive) && (speakerBFinal || speakerBLive)}}"
+                class="chat-room__divider"
+            >
+                <text class="chat-room__divider-text">------------------我是分割线------------------</text>
+            </view>
+
+            <!-- Phase B 区（被告 / Joiner / Guest） -->
             <view
                 wx:if="{{speakerBFinal || speakerBLive}}"
                 id="msg-speaker-b"
-                class="chat-room__message chat-room__message--{{localRole === 'Joiner' ? 'self' : 'other'}}"
+                class="chat-room__section"
             >
-                <view class="chat-room__message-bubble">
-                    <text class="chat-room__message-text">{{speakerBFinal}}{{speakerBLive}}</text>
+                <view class="chat-room__section-title">
+                    <text>{{guestName}}的诉状</text>
                 </view>
-                <view class="chat-room__message-role">
-                    <text>被告</text>
+                <view class="chat-room__section-text">
+                    <text>{{speakerBFinal}}{{speakerBLive}}</text>
                 </view>
             </view>
         </view>
     </scroll-view>
 
-    <!-- 麦克风按钮 -->
-    <view class="chat-room__mic-area">
+    <!-- 麦克风按钮（仅发言者显示） -->
+    <view wx:if="{{canSpeak}}" class="chat-room__mic-area">
         <view class="chat-room__mic-buttons">
             <view
-                class="chat-room__mic {{canSpeak ? (isRecording ? 'chat-room__mic--recording' : 'chat-room__mic--active') : 'chat-room__mic--disabled'}}"
+                class="chat-room__mic {{isRecording ? 'chat-room__mic--recording' : 'chat-room__mic--active'}}"
                 bindtouchstart="onMicTouchStart"
                 bindtouchend="onMicTouchEnd"
                 bindtouchcancel="onMicTouchCancel"
             >
                 <text class="chat-room__mic-icon">🎤</text>
             </view>
-            <view
-                wx:if="{{canSpeak}}"
+            <view 
                 class="chat-room__end-btn"
                 bindtap="onEndEarlyTap"
             >
@@ -118,22 +105,56 @@
             </view>
         </view>
         <text class="chat-room__mic-label">
-            {{isRecording ? '松开结束' : (canSpeak ? '按住说话' : '等待发言')}}
+            {{isRecording ? '松开结束' : '按住说话'}}
         </text>
     </view>
 
-    <!-- 底部表情面板 -->
-    <view class="chat-room__emoji-panel {{canReact ? '' : 'chat-room__emoji-panel--disabled'}}">
-        <view
-            wx:for="{{emojiList}}"
-            wx:key="*this"
-            class="chat-room__emoji-btn"
-            data-emoji="{{item}}"
-            data-index="{{index}}"
-            bindtap="onEmojiTap"
-            animation="{{emojiAnimations[index]}}"
-        >
-            <text class="chat-room__emoji-text">{{item}}</text>
+    <!-- 底部表情面板（仅非发言者显示） -->
+    <view wx:if="{{!canSpeak}}" class="chat-room__emoji-panel">
+        <text class="chat-room__emoji-hint">用表情包宣泄你的不满吧，大老爷看不到的哦~</text>
+        <view class="chat-room__emoji-grid">
+            <view
+                wx:for="{{emojiList}}"
+                wx:key="*this"
+                class="chat-room__emoji-btn"
+                data-emoji="{{item}}"
+                data-index="{{index}}"
+                bindtap="onEmojiTap"
+                animation="{{emojiAnimations[index]}}"
+            >
+                <text class="chat-room__emoji-text">{{item}}</text>
+            </view>
+        </view>
+    </view>
+
+    <!-- 提前结束确认弹窗 -->
+    <notification
+        isOpen="{{showEndEarlyNotification}}"
+        title="警告"
+        content="这就没话说了？看来也没什么苦吗！"
+        buttonText="我说完了"
+        bind:close="onEndEarlyCancel"
+        bind:buttonTap="onEndEarlyConfirm"
+    />
+
+    <!-- 告状须知弹窗 -->
+    <notification
+        isOpen="{{showNotification}}"
+        title="告状须知"
+        content="长按点击麦克风，抓紧属于你的60秒吐槽机会，向青天大老爷好好诉诉苦吧（注意不要松手哦）"
+        buttonText="我明白了"
+        bind:close="onNotificationDismiss"
+        bind:buttonTap="onNotificationDismiss"
+    />
+
+    <!-- 切换提示遮罩 -->
+    <view
+        wx:if="{{showSwitchNotification}}"
+        class="chat-room__switch-mask"
+        catchtouchmove="preventTouchMove"
+    >
+        <view class="chat-room__switch-content">
+            <text class="chat-room__switch-text">下一位</text>
         </view>
     </view>
 

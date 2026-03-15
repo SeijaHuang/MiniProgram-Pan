@@ -3,6 +3,7 @@
  */
 
 import { asrService } from '../../../services/asr-service';
+import { nicknameService } from '../../../services/nickname-service';
 import { stsService } from '../../../services/sts-service';
 import { wsManager } from '../../../services/websocket-manager';
 import type { IEmojiReceiveData } from '../../../types/emoji-websocket';
@@ -40,6 +41,11 @@ interface IReaction {
 }
 
 interface IChatRoomPageData {
+    // 告状须知弹窗
+    showNotification: boolean;
+    // 提前结束确认弹窗
+    showEndEarlyNotification: boolean;
+
     // 房间标识
     roomCode: string;
 
@@ -51,7 +57,9 @@ interface IChatRoomPageData {
 
     // 派生权限
     canSpeak: boolean;
-    canReact: boolean;
+
+    // 切换提示
+    showSwitchNotification: boolean;
 
     // 倒计时状态
     countdownClass: 'normal' | 'warn' | 'danger';
@@ -85,6 +93,10 @@ interface IChatRoomPageData {
     listenerHint: string;
     // 对方昵称
     opponentName: string;
+    // 原告（Organizer）昵称
+    hostName: string;
+    // 被告（Joiner）昵称
+    guestName: string;
 }
 
 type TSpeakerFinal = Pick<IChatRoomPageData, 'speakerAFinal' | 'speakerBFinal'>;
@@ -94,33 +106,36 @@ type TSpeakerLive = Pick<IChatRoomPageData, 'speakerALive' | 'speakerBLive'>;
 interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     timerId: number | null;
     listenerHintTimerId: number | null;
+    switchNotificationTimerId: number | null;
     reactionIdCounter: number;
     myReactionTimeouts: number[];
     opponentReactionTimeouts: number[];
     rpxToPx: number;
     asrManager: AsrManager; // 语音识别管理器
     stsCredentials: ISTSCredentials | null; // STS 临时凭证
+    _originalRole: EPlayerRole; // Room creator role (for verdict navigation)
 }
 
 const EMOJI_LIST = [
     '😠',
     '😢',
     '❤️',
-    '🤔',
+    '💩',
     '😂',
     '😅',
     '🥺',
-    '💔',
+    '💨',
     '👍',
     '👎',
-    '🙄',
-    '😤',
-    '🤯',
-    '😭',
+    '🧎',
+    '💣',
+    '👄',
+    '🌹',
+    '🧧',
 ];
 const MAX_REACTIONS = 3;
-const REACTION_DURATION_MIN = 3000;
-const REACTION_DURATION_MAX = 5000;
+const REACTION_DURATION_MIN = 5000;
+const REACTION_DURATION_MAX = 7000;
 const TOTAL_PER_TURN = 60;
 const PHASE_TRANSITION: Record<EPhase, EPhase> = {
     [EPhase.SpeakerA]: EPhase.SpeakerB,
@@ -143,6 +158,7 @@ function buildListenerHints(name: string): string[] {
 }
 
 const LISTENER_HINT_INTERVAL_MS = 10000;
+const SWITCH_NOTIFICATION_DURATION_MS = 2000;
 
 /**
  * ASR 语音识别配置
@@ -156,6 +172,9 @@ const ASR_CONFIG = {
 
 Page<IChatRoomPageData, IChatRoomCustomOption>({
     data: {
+        showNotification: true,
+        showEndEarlyNotification: false,
+
         roomCode: '',
 
         phase: EPhase.SpeakerA,
@@ -164,7 +183,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         totalPerTurn: TOTAL_PER_TURN,
 
         canSpeak: true,
-        canReact: false,
+
+        showSwitchNotification: false,
 
         countdownClass: 'normal',
 
@@ -194,16 +214,21 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         listenerHint: '',
         // 对方昵称
         opponentName: '',
+        // 原告/被告昵称
+        hostName: '小美',
+        guestName: '大壮',
     },
 
     timerId: null,
     listenerHintTimerId: null,
+    switchNotificationTimerId: null,
     reactionIdCounter: 0,
     myReactionTimeouts: [],
     opponentReactionTimeouts: [],
     rpxToPx: 0.5,
     asrManager: null,
     stsCredentials: null,
+    _originalRole: EPlayerRole.Organizer,
 
     onLoad(options): void {
         // 解析页面参数
@@ -212,9 +237,20 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             options.role === EPlayerRole.Joiner
                 ? EPlayerRole.Joiner
                 : EPlayerRole.Organizer;
+        // originalRole: room creator role (independent of drum game result)
+        // Used for verdict navigation to match backend host/guest classification
+        this._originalRole =
+            options.originalRole === EPlayerRole.Joiner
+                ? EPlayerRole.Joiner
+                : EPlayerRole.Organizer;
         const opponentName: string = options.opponentName
             ? decodeURIComponent(options.opponentName)
             : DEFAULT_OPPONENT_NAME;
+        const selfName: string = nicknameService.getNickName();
+        const hostName: string =
+            localRole === EPlayerRole.Organizer ? selfName : opponentName;
+        const guestName: string =
+            localRole === EPlayerRole.Joiner ? selfName : opponentName;
         // 校验 roomCode
         if (!roomCode) {
             void wx.showToast({ title: '房间号无效', icon: 'error' });
@@ -229,7 +265,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             EPhase.SpeakerA,
             localRole
         );
-        const canReact: boolean = !canSpeak;
 
         // 计算 rpx → px 换算比例
         const sysInfo = wx.getSystemInfoSync();
@@ -250,11 +285,12 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             remaining: TOTAL_PER_TURN,
             phase: EPhase.SpeakerA,
             canSpeak,
-            canReact,
             countdownClass: this.getCountdownClass(TOTAL_PER_TURN),
             emojiAnimations,
             listenerHint: canSpeak ? '' : this.pickListenerHint(opponentName),
             opponentName,
+            hostName,
+            guestName,
         });
 
         // 非发言者启动提示文案轮播
@@ -303,6 +339,12 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 清理提示文案轮播定时器
         this.stopListenerHintRotation();
+
+        // 清理切换提示定时器
+        if (this.switchNotificationTimerId) {
+            clearTimeout(this.switchNotificationTimerId);
+            this.switchNotificationTimerId = null;
+        }
 
         // 停止语音识别
         if (this.asrManager && this.data.isRecording) {
@@ -384,6 +426,32 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             clearInterval(this.listenerHintTimerId);
             this.listenerHintTimerId = null;
         }
+    },
+
+    /**
+     * 阻止触摸事件穿透
+     */
+    preventTouchMove(): void {
+        // 空函数，仅用于阻止事件冒泡
+    },
+
+    /**
+     * 显示切换提示（"下一位"）
+     * 2 秒后自动隐藏
+     */
+    async showSwitchNotification(): Promise<void> {
+        // 清理之前的定时器
+        if (this.switchNotificationTimerId) {
+            clearTimeout(this.switchNotificationTimerId);
+            this.switchNotificationTimerId = null;
+        }
+        await wx.vibrateLong();
+        this.setData({ showSwitchNotification: true });
+
+        this.switchNotificationTimerId = setTimeout(() => {
+            this.setData({ showSwitchNotification: false });
+            this.switchNotificationTimerId = null;
+        }, SWITCH_NOTIFICATION_DURATION_MS) as unknown as number;
     },
 
     /**
@@ -740,8 +808,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     tick(): void {
         const { remaining } = this.data;
 
-        // ≤10 秒震动
-        if (remaining <= 10 && remaining > 0) {
+        // 最后 5 秒每秒震动
+        if (remaining <= 5 && remaining > 0) {
             void wx.vibrateShort({ type: 'medium' });
         }
 
@@ -791,7 +859,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             this.setData({
                 phase: EPhase.Done,
                 canSpeak: false,
-                canReact: false,
                 remaining: 0,
                 isRecording: false,
                 [liveKey]: '', // 仅清 live，final 保留
@@ -799,7 +866,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             // 等待 CHAT_COMPLETE 消息触发跳转
         } else {
             const nextCanSpeak = this.computeCanSpeak(nextPhase, localRole);
-            const canReact: boolean = !nextCanSpeak;
 
             // 不再发言时停止倒计时（由新发言者自行启动）
             if (!nextCanSpeak && this.timerId) {
@@ -807,11 +873,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 this.timerId = null;
             }
 
+            // 显示"下一位"切换提示
+            this.showSwitchNotification();
+
             this.setData({
                 phase: nextPhase,
                 remaining: totalPerTurn,
                 canSpeak: nextCanSpeak,
-                canReact,
                 countdownClass: this.getCountdownClass(totalPerTurn),
                 isRecording: false,
                 [liveKey]: '', // 仅清结束阶段的 live
@@ -869,17 +937,18 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         logger.log('ChatRoom', 'SPEECH_TURN_SWITCH → SpeakerB');
 
+        // 显示"下一位"切换提示
+        this.showSwitchNotification();
+
         const nextCanSpeak: boolean = this.computeCanSpeak(
             EPhase.SpeakerB,
             localRole
         );
-        const canReact: boolean = !nextCanSpeak;
 
         this.setData({
             phase: EPhase.SpeakerB,
             remaining: totalPerTurn,
             canSpeak: nextCanSpeak,
-            canReact,
             countdownClass: this.getCountdownClass(totalPerTurn),
             isRecording: false,
             speakerALive: '', // 清 Phase A live，final 保留
@@ -920,20 +989,28 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             phase: EPhase.Done,
             isCompleted: true,
             canSpeak: false,
-            canReact: false,
             remaining: 0,
             isRecording: false,
         });
 
         // 直接跳转到 verdict-waiting
         const roomId: string = this.data.roomCode;
+        // Use _originalRole (room creator role) so currentRole on verdict page
+        // matches backend host/guest classification (based on room.hostUserId)
         const role: string =
-            this.data.localRole === EPlayerRole.Organizer ? 'host' : 'guest';
+            this._originalRole === EPlayerRole.Organizer ? 'host' : 'guest';
         void wx.redirectTo({
             url:
                 `/packageB/pages/verdict-waiting/index` +
                 `?roomId=${roomId}&role=${role}`,
         });
+    },
+
+    /**
+     * 关闭告状须知弹窗
+     */
+    onNotificationDismiss(): void {
+        this.setData({ showNotification: false });
     },
 
     /**
@@ -974,14 +1051,29 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
-     * 提前结束发言：跳过剩余倒计时，立即切换阶段
+     * 提前结束发言：弹出确认弹窗
      */
     onEndEarlyTap(): void {
         if (!this.data.canSpeak) {
             return;
         }
         void wx.vibrateShort({ type: 'medium' });
+        this.setData({ showEndEarlyNotification: true });
+    },
+
+    /**
+     * 确认提前结束发言：关闭弹窗并切换阶段
+     */
+    onEndEarlyConfirm(): void {
+        this.setData({ showEndEarlyNotification: false });
         this.switchPhase();
+    },
+
+    /**
+     * 取消提前结束发言：关闭弹窗
+     */
+    onEndEarlyCancel(): void {
+        this.setData({ showEndEarlyNotification: false });
     },
 
     /**
@@ -1077,7 +1169,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 发送表情（自己点击表情时）
      */
     onEmojiTap(e: WechatMiniprogram.TouchEvent): void {
-        if (!this.data.canReact) {
+        if (this.data.canSpeak) {
             return;
         }
 
@@ -1191,6 +1283,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 处理收到对方的表情
      */
     handleEmojiReceive(emoji: string): void {
+        void wx.vibrateShort({ type: 'heavy' });
+
         // 对方表情同屏最多 3 个
         if (this.data.opponentReactions.length >= MAX_REACTIONS) {
             return;

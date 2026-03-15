@@ -147,11 +147,15 @@
     flex-direction: column;
 }
 
+.card__wrapper {
+    display: grid;
+    height: 100%;
+    grid-template-rows: repeat(10, 1fr);
+}
+
 .card__line {
     display: flex;
     align-items: center;
-    margin-bottom: 16rpx;
-    flex-shrink: 0;
     opacity: 0;
 }
 

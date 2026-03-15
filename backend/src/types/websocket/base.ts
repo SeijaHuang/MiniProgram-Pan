@@ -23,6 +23,8 @@ export enum EWSMessageType {
     // Drum Game (Bidirectional)
     DrumReady = 'DRUM_READY',
     DrumStart = 'DRUM_START',
+    DrumStartRequest = 'DRUM_START_REQUEST', // Client → Server
+    DrumPlayerReady = 'DRUM_PLAYER_READY', // Server → Client
     DrumTap = 'DRUM_TAP',
     DrumFinish = 'DRUM_FINISH',
     DrumResult = 'DRUM_RESULT',

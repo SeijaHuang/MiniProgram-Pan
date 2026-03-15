@@ -144,6 +144,7 @@ export const nicknameService = new NicknameService();
 
 - `startListening()`: 提前监听消息（在 waiting-room 调用）
 - `initialize(options: IDrumServiceOptions)`: 设置回调并处理队列
+- `sendStartRequest(userId)`: 发送 DRUM_START_REQUEST（玩家点击「开始游戏」时调用）
 - `queueTap()`: 点击入队（节流批量发送）
 - `flushPendingTaps()`: 立即发送积压点击
 - `cleanup()`: 清理计时器与回调
@@ -161,6 +162,7 @@ interface IDrumServiceOptions {
         joinerName,
         receivedAtMs
     ) => void;
+    onPlayerReady: (readyCount: number) => void;
     onStart: (startAtMs) => void;
     onTap: (role, delta) => void;
     onFinish: () => void;
@@ -171,8 +173,8 @@ interface IDrumServiceOptions {
 
 **消息类型**:
 
-- 发送: `DRUM_TAP`
-- 接收: `DRUM_READY / DRUM_START / DRUM_TAP / DRUM_FINISH / DRUM_RESULT`
+- 发送: `DRUM_TAP`, `DRUM_START_REQUEST`
+- 接收: `DRUM_READY / DRUM_PLAYER_READY / DRUM_START / DRUM_TAP / DRUM_FINISH / DRUM_RESULT`
 
 **消息队列机制**:
 

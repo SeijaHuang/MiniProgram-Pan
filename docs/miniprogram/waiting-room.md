@@ -2,10 +2,10 @@
 
 基于《页面级 PRD｜房间创建 & 等待页（Waiting Room）》梳理的实现文档，对应页面代码位于：
 
-- `miniprogram/pages/waiting-room/index.json`
-- `miniprogram/pages/waiting-room/index.wxml`
-- `miniprogram/pages/waiting-room/index.wxss`
-- `miniprogram/pages/waiting-room/index.ts`
+- `miniprogram/packageA/pages/waiting-room/index.json`
+- `miniprogram/packageA/pages/waiting-room/index.wxml`
+- `miniprogram/packageA/pages/waiting-room/index.wxss`
+- `miniprogram/packageA/pages/waiting-room/index.ts`
 
 本文档用于在产品、设计、前端之间对齐「等待页」的目标、布局和交互细节。
 
@@ -16,7 +16,7 @@
 | 项目     | 说明                                     |
 | -------- | ---------------------------------------- |
 | 页面名称 | 房间创建 / 等待页（Waiting Room）        |
-| 页面路径 | `/pages/waiting-room/index`              |
+| 页面路径 | `/packageA/pages/waiting-room/index`     |
 | 页面类型 | 状态等待页（房间未满）                   |
 | 进入方式 | 创建房间成功后自动进入                   |
 | 退出方式 | 取消审判 / 房间失效 / 对方进入后自动跳转 |
@@ -438,10 +438,10 @@ roomWebSocketService.initialize((room: IRoom) => {
 ## 13. 相关文件一览
 
 - **页面实现**：
-    - 结构：`miniprogram/pages/waiting-room/index.wxml`
-    - 样式：`miniprogram/pages/waiting-room/index.wxss`
-    - 逻辑：`miniprogram/pages/waiting-room/index.ts`
-    - 配置：`miniprogram/pages/waiting-room/index.json`
+    - 结构：`miniprogram/packageA/pages/waiting-room/index.wxml`
+    - 样式：`miniprogram/packageA/pages/waiting-room/index.wxss`
+    - 逻辑：`miniprogram/packageA/pages/waiting-room/index.ts`
+    - 配置：`miniprogram/packageA/pages/waiting-room/index.json`
 - **组件**：
     - 倒计时组件：`miniprogram/components/countdown/`
     - 样式化按钮：`miniprogram/components/styled-button/`

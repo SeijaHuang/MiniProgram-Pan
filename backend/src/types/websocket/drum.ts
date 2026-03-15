@@ -83,6 +83,34 @@ export interface IDrumResultData {
     winnerRole: EPlayerRole;
 }
 
+// ==================== Client → Server ====================
+
+/**
+ * DRUM_START_REQUEST: Client requests to start the drum game
+ * Sent after both players have navigated to the drum room
+ */
+export interface IDrumStartRequestMessage extends IWSMessage<IDrumStartRequestData> {
+    type: EWSMessageType.DrumStartRequest;
+}
+
+export interface IDrumStartRequestData {
+    roomId: string;
+    userId: string;
+}
+
+/**
+ * DRUM_PLAYER_READY: A player has signalled ready (but game not yet started)
+ * Broadcast to all participants so UI can show waiting state
+ */
+export interface IDrumPlayerReadyMessage extends IWSMessage<IDrumPlayerReadyData> {
+    type: EWSMessageType.DrumPlayerReady;
+}
+
+export interface IDrumPlayerReadyData {
+    roomId: string;
+    readyCount: number; // How many players are ready so far (1 or 2)
+}
+
 // ==================== Bidirectional ====================
 
 /**

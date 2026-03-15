@@ -2,10 +2,10 @@
 
 基于《Chat Room（对簿公堂）功能 PRD v1.0》梳理的实现文档，对应页面代码位于：
 
-- `miniprogram/pages/chat-room/index.json`
-- `miniprogram/pages/chat-room/index.wxml`
-- `miniprogram/pages/chat-room/index.wxss`
-- `miniprogram/pages/chat-room/index.ts`
+- `miniprogram/packageB/pages/chat-room/index.json`
+- `miniprogram/packageB/pages/chat-room/index.wxml`
+- `miniprogram/packageB/pages/chat-room/index.wxss`
+- `miniprogram/packageB/pages/chat-room/index.ts`
 
 本文档用于在产品、设计、前端之间对齐「Chat Room」的目标、布局和交互细节。
 
@@ -13,15 +13,15 @@
 
 ## 1. 页面基本信息
 
-| 项目     | 说明                           |
-| -------- | ------------------------------ |
-| 页面名称 | Chat Room（对簿公堂）          |
-| 页面路径 | `/pages/chat-room/index`       |
-| 页面类型 | 核心对簿与情绪释放页面         |
-| 进入方式 | Drum Room 结束后自动跳转       |
-| 退出方式 | 双方完成发言后跳转至 AI 分析页 |
-| 设计风格 | 强舞台感、娱乐化、视觉即状态   |
-| 优先级   | P0（主流程核心页面）           |
+| 项目     | 说明                              |
+| -------- | --------------------------------- |
+| 页面名称 | Chat Room（对簿公堂）             |
+| 页面路径 | `/packageB/pages/chat-room/index` |
+| 页面类型 | 核心对簿与情绪释放页面            |
+| 进入方式 | Drum Room 结束后自动跳转          |
+| 退出方式 | 双方完成发言后跳转至 AI 分析页    |
+| 设计风格 | 强舞台感、娱乐化、视觉即状态      |
+| 优先级   | P0（主流程核心页面）              |
 
 ---
 
@@ -291,36 +291,24 @@ type ChatRoomState =
 
 ### 9.1 消息类型
 
-```typescript
-// 发言开始
-{
-    type: 'speech:start',
-    userId: string,
-    timestamp: number,
-}
+**客户端 → 服务器**:
 
-// 发言结束
-{
-    type: 'speech:end',
-    userId: string,
-    audioUrl: string,
-    duration: number,
-}
+| 消息类型          | 说明                                           |
+| ----------------- | ---------------------------------------------- |
+| `CHAT_SEND`       | 发送文本消息（调试/测试用）                    |
+| `ASR_TEXT_PUSH`   | 推送 ASR 识别文本（partial 节流 + final 即时） |
+| `EMOJI_SEND`      | 发送表情互动                                   |
+| `SPEECH_TURN_END` | 通知服务器本玩家发言结束                       |
 
-// 表情发送
-{
-    type: 'emoji:send',
-    userId: string,
-    emoji: string,
-}
+**服务器 → 客户端**:
 
-// 状态同步
-{
-    type: 'state:sync',
-    currentSpeaker: string,
-    remainingTime: number,
-}
-```
+| 消息类型             | 说明                           |
+| -------------------- | ------------------------------ |
+| `CHAT_RECEIVE`       | 接收对方文本消息               |
+| `ASR_TEXT`           | 接收对方的 ASR 实时文本        |
+| `EMOJI_RECEIVE`      | 接收对方发送的表情互动         |
+| `SPEECH_TURN_SWITCH` | 第一位发言者结束，通知切换轮次 |
+| `CHAT_COMPLETE`      | 双方均已结束，触发 AI 判决生成 |
 
 ### 9.2 生命周期管理
 
@@ -523,10 +511,10 @@ this.initSpeechRecognitionCallbacks();
 ## 16. 相关文件一览
 
 - **页面实现**:
-    - 结构: `miniprogram/pages/chat-room/index.wxml`
-    - 样式: `miniprogram/pages/chat-room/index.wxss`
-    - 逻辑: `miniprogram/pages/chat-room/index.ts`
-    - 配置: `miniprogram/pages/chat-room/index.json`
+    - 结构: `miniprogram/packageB/pages/chat-room/index.wxml`
+    - 样式: `miniprogram/packageB/pages/chat-room/index.wxss`
+    - 逻辑: `miniprogram/packageB/pages/chat-room/index.ts`
+    - 配置: `miniprogram/packageB/pages/chat-room/index.json`
 - **服务层**:
     - WebSocket 管理: `miniprogram/services/websocket-manager.ts`
     - Chat 服务: `miniprogram/services/chat-service.ts`

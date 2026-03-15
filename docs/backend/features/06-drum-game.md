@@ -31,17 +31,21 @@ WAITING → COUNTDOWN → RUNNING → FINISHED
 │       ↓                                                          │
 │  服务器发送 DRUM_READY（时间同步 + 玩家信息）                        │
 │       ↓                                                          │
-│  服务器发送 DRUM_START（游戏开始时间戳）                            │
+│  双方各自点击「开始游戏」，发送 DRUM_START_REQUEST                  │
+│       ↓                                                          │
+│  每有一方就绪，服务器广播 DRUM_PLAYER_READY（readyCount）           │
+│       ↓                                                          │
+│  双方均就绪后，服务器发送 DRUM_START（游戏开始时间戳）              │
 │       ↓                                                          │
 │  倒计时 3 秒 (COUNTDOWN 阶段)                                      │
 │       ↓                                                          │
-│  游戏开始 (RUNNING 阶段，持续 10 秒)                               │
+│  游戏开始 (RUNNING 阶段，持续 10 秒，上限 60 次点击)               │
 │       ↓                                                          │
 │  服务器发送 DRUM_FINISH（游戏结束）                                 │
 │       ↓                                                          │
 │  服务器发送 DRUM_RESULT（最终结果）                                 │
 │       ↓                                                          │
-│  游戏清理 (FINISHED 阶段)                                          │
+│  结果展示 (RESULT 阶段，持续 5 秒后跳转聊天室)                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -49,11 +53,13 @@ WAITING → COUNTDOWN → RUNNING → FINISHED
 
 ```
 T+0s     : 房间满员，触发等待室倒计时 (3s)
-T+3s     : 发送 DRUM_READY + DRUM_START
-T+3s~6s  : 游戏倒计时 (3s)
-T+6s     : 游戏开始 (RUNNING)
-T+6s~16s : 游戏进行中 (10s)
-T+16s    : 游戏结束，发送 DRUM_FINISH + DRUM_RESULT
+T+3s     : 发送 DRUM_READY；双方看到「开始游戏」按钮
+T+3s~?   : 等待双方均点击「开始游戏」（DRUM_PLAYER_READY 广播就绪数）
+T+N      : 双方均就绪，发送 DRUM_START
+T+N~N+3s : 游戏倒计时 (3s)
+T+N+3s   : 游戏开始 (RUNNING)
+T+N+13s  : 游戏结束，发送 DRUM_FINISH + DRUM_RESULT
+T+N+13s~N+18s : 结果展示 (5s)，跳转聊天室
 ```
 
 ---
@@ -64,11 +70,13 @@ T+16s    : 游戏结束，发送 DRUM_FINISH + DRUM_RESULT
 
 ```typescript
 enum EWSMessageType {
-    DrumReady = 'DRUM_READY',   // 服务器 → 客户端：房间就绪
-    DrumStart = 'DRUM_START',   // 服务器 → 客户端：游戏开始
-    DrumTap = 'DRUM_TAP',       // 双向：点击事件
-    DrumFinish = 'DRUM_FINISH', // 服务器 → 客户端：游戏结束
-    DrumResult = 'DRUM_RESULT', // 服务器 → 客户端：最终结果
+    DrumReady = 'DRUM_READY',               // 服务器 → 客户端：房间就绪
+    DrumPlayerReady = 'DRUM_PLAYER_READY',  // 服务器 → 客户端：玩家就绪广播
+    DrumStartRequest = 'DRUM_START_REQUEST',// 客户端 → 服务器：玩家请求开始
+    DrumStart = 'DRUM_START',               // 服务器 → 客户端：游戏开始
+    DrumTap = 'DRUM_TAP',                   // 双向：点击事件
+    DrumFinish = 'DRUM_FINISH',             // 服务器 → 客户端：游戏结束
+    DrumResult = 'DRUM_RESULT',             // 服务器 → 客户端：最终结果
 }
 ```
 
@@ -109,6 +117,46 @@ interface IDrumReadyMessage {
         "joinerName": "家冤小"
     },
     "timestamp": 1737849600000
+}
+```
+
+---
+
+### DRUM_PLAYER_READY（服务器 → 客户端）
+
+**触发时机**: 每有一名玩家发送 `DRUM_START_REQUEST` 时广播
+
+**用途**: 通知双方当前就绪人数，用于更新「等待对方准备」状态文案
+
+**消息格式**:
+```typescript
+interface IDrumPlayerReadyMessage {
+    type: 'DRUM_PLAYER_READY';
+    data: {
+        roomId: string;
+        readyCount: number; // 当前已就绪玩家数（1 或 2）
+    };
+    timestamp: number;
+}
+```
+
+---
+
+### DRUM_START_REQUEST（客户端 → 服务器）
+
+**触发时机**: 玩家点击「开始游戏」按钮
+
+**用途**: 告知服务器本玩家已就绪，等双方均就绪后服务器发送 DRUM_START
+
+**消息格式**:
+```typescript
+interface IDrumStartRequestMessage {
+    type: 'DRUM_START_REQUEST';
+    data: {
+        roomId: string;
+        userId: string;
+    };
+    timestamp: number;
 }
 ```
 
@@ -350,6 +398,8 @@ export const DRUM_CONFIG = {
 | WAITING_ROOM_CONFIG.COUNTDOWN_MS | 3000ms | 房间满员后到游戏开始的等待时间 |
 | DRUM_CONFIG.COUNTDOWN_MS | 3000ms | 游戏开始前的倒计时 |
 | DRUM_CONFIG.GAME_DURATION_MS | 10000ms | 游戏进行时间 |
+| RESULT_DISPLAY_MS（前端）| 5000ms | 结果展示时长，之后跳转聊天室 |
+| MAX_TAPS（前端）| 60 | 单局最大有效点击次数上限 |
 
 ---
 
@@ -545,6 +595,12 @@ calculateResult(roomId: string): IDrumGameResult | undefined {
     │<──DRUM_READY──────│───DRUM_READY─────>│
     │   (时间同步)       │                   │
     │                   │                   │
+    │───START_REQUEST──>│                   │
+    │                   │───PLAYER_READY───>│ (readyCount=1)
+    │<──PLAYER_READY────│                   │
+    │                   │<──START_REQUEST───│
+    │<──PLAYER_READY────│───PLAYER_READY───>│ (readyCount=2)
+    │                   │                   │
     │<──DRUM_START──────│───DRUM_START─────>│
     │   (开始时间戳)     │                   │
     │                   │                   │
@@ -565,6 +621,9 @@ calculateResult(roomId: string): IDrumGameResult | undefined {
     │                   │                   │
     │<──DRUM_RESULT─────│───DRUM_RESULT────>│
     │   (最终结果)       │                   │
+    │                   │                   │
+    │   [5秒结果展示]   │                   │
+    │   → 跳转聊天室     │                   │
     │                   │                   │
 ```
 

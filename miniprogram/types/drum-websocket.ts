@@ -17,6 +17,12 @@ export enum EDrumMessageType {
     // Server -> Client: Room ready, sync time
     DrumReady = 'DRUM_READY',
 
+    // Client -> Server: Player signals ready to start
+    DrumStartRequest = 'DRUM_START_REQUEST',
+
+    // Server -> Client: A player has signalled ready (broadcast readyCount)
+    DrumPlayerReady = 'DRUM_PLAYER_READY',
+
     // Server -> Client: Game start signal with timing
     DrumStart = 'DRUM_START',
 
@@ -51,8 +57,34 @@ export interface IDrumReadyData {
     joinerName: string;
 }
 
+/**
+ * DRUM_PLAYER_READY: A player has signalled ready
+ * Server -> Client (broadcast to all participants)
+ */
+export interface IDrumPlayerReadyData {
+    roomId: string;
+    readyCount: number;
+}
+
+export interface IDrumPlayerReadyMessage extends IDrumMessage<IDrumPlayerReadyData> {
+    type: EDrumMessageType.DrumPlayerReady;
+}
+
 export interface IDrumReadyMessage extends IDrumMessage<IDrumReadyData> {
     type: EDrumMessageType.DrumReady;
+}
+
+/**
+ * DRUM_START_REQUEST: Player signals ready to start
+ * Client -> Server
+ */
+export interface IDrumStartRequestData {
+    roomId: string;
+    userId: string;
+}
+
+export interface IDrumStartRequestMessage extends IDrumMessage<IDrumStartRequestData> {
+    type: EDrumMessageType.DrumStartRequest;
 }
 
 /**
@@ -116,6 +148,7 @@ export interface IDrumResultMessage extends IDrumMessage<IDrumResultData> {
  */
 export type TDrumMessage =
     | IDrumReadyMessage
+    | IDrumPlayerReadyMessage
     | IDrumStartMessage
     | IDrumTapMessage
     | IDrumFinishMessage
@@ -142,6 +175,23 @@ export function parseDrumMessage(rawData: string): TDrumMessage | null {
         logger.error('DrumWS', 'Failed to parse message:', e);
         return null;
     }
+}
+
+/**
+ * Create drum start request message payload
+ * @param roomId - Room ID
+ * @param userId - Current user ID
+ * @returns Message object ready to send
+ */
+export function createStartRequestMessage(
+    roomId: string,
+    userId: string
+): IDrumStartRequestMessage {
+    return {
+        type: EDrumMessageType.DrumStartRequest,
+        data: { roomId, userId },
+        timestamp: Date.now(),
+    };
 }
 
 /**
