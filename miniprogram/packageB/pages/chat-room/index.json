@@ -1,4 +1,6 @@
 {
     "navigationBarTitleText": "对簿公堂",
-    "usingComponents": {}
+    "usingComponents": {
+        "notification": "../../../components/notification/index"
+    }
 }
