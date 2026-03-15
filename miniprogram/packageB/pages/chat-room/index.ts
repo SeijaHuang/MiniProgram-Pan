@@ -113,6 +113,7 @@ interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     rpxToPx: number;
     asrManager: AsrManager; // 语音识别管理器
     stsCredentials: ISTSCredentials | null; // STS 临时凭证
+    _originalRole: EPlayerRole; // Room creator role (for verdict navigation)
 }
 
 const EMOJI_LIST = [
@@ -227,12 +228,19 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     rpxToPx: 0.5,
     asrManager: null,
     stsCredentials: null,
+    _originalRole: EPlayerRole.Organizer,
 
     onLoad(options): void {
         // 解析页面参数
         const roomCode = options.roomCode ?? '';
         const localRole: EPlayerRole =
             options.role === EPlayerRole.Joiner
+                ? EPlayerRole.Joiner
+                : EPlayerRole.Organizer;
+        // originalRole: room creator role (independent of drum game result)
+        // Used for verdict navigation to match backend host/guest classification
+        this._originalRole =
+            options.originalRole === EPlayerRole.Joiner
                 ? EPlayerRole.Joiner
                 : EPlayerRole.Organizer;
         const opponentName: string = options.opponentName
@@ -987,8 +995,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 直接跳转到 verdict-waiting
         const roomId: string = this.data.roomCode;
+        // Use _originalRole (room creator role) so currentRole on verdict page
+        // matches backend host/guest classification (based on room.hostUserId)
         const role: string =
-            this.data.localRole === EPlayerRole.Organizer ? 'host' : 'guest';
+            this._originalRole === EPlayerRole.Organizer ? 'host' : 'guest';
         void wx.redirectTo({
             url:
                 `/packageB/pages/verdict-waiting/index` +

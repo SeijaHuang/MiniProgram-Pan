@@ -453,6 +453,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             const url: string =
                 `/packageB/pages/chat-room/index?roomCode=${roomId}` +
                 `&role=${chatRole}` +
+                `&originalRole=${selfRole}` +
                 `&opponentName=${encodeURIComponent(opponentName)}`;
             wx.redirectTo({
                 url,
