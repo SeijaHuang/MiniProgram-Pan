@@ -1283,7 +1283,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 处理收到对方的表情
      */
     handleEmojiReceive(emoji: string): void {
-        void wx.vibrateShort({ type: 'light' });
+        void wx.vibrateShort({ type: 'heavy' });
 
         // 对方表情同屏最多 3 个
         if (this.data.opponentReactions.length >= MAX_REACTIONS) {

@@ -424,9 +424,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             ? '你先申冤！'
             : '先听对方说吧';
 
-        const { organizerName, joinerName, organizerScore, joinerScore } =
-            this.data;
-        const resultScoreText: string = `${organizerName}: ${organizerScore} vs ${joinerName}: ${joinerScore}`;
+        const { organizerScore, joinerScore } = this.data;
+        const resultScoreText: string = ` ${organizerScore} vs ${joinerScore}`;
 
         vibrateLong();
 

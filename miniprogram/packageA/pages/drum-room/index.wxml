@@ -90,6 +90,7 @@
         <notification
             isOpen="{{ resultVisible }}"
             title="{{ resultTitle }}"
+            statusTextFontSize="42rpx"
             content="{{ resultSubtitle }}"
             statusText="{{ resultScoreText }}"
             bind:close="onResultNotificationClose"

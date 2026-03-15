@@ -21,16 +21,16 @@
         </view>
 
         <!-- Content -->
-        <view class="notification__content">
-            <text class="notification__content-text">{{ content }}</text>
+        <view class="notification__content" wx:if="{{ content }}">
+            <text class="notification__content-text" >{{ content }}</text>
         </view>
 
         <!-- Status text -->
         <view
             class="notification__status"
-            wx:if="{{ statusText }}"
+            wx:if="{{ statusText }}" 
         >
-            <text class="notification__status-text">{{ statusText }}</text>
+            <text class="notification__status-text" style="font-size: {{ statusTextFontSize }}">{{ statusText }}</text>
         </view>
 
         <!-- Action button -->

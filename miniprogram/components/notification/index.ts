@@ -22,6 +22,10 @@ Component({
             type: String,
             value: '',
         },
+        statusTextFontSize: {
+            type: String,
+            value: '',
+        },
         buttonText: {
             type: String,
             value: '',
