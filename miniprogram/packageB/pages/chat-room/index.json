@@ -1,5 +1,6 @@
 {
     "navigationBarTitleText": "对簿公堂",
+    "disableScroll": true,
     "usingComponents": {
         "notification": "../../../components/notification/index"
     }

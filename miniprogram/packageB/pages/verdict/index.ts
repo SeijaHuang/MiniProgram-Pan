@@ -452,7 +452,7 @@ Page({
         }
 
         const width: number = 750;
-        const height: number = 1334;
+        const height: number = 1334; // fixed screen height
         const dpr: number = 2;
 
         canvas.width = width * dpr;
@@ -463,18 +463,105 @@ Page({
         ) as ICanvas2DContext;
         ctx.scale(dpr, dpr);
 
+        // Layout constants
+        const headerH: number = 200;
+        const footerH: number = 60;
+        const outerPadX: number = 40;
+        const sectionW: number = width - outerPadX * 2;
+        const innerPadX: number = 30;
+        const innerPadY: number = 28;
+        const textX: number = outerPadX + innerPadX;
+        const textMaxW: number = sectionW - innerPadX * 2;
+
+        // Word-wrap helper — modifies ctx.font as a side-effect
+        const wrapText = (
+            text: string,
+            maxW: number,
+            font: string
+        ): string[] => {
+            ctx.font = font;
+            const lines: string[] = [];
+            let line: string = '';
+            for (const ch of [...text]) {
+                const test: string = line + ch;
+                if (ctx.measureText(test).width > maxW && line) {
+                    lines.push(line);
+                    line = ch;
+                } else {
+                    line = test;
+                }
+            }
+            if (line) lines.push(line);
+            return lines;
+        };
+
+        // Draw a full-width section panel with left accent bar
+        const drawPanel = (panelY: number, panelH: number): void => {
+            ctx.fillStyle = 'rgba(212, 56, 13, 0.06)';
+            ctx.fillRect(outerPadX, panelY, sectionW, panelH);
+            ctx.fillStyle = '#D4380D';
+            ctx.fillRect(outerPadX, panelY, 6, panelH);
+        };
+
+        // ── Pre-calculate section heights ──────────────────────────────
+        const { hostNickName, guestNickName } = this.data;
+        const thirdPartyLines: string[] = verdict.responsibility.thirdParty.map(
+            f => `${f.emoji}${f.reason}: ${f.percentage}%`
+        );
+
+        const respTitleH: number = 56;
+        const respNameH: number = 64;
+        const respThirdH: number = 44;
+        const respPanelH: number =
+            innerPadY * 2 +
+            respTitleH +
+            respNameH * 2 +
+            respThirdH * thirdPartyLines.length;
+
+        const summaryFont: string = '28px sans-serif';
+        const summaryLines: string[] = wrapText(
+            verdict.verdictSummary,
+            textMaxW,
+            summaryFont
+        );
+        const summaryLineH: number = 44;
+        const summaryTitleH: number = 56;
+        const summaryPanelH: number =
+            innerPadY * 2 + summaryTitleH + summaryLines.length * summaryLineH;
+
+        const punishFont: string = 'bold 30px sans-serif';
+        const punishLines: string[] = wrapText(
+            verdict.punishmentTask.task,
+            textMaxW,
+            punishFont
+        );
+        const punishLineH: number = 46;
+        const punishTitleH: number = 56;
+        const deadlineH: number = 44;
+        const punishPanelH: number =
+            innerPadY * 2 +
+            punishTitleH +
+            punishLines.length * punishLineH +
+            deadlineH;
+
+        // Distribute remaining space evenly as 4 gaps
+        // (top gap + 2 between sections + bottom gap before footer)
+        const totalSectionH: number = respPanelH + summaryPanelH + punishPanelH;
+        const contentAvail: number = height - headerH - footerH;
+        const gap: number = Math.max(
+            20,
+            Math.floor((contentAvail - totalSectionH) / 4)
+        );
+
+        // ── Draw ──────────────────────────────────────────────────────
+
         // Background
         ctx.fillStyle = '#FFFEF7';
         ctx.fillRect(0, 0, width, height);
 
-        // Red border
-        ctx.strokeStyle = '#D4380D';
-        ctx.lineWidth = 8;
-        ctx.strokeRect(4, 4, width - 8, height - 8);
-
         // Header
         ctx.fillStyle = '#D4380D';
-        ctx.fillRect(0, 0, width, 200);
+        ctx.fillRect(0, 0, width, headerH);
 
         ctx.fillStyle = '#FFD93D';
         ctx.font = 'bold 48px sans-serif';
@@ -485,87 +572,103 @@ Page({
         ctx.font = '24px sans-serif';
         ctx.fillText(`案件编号: NO.${verdict.caseNumber}`, width / 2, 160);
 
-        // Responsibility
-        let y: number = 250;
-        ctx.fillStyle = '#D4380D';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.fillText('责任分布', width / 2, y);
+        let y: number = headerH + gap;
 
-        y += 60;
-        ctx.font = 'bold 48px sans-serif';
+        // ===== 责任分布 =====
+        drawPanel(y, respPanelH);
+
+        let iy: number = y + innerPadY;
+
+        ctx.fillStyle = '#D4380D';
+        ctx.font = 'bold 34px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('责任分布', width / 2, iy + 32);
+        iy += respTitleH;
+
         ctx.fillStyle = '#333333';
-        const { hostNickName, guestNickName } = this.data;
+        ctx.font = 'bold 44px sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(`${hostNickName}: ${verdict.responsibility.host}%`, 80, y);
-        ctx.textAlign = 'right';
+        ctx.fillText(
+            `${hostNickName}: ${verdict.responsibility.host}%`,
+            textX,
+            iy + 46
+        );
+        iy += respNameH;
+
         ctx.fillText(
             `${guestNickName}: ${verdict.responsibility.guest}%`,
-            width - 80,
-            y
+            textX,
+            iy + 46
         );
+        iy += respNameH;
 
-        // Third party factors
-        y += 50;
-        ctx.font = '24px sans-serif';
         ctx.fillStyle = '#666666';
+        ctx.font = '26px sans-serif';
+        for (const tpLine of thirdPartyLines) {
+            ctx.fillText(tpLine, textX, iy + 30);
+            iy += respThirdH;
+        }
+
+        y += respPanelH + gap;
+
+        // ===== 大老爷赠言 =====
+        drawPanel(y, summaryPanelH);
+        iy = y + innerPadY;
+
+        ctx.fillStyle = '#D4380D';
+        ctx.font = 'bold 34px sans-serif';
         ctx.textAlign = 'center';
-        const factorText: string = verdict.responsibility.thirdParty
-            .map(f => `${f.emoji}${f.reason} ${f.percentage}%`)
-            .join('  ');
-        ctx.fillText(factorText, width / 2, y);
+        ctx.fillText('大老爷赠言', width / 2, iy + 32);
+        iy += summaryTitleH;
 
-        // Verdict summary
-        y += 80;
-        ctx.fillStyle = '#D4380D';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.fillText('大老爷赠言', width / 2, y);
-
-        y += 50;
         ctx.fillStyle = '#333333';
-        ctx.font = '28px sans-serif';
-        // Word wrap
-        const maxLineWidth: number = width - 160;
-        const summaryChars: string[] = [...verdict.verdictSummary];
-        let line: string = '';
-        for (const char of summaryChars) {
-            const testLine: string = line + char;
-            const metrics: { width: number } = ctx.measureText(testLine);
-            if (metrics.width > maxLineWidth && line) {
-                ctx.fillText(line, width / 2, y);
-                line = char;
-                y += 40;
-            } else {
-                line = testLine;
-            }
-        }
-        if (line) {
-            ctx.fillText(line, width / 2, y);
+        ctx.font = summaryFont;
+        ctx.textAlign = 'left';
+        for (const sLine of summaryLines) {
+            ctx.fillText(sLine, textX, iy + 32);
+            iy += summaryLineH;
         }
 
-        // Punishment
-        y += 80;
+        y += summaryPanelH + gap;
+
+        // ===== 惩罚令牌 =====
+        drawPanel(y, punishPanelH);
+        iy = y + innerPadY;
+
         ctx.fillStyle = '#D4380D';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.fillText('惩罚令牌', width / 2, y);
+        ctx.font = 'bold 34px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('惩罚令牌', width / 2, iy + 32);
+        iy += punishTitleH;
 
-        y += 50;
         ctx.fillStyle = '#333333';
-        ctx.font = 'bold 30px sans-serif';
-        ctx.fillText(verdict.punishmentTask.task, width / 2, y);
+        ctx.font = punishFont;
+        ctx.textAlign = 'left';
+        for (const pLine of punishLines) {
+            ctx.fillText(pLine, textX, iy + 36);
+            iy += punishLineH;
+        }
 
-        y += 40;
         ctx.fillStyle = '#999999';
         ctx.font = '24px sans-serif';
-        ctx.fillText(verdict.punishmentTask.deadline, width / 2, y);
+        ctx.fillText(verdict.punishmentTask.deadline, textX, iy + 28);
+
+        y += punishPanelH + gap;
 
         // Footer
         ctx.fillStyle = '#CCCCCC';
         ctx.font = '20px sans-serif';
-        ctx.fillText('清汤大老爷 · 判决书', width / 2, height - 60);
+        ctx.textAlign = 'center';
+        ctx.fillText('清汤大老爷 · 判决书', width / 2, y + 20);
         const dateStr: string = new Date().toLocaleDateString('zh-CN');
-        ctx.fillText(dateStr, width / 2, height - 30);
+        ctx.fillText(dateStr, width / 2, y + 44);
 
-        // Save to album
+        // Border drawn last to frame full screen height
+        ctx.strokeStyle = '#D4380D';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(4, 4, width - 8, height - 8);
+
+        // Save to album at fixed screen height
         wx.canvasToTempFilePath({
             canvas,
             x: 0,
