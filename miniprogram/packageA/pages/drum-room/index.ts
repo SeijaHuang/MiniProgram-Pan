@@ -10,14 +10,7 @@
  * - Receive: DRUM_TAP (opponent), DRUM_RESULT (final result)
  */
 
-import {
-    DEFAULT_HOST_NAME,
-    DEFAULT_USER_NAME,
-    DEFAULT_JOINER_NAME,
-} from '../../../constants/defaultValue';
 import { drumService } from '../../../services/drum-service';
-import { nicknameService } from '../../../services/nickname-service';
-import { EPlayerRole } from '../../../types/websocket-common';
 import { playDrumSound, destroyAudioPool } from '../../../utils/audio';
 import { vibrateShort, vibrateLong } from '../../../utils/haptic';
 import { logger } from '../../../utils/logger';
@@ -53,8 +46,8 @@ interface IDrumPageData {
     roomId: string;
 
     // Player info
-    selfRole: EPlayerRole;
-    hostRole: EPlayerRole;
+    organizerUserId: string;
+    joinerUserId: string;
     organizerName: string;
     joinerName: string;
 
@@ -81,7 +74,7 @@ interface IDrumPageData {
     flyTexts: IFlyText[];
 
     // Result
-    winnerRole: EPlayerRole | null;
+    winnerUserId: string;
     resultTitle: string;
     resultSubtitle: string;
     resultScoreText: string;
@@ -101,10 +94,6 @@ interface IDrumPageData {
 /** Page options interface (from waiting-room navigation) */
 interface IDrumPageOptions {
     roomId?: string;
-    selfRole?: EPlayerRole;
-    hostRole?: EPlayerRole;
-    organizerName?: string;
-    joinerName?: string;
 }
 
 interface PrivateState {
@@ -117,11 +106,6 @@ interface PrivateState {
     _hintTimer: ReturnType<typeof setTimeout> | null;
 
     _lastShakeTime: number;
-}
-
-/** Get score key by player role */
-function getScoreKey(role: EPlayerRole): 'organizerScore' | 'joinerScore' {
-    return role === EPlayerRole.Organizer ? 'organizerScore' : 'joinerScore';
 }
 
 /** Game timing constants */
@@ -137,8 +121,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         phase: 'INIT',
         roomId: '',
 
-        selfRole: EPlayerRole.Organizer,
-        hostRole: EPlayerRole.Organizer,
+        organizerUserId: '',
+        joinerUserId: '',
         organizerName: '',
         joinerName: '',
 
@@ -159,7 +143,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         flyTexts: [],
 
-        winnerRole: null,
+        winnerUserId: '',
         resultTitle: '',
         resultSubtitle: '',
         resultScoreText: '',
@@ -189,52 +173,27 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     onLoad(options: IDrumPageOptions): void {
         logger.log('DrumRoom', 'onLoad', options);
 
-        // Parse options from previous page (waiting-room)
-        const roomId: string = options.roomId || 'room-001';
-        const selfRole: EPlayerRole = options.selfRole || EPlayerRole.Organizer;
-        const hostRole: EPlayerRole = options.hostRole || EPlayerRole.Organizer;
+        const roomId: string = options.roomId || '';
 
-        // Decode first, then check if it's the default user name
-        const rawOrganizerName: string = decodeURIComponent(
-            options.organizerName || ''
-        );
-        const organizerName: string =
-            rawOrganizerName && rawOrganizerName !== DEFAULT_USER_NAME
-                ? rawOrganizerName
-                : DEFAULT_HOST_NAME;
-
-        const rawJoinerName: string = decodeURIComponent(
-            options.joinerName || ''
-        );
-        const joinerName: string =
-            rawJoinerName && rawJoinerName !== DEFAULT_USER_NAME
-                ? rawJoinerName
-                : DEFAULT_JOINER_NAME;
-
-        this.setData({
-            roomId,
-            selfRole,
-            hostRole,
-            organizerName,
-            joinerName,
-        });
+        this.setData({ roomId });
 
         // Initialize drum service with handlers
         drumService.initialize({
             roomId,
-            selfRole,
             onReady: (
                 serverTimeMs: number,
-                hostRole: EPlayerRole,
-                organizerName: string,
-                joinerName: string,
+                organizerUserId: string,
+                joinerUserId: string,
+                organizerNickname: string,
+                joinerNickname: string,
                 receivedAtMs: number
             ) => {
                 this._handleDrumReady(
                     serverTimeMs,
-                    hostRole,
-                    organizerName,
-                    joinerName,
+                    organizerUserId,
+                    joinerUserId,
+                    organizerNickname,
+                    joinerNickname,
                     receivedAtMs
                 );
             },
@@ -244,14 +203,14 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             onStart: (startAtMs: number) => {
                 this._handleDrumStart(startAtMs);
             },
-            onTap: (role: EPlayerRole, delta: number) => {
-                this._handleOpponentTap(role, delta);
+            onTap: (userId: string, delta: number) => {
+                this._handleOpponentTap(userId, delta);
             },
             onFinish: () => {
                 this._handleDrumFinish();
             },
-            onResult: (winnerRole: EPlayerRole) => {
-                this._handleServerResult(winnerRole);
+            onResult: (winnerUserId: string) => {
+                this._handleServerResult(winnerUserId);
             },
             onError: (message: string) => {
                 logger.error('DrumRoom', 'Service error:', message);
@@ -317,7 +276,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         if (this.data.selfReady) {
             return;
         }
-        const userId: string = nicknameService.getUserId();
+        const userId: string = getApp<IAppOption>().globalData.selfUserId;
         drumService.sendStartRequest(userId);
         this.setData({ selfReady: true });
     },
@@ -412,10 +371,11 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     /**
      * Show result overlay and navigate to chat room
      */
-    _showResult(winnerRole: EPlayerRole): void {
-        logger.log('DrumRoom', 'Showing result, winner:', winnerRole);
+    _showResult(winnerUserId: string): void {
+        logger.log('DrumRoom', 'Showing result, winner:', winnerUserId);
 
-        const isSelfWinner: boolean = winnerRole === this.data.selfRole;
+        const selfUserId: string = getApp<IAppOption>().globalData.selfUserId;
+        const isSelfWinner: boolean = winnerUserId === selfUserId;
 
         const resultTitle: string = isSelfWinner
             ? '你抢到了惊堂木！'
@@ -431,7 +391,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         this.setData({
             phase: 'RESULT',
-            winnerRole,
+            winnerUserId,
             resultTitle,
             resultSubtitle,
             resultScoreText,
@@ -440,22 +400,8 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Navigate to chat room after delay
         this._resultTimer = setTimeout(() => {
-            const { roomId, selfRole, organizerName, joinerName } = this.data;
-            // Winner speaks first (Organizer), loser speaks second (Joiner)
-            const chatRole: EPlayerRole =
-                selfRole === winnerRole
-                    ? EPlayerRole.Organizer
-                    : EPlayerRole.Joiner;
-            // Opponent in drum = the other player
-            const opponentName: string =
-                selfRole === EPlayerRole.Organizer ? joinerName : organizerName;
-            const url: string =
-                `/packageB/pages/chat-room/index?roomCode=${roomId}` +
-                `&role=${chatRole}` +
-                `&originalRole=${selfRole}` +
-                `&opponentName=${encodeURIComponent(opponentName)}`;
             wx.redirectTo({
-                url,
+                url: '/packageB/pages/chat-room/index',
                 fail: (err: WechatMiniprogram.GeneralCallbackResult) => {
                     logger.error('DrumRoom', 'Navigate failed:', err);
                 },
@@ -471,10 +417,11 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             return;
         }
 
-        // Increment local score immediately
-        const scoreKey: 'organizerScore' | 'joinerScore' = getScoreKey(
-            this.data.selfRole
-        );
+        const selfUserId: string = getApp<IAppOption>().globalData.selfUserId;
+        const scoreKey: 'organizerScore' | 'joinerScore' =
+            selfUserId === this.data.organizerUserId
+                ? 'organizerScore'
+                : 'joinerScore';
         const currentScore: number = this.data[scoreKey];
 
         // Ignore taps beyond the cap
@@ -482,8 +429,7 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
             return;
         }
 
-        const newScore: number = currentScore + 1;
-        this._updateScore(this.data.selfRole, newScore);
+        this._updateScore(selfUserId, currentScore + 1);
 
         // Trigger feedback
         this._triggerTapFeedback();
@@ -495,8 +441,11 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     /**
      * Update score and progress bar
      */
-    _updateScore(role: EPlayerRole, score: number): void {
-        const scoreKey: 'organizerScore' | 'joinerScore' = getScoreKey(role);
+    _updateScore(userId: string, score: number): void {
+        const scoreKey: 'organizerScore' | 'joinerScore' =
+            userId === this.data.organizerUserId
+                ? 'organizerScore'
+                : 'joinerScore';
 
         const updateData: Partial<IDrumPageData> = {
             [scoreKey]: score,
@@ -664,16 +613,18 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
      */
     _handleDrumReady(
         serverTimeMs: number,
-        hostRole: EPlayerRole,
-        organizerName: string,
-        joinerName: string,
+        organizerUserId: string,
+        joinerUserId: string,
+        organizerNickname: string,
+        joinerNickname: string,
         receivedAtMs: number
     ): void {
         logger.log('DrumRoom', 'DRUM_READY received', {
             serverTimeMs,
-            hostRole,
-            organizerName,
-            joinerName,
+            organizerUserId,
+            joinerUserId,
+            organizerNickname,
+            joinerNickname,
             receivedAtMs,
         });
 
@@ -683,9 +634,10 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
 
         // Update player info from server and show rule notification
         this.setData({
-            hostRole,
-            organizerName,
-            joinerName,
+            organizerUserId,
+            joinerUserId,
+            organizerName: organizerNickname,
+            joinerName: joinerNickname,
             phase: 'PREPARE_COUNTDOWN',
             showRuleNotification: true,
             selfReady: false,
@@ -753,23 +705,31 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
     /**
      * Handle opponent tap event from server
      */
-    _handleOpponentTap(role: EPlayerRole, delta: number): void {
+    _handleOpponentTap(userId: string, delta: number): void {
         // Only update if it's the opponent's tap
-        if (role === this.data.selfRole) {
+        const selfUserId: string = getApp<IAppOption>().globalData.selfUserId;
+        if (userId === selfUserId) {
             return;
         }
 
-        const scoreKey: 'organizerScore' | 'joinerScore' = getScoreKey(role);
+        const scoreKey: 'organizerScore' | 'joinerScore' =
+            userId === this.data.organizerUserId
+                ? 'organizerScore'
+                : 'joinerScore';
         const newScore: number = this.data[scoreKey] + delta;
 
-        this._updateScore(role, newScore);
+        this._updateScore(userId, newScore);
     },
 
     /**
      * Handle DRUM_RESULT message from server
      */
-    _handleServerResult(winnerRole: EPlayerRole): void {
-        logger.log('DrumRoom', 'DRUM_RESULT received, winner:', winnerRole);
+    _handleServerResult(winnerUserId: string): void {
+        logger.log('DrumRoom', 'DRUM_RESULT received, winner:', winnerUserId);
+
+        // Write winner to globalData for downstream pages
+        const app = getApp<IAppOption>();
+        app.globalData.firstSpeakerUserId = winnerUserId;
 
         // Clear timers
         this._clearAllTimers();
@@ -781,6 +741,6 @@ Page<IDrumPageData, WechatMiniprogram.Page.CustomOption & PrivateState>({
         });
 
         // Show result from server
-        this._showResult(winnerRole);
+        this._showResult(winnerUserId);
     },
 });

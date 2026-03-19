@@ -11,10 +11,7 @@
  */
 
 import type { IWSMessage } from './base';
-import { EWSMessageType, EPlayerRole } from './base';
-
-// Re-export EPlayerRole for convenience
-export { EPlayerRole } from './base';
+import { EWSMessageType } from './base';
 
 // ==================== Game Phase ====================
 
@@ -40,9 +37,10 @@ export interface IDrumReadyMessage extends IWSMessage<IDrumReadyData> {
 export interface IDrumReadyData {
     roomId: string;
     serverTimeMs: number;
-    hostRole: EPlayerRole;
-    organizerName: string;
-    joinerName: string;
+    organizerUserId: string;
+    joinerUserId: string;
+    organizerNickname: string;
+    joinerNickname: string;
 }
 
 /**
@@ -78,9 +76,8 @@ export interface IDrumResultMessage extends IWSMessage<IDrumResultData> {
 
 export interface IDrumResultData {
     roomId: string;
-    organizerScore: number;
-    joinerScore: number;
-    winnerRole: EPlayerRole;
+    scores: { [userId: string]: number };
+    winnerUserId: string;
 }
 
 // ==================== Client → Server ====================
@@ -124,7 +121,7 @@ export interface IDrumTapMessage extends IWSMessage<IDrumTapData> {
 
 export interface IDrumTapData {
     roomId: string;
-    role: EPlayerRole;
+    userId: string;
     delta: number; // Number of taps in this batch
     clientTimeMs: number;
 }

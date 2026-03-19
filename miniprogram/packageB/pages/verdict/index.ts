@@ -232,10 +232,15 @@ Page({
 
         // Read participant nicknames from globalData
         const app = getApp<IAppOption>();
+        const isHost: boolean = currentRole === 'host';
         const hostNickName: string =
-            app.globalData.participants?.hostNickName || '玩家1';
+            (isHost
+                ? app.globalData.selfNickname
+                : app.globalData.opponentNickname) || '玩家1';
         const guestNickName: string =
-            app.globalData.participants?.guestNickName || '玩家2';
+            (isHost
+                ? app.globalData.opponentNickname
+                : app.globalData.selfNickname) || '玩家2';
 
         this.setData({
             loading: false,

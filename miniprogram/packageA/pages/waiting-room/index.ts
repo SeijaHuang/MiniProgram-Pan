@@ -2,7 +2,6 @@
 
 import type { IRoom } from '../../../models/room';
 import { ERoomStatus } from '../../../models/room';
-import type { IUser } from '../../../models/user';
 import { drumService } from '../../../services/drum-service';
 import {
     nicknameService,
@@ -11,7 +10,7 @@ import {
 import { roomService } from '../../../services/room-service';
 import { roomWebSocketService } from '../../../services/room-websocket-service';
 import { wsManager } from '../../../services/websocket-manager';
-import { EPlayerRole } from '../../../types/websocket-common';
+import type { IJoinAckData } from '../../../types/room-websocket';
 import { logger } from '../../../utils/logger';
 
 /**
@@ -61,7 +60,6 @@ interface IWaitingRoomPageData {
     cancelButtonAnimation: WechatMiniprogram.AnimationExportResult;
     confirmButtonAnimation: WechatMiniprogram.AnimationExportResult;
     // 用户和房间信息
-    currentUser: IUser | null;
     currentRoom: IRoom | null;
     // 双方昵称（房间满员后显示）
     roomParticipants: Array<{ nickname: string; isMe: boolean }>;
@@ -130,7 +128,6 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         cancelButtonAnimation: {} as WechatMiniprogram.AnimationExportResult,
         confirmButtonAnimation: {} as WechatMiniprogram.AnimationExportResult,
         // 用户和房间信息
-        currentUser: null,
         currentRoom: null,
         roomParticipants: [],
     },
@@ -150,7 +147,6 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     onLoad(options: IWaitingRoomOnLoadOptions): void {
         this.initAnimations();
         this.initWebSocket();
-        this.initUser();
 
         wx.enableAlertBeforeUnload({
             message: '退出后房间将失效，确定要离开吗？',
@@ -200,21 +196,8 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             },
         });
 
-        roomWebSocketService.initialize((room: IRoom) => {
-            this.handleRoomJoined(room);
-        });
-    },
-
-    /**
-     * 初始化用户信息（从 globalData / Storage 读取）
-     */
-    initUser(): void {
-        const userId: string = nicknameService.getUserId();
-        const nickname: string =
-            nicknameService.getNickName() || DEFAULT_NICK_NAME;
-
-        this.setData({
-            currentUser: { userId, nickname },
+        roomWebSocketService.initialize((data: IJoinAckData) => {
+            this.handleRoomJoined(data);
         });
     },
 
@@ -279,7 +262,6 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         }
 
         nicknameService.saveNickName(nicknameInput);
-        this.initUser();
 
         this.setData({ showNicknameModal: false });
 
@@ -294,9 +276,6 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      * 「稍后再说」次级按钮：使用默认昵称进入，不保存到 Storage
      */
     onNicknameSkip(): void {
-        const app = getApp<IAppOption>();
-        app.globalData.userInfo.nickName = DEFAULT_NICK_NAME;
-
         this.setData({ showNicknameModal: false });
 
         if (this.pendingRoomId) {
@@ -428,17 +407,13 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             return;
         }
 
-        const { currentUser } = this.data;
-        if (!currentUser) {
-            void wx.showToast({ title: '用户信息错误', icon: 'error' });
-            return;
-        }
-
         this.isCreatingRoom = true;
         void wx.showLoading({ title: '创建房间中...' });
 
+        const nickname: string = nicknameService.getNickName();
+
         try {
-            const room = await roomService.createRoom(currentUser);
+            const room = await roomService.createRoom();
 
             void wx.hideLoading();
 
@@ -452,14 +427,11 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
 
             this.startWaitingTextCarousel();
 
-            logger.log(
-                'WaitingRoom',
-                `Room created - Code: ${room.roomCode}, Host: ${currentUser.userId}`
-            );
+            logger.log('WaitingRoom', `Room created - Code: ${room.roomCode}`);
 
             // CRITICAL: 房主创建房间后立即通过 WebSocket 加入
             // 后端已记录 hostUserId，前端通过该字段判断是否为房主
-            roomWebSocketService.joinRoom(room.roomCode, currentUser);
+            roomWebSocketService.joinRoom(room.roomCode, nickname);
         } catch (error) {
             void wx.hideLoading();
             logger.error('WaitingRoom', 'Create room failed:', error);
@@ -569,12 +541,6 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             return;
         }
 
-        const { currentUser } = this.data;
-        if (!currentUser) {
-            void wx.showToast({ title: '用户信息错误', icon: 'error' });
-            return;
-        }
-
         // 通过 WebSocket 加入房间
         this.setData({
             errorType: null,
@@ -585,7 +551,10 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         void wx.showLoading({ title: '加入房间中...' });
 
         // 发送加入房间消息
-        roomWebSocketService.joinRoom(roomCodeInput, currentUser);
+        roomWebSocketService.joinRoom(
+            roomCodeInput,
+            nicknameService.getNickName()
+        );
 
         // 设置超时处理
         setTimeout(() => {
@@ -626,12 +595,20 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     /**
      * 处理房间加入成功
      */
-    handleRoomJoined(room: IRoom): void {
+    handleRoomJoined(data: IJoinAckData): void {
+        const room = data.room;
         logger.log('WaitingRoom', room);
         void wx.hideLoading();
 
         // 释放加入房间的请求锁
         this.isJoiningRoom = false;
+
+        // 写入 globalData：自身身份信息
+        const app = getApp<IAppOption>();
+        app.globalData.selfUserId = data.selfUserId;
+        app.globalData.roomId = room.roomId;
+        app.globalData.roomCode = room.roomCode;
+        app.globalData.selfNickname = nicknameService.getNickName();
 
         this.setData({
             currentRoom: room,
@@ -651,26 +628,17 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             room.participants.length >= 2 &&
             room.status === ERoomStatus.Ready
         ) {
-            // 将双方昵称存入 globalData 供后续页面使用
-            const selfUserId: string = this.data.currentUser?.userId ?? '';
-            const hostParticipant = room.participants.find(
-                p => p.user.userId === room.hostUserId
-            );
-            const guestParticipant = room.participants.find(
-                p => p.user.userId !== room.hostUserId
-            );
-            const app = getApp<IAppOption>();
-            app.globalData.participants = {
-                hostNickName:
-                    hostParticipant?.user.nickname || DEFAULT_NICK_NAME,
-                guestNickName:
-                    guestParticipant?.user.nickname || DEFAULT_NICK_NAME,
-            };
+            // 写入对手信息到 globalData
+            const opponent = room.participants.find(
+                p => p.user.userId !== data.selfUserId
+            )!;
+            app.globalData.opponentUserId = opponent.user.userId;
+            app.globalData.opponentNickname = opponent.user.nickname;
 
             // 构建页面展示用的参与者列表
             const roomParticipants = room.participants.map(p => ({
                 nickname: p.user.nickname || DEFAULT_NICK_NAME,
-                isMe: p.user.userId === selfUserId,
+                isMe: p.user.userId === data.selfUserId,
             }));
             this.setData({ roomParticipants });
 
@@ -717,39 +685,10 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     onCountdownComplete(): void {
         this.clearAllTimers();
         // 跳转到击鼓抢麦房间页面
-        const { currentRoom, currentUser } = this.data;
-        if (currentRoom && currentUser) {
-            // Determine self role: host is Organizer, otherwise Joiner
-            const isHost: boolean =
-                currentRoom.hostUserId === currentUser.userId;
-            const selfRole: EPlayerRole = isHost
-                ? EPlayerRole.Organizer
-                : EPlayerRole.Joiner;
-
-            // Find organizer and joiner names
-            const hostParticipant = currentRoom.participants.find(
-                p => p.user.userId === currentRoom.hostUserId
-            );
-            const joinerParticipant = currentRoom.participants.find(
-                p => p.user.userId !== currentRoom.hostUserId
-            );
-
-            const organizerName: string = encodeURIComponent(
-                hostParticipant?.user.nickname || '小冤家'
-            );
-            const joinerName: string = encodeURIComponent(
-                joinerParticipant?.user.nickname || '家冤小'
-            );
-
-            const url: string =
-                `/packageA/pages/drum-room/index?roomId=${currentRoom.roomId}` +
-                `&selfRole=${selfRole}` +
-                `&hostRole=${EPlayerRole.Organizer}` +
-                `&organizerName=${organizerName}` +
-                `&joinerName=${joinerName}`;
-
+        const { currentRoom } = this.data;
+        if (currentRoom) {
             void wx.navigateTo({
-                url,
+                url: `/packageA/pages/drum-room/index?roomId=${currentRoom.roomId}`,
                 fail: err => {
                     logger.error('WaitingRoom', '跳转失败:', err);
                     void wx.showToast({

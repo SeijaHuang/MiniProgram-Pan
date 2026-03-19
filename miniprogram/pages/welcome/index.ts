@@ -1,5 +1,4 @@
 // pages/welcome/index.ts
-import { nicknameService } from '../../services/nickname-service';
 
 interface WelcomePageData {
     // 入场动画状态
@@ -34,9 +33,6 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
     hasPlayedEntrance: false,
 
     onLoad(): void {
-        // 初始化用户 ID
-        nicknameService.getUserId();
-
         wx.request({
             url: 'https://panleme.fun/health',
             success: res => console.log('HTTP OK:', res.statusCode),
