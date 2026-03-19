@@ -12,6 +12,7 @@
 import { API_BASE_URL } from '../constants/env';
 import type { IVerdictResult, IDimensionScores } from '../types/verdict';
 import type {
+    IBackendDimensionScores,
     IBackendVerdictResult,
     IVerdictResultPayload,
     IVerdictFailedPayload,
@@ -41,7 +42,7 @@ class VerdictService {
      * Backend uses logicFallacy/coquettishDamage, frontend uses logicSlippery/charmAttack
      */
     private mapDimensionScores(
-        backend: IBackendVerdictResult['radarChart']['host']
+        backend: IBackendDimensionScores
     ): IDimensionScores {
         return {
             mouthHard: backend.mouthHard,
@@ -64,39 +65,41 @@ class VerdictService {
             emoji: f.emoji,
         }));
 
-        // Map secret reports: backend uses array, frontend uses host/guest object
-        const hostReport = backend.secretReports.find(r => r.role === 'host');
-        const guestReport = backend.secretReports.find(r => r.role === 'guest');
+        // Map responsibility players
+        const players = backend.responsibility.players.map(p => ({
+            userId: p.userId,
+            nickname: p.nickname,
+            percentage: p.percentage,
+        }));
+
+        // Map radar chart players with dimension score renaming
+        const radarChart = backend.radarChart.map(p => ({
+            userId: p.userId,
+            nickname: p.nickname,
+            scores: this.mapDimensionScores(p.scores),
+        }));
+
+        // Map secret reports: backend uses highestDimension, frontend uses title
+        const secretReports = backend.secretReports.map(r => ({
+            userId: r.userId,
+            title: r.highestDimension,
+            advice: r.advice,
+        }));
 
         return {
             caseNumber: backend.caseNumber,
             winnerId: backend.winnerId,
             loserId: backend.loserId,
-            responsibility: {
-                host: backend.responsibility.host,
-                guest: backend.responsibility.guest,
-                thirdParty,
-            },
-            battleStats: {
-                host: this.mapDimensionScores(backend.radarChart.host),
-                guest: this.mapDimensionScores(backend.radarChart.guest),
-            },
+            responsibility: { players, thirdParty },
+            radarChart,
             verdictSummary: backend.verdict,
             punishmentTask: {
-                loserId: backend.punishmentTask.role,
+                loserUserId: backend.punishmentTask.loserUserId,
+                loserNickname: backend.punishmentTask.loserNickname,
                 task: backend.punishmentTask.task,
                 deadline: '须在24小时内完成',
             },
-            secretReports: {
-                host: {
-                    title: hostReport?.highestDimension ?? '',
-                    advice: hostReport?.advice ?? '',
-                },
-                guest: {
-                    title: guestReport?.highestDimension ?? '',
-                    advice: guestReport?.advice ?? '',
-                },
-            },
+            secretReports,
         };
     }
 

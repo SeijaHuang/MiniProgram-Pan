@@ -48,7 +48,7 @@ export interface IBackendThirdPartyFactor {
  * Backend secret report format
  */
 export interface IBackendSecretReport {
-    role: 'host' | 'guest';
+    userId: string;
     highestDimension: string;
     advice: string;
 }
@@ -59,22 +59,27 @@ export interface IBackendSecretReport {
  */
 export interface IBackendVerdictResult {
     caseNumber: string;
-    winnerId: 'host' | 'guest';
-    loserId: 'host' | 'guest';
+    winnerId: string; // userId
+    loserId: string; // userId
     responsibility: {
-        host: number;
-        guest: number;
+        players: Array<{
+            userId: string;
+            nickname: string;
+            percentage: number;
+        }>;
         thirdParty: {
             factors: IBackendThirdPartyFactor[];
         };
     };
-    radarChart: {
-        host: IBackendDimensionScores;
-        guest: IBackendDimensionScores;
-    };
+    radarChart: Array<{
+        userId: string;
+        nickname: string;
+        scores: IBackendDimensionScores;
+    }>;
     verdict: string;
     punishmentTask: {
-        role: 'host' | 'guest';
+        loserUserId: string;
+        loserNickname: string;
         task: string;
     };
     secretReports: IBackendSecretReport[];

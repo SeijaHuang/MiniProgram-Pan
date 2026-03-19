@@ -105,7 +105,6 @@ Page({
     _nextTextId: 0 as number,
     _enterTime: 0 as number,
     _hasNavigated: false as boolean,
-    _role: 'host' as 'host' | 'guest',
 
     // Timer references
     _dotsTimer: null as number | null,
@@ -122,7 +121,6 @@ Page({
     onLoad(options: Record<string, string | undefined>): void {
         const roomId: string = options.roomId ?? '';
         const roomCode: string = options.roomCode ?? '';
-        this._role = (options.role as 'host' | 'guest') ?? 'host';
 
         // Generate particles
         const particles: IParticle[] = generateParticles(PARTICLE_COUNT);
@@ -265,14 +263,10 @@ Page({
         if (this._hasNavigated) return;
         this._hasNavigated = true;
 
-        const { roomId } = this.data;
-        const role: string = this._role;
         this._cleanup();
 
         void wx.redirectTo({
-            url:
-                `/packageB/pages/verdict/index` +
-                `?roomId=${roomId}&role=${role}`,
+            url: '/packageB/pages/verdict/index',
         });
     },
 
@@ -492,7 +486,7 @@ Page({
      */
     onTapRetry(): void {
         const { roomId } = this.data;
-        const userId: string = wx.getStorageSync('userId') ?? '';
+        const userId: string = getApp<IAppOption>().globalData.selfUserId;
 
         if (!roomId || !userId) {
             logger.warn(

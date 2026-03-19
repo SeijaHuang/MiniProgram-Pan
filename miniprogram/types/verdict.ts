@@ -13,11 +13,19 @@ export interface IThirdPartyFactor {
 }
 
 /**
- * Responsibility distribution (host + guest + thirdParty = 100)
+ * Player responsibility entry
+ */
+export interface IResponsibilityPlayer {
+    userId: string;
+    nickname: string;
+    percentage: number;
+}
+
+/**
+ * Responsibility distribution (players + thirdParty = 100)
  */
 export interface IResponsibility {
-    host: number;
-    guest: number;
+    players: IResponsibilityPlayer[];
     thirdParty: IThirdPartyFactor[];
 }
 
@@ -34,18 +42,20 @@ export interface IDimensionScores {
 }
 
 /**
- * Battle stats for both players
+ * Radar chart entry for one player
  */
-export interface IBattleStats {
-    host: IDimensionScores;
-    guest: IDimensionScores;
+export interface IRadarChartPlayer {
+    userId: string;
+    nickname: string;
+    scores: IDimensionScores;
 }
 
 /**
  * Punishment task for the loser
  */
 export interface IPunishmentTask {
-    loserId: 'host' | 'guest';
+    loserUserId: string;
+    loserNickname: string;
     task: string;
     deadline: string;
 }
@@ -54,16 +64,9 @@ export interface IPunishmentTask {
  * Secret report for one player
  */
 export interface ISecretReport {
+    userId: string;
     title: string;
     advice: string;
-}
-
-/**
- * Secret reports for both players
- */
-export interface ISecretReports {
-    host: ISecretReport;
-    guest: ISecretReport;
 }
 
 /**
@@ -71,13 +74,13 @@ export interface ISecretReports {
  */
 export interface IVerdictResult {
     caseNumber: string;
-    winnerId: 'host' | 'guest' | null;
-    loserId: 'host' | 'guest' | null;
+    winnerId: string | null;
+    loserId: string | null;
     responsibility: IResponsibility;
-    battleStats: IBattleStats;
+    radarChart: IRadarChartPlayer[];
     verdictSummary: string;
     punishmentTask: IPunishmentTask;
-    secretReports: ISecretReports;
+    secretReports: ISecretReport[];
 }
 
 /**

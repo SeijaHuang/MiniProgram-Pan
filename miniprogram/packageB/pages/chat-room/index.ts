@@ -973,16 +973,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 直接跳转到 verdict-waiting
         const roomId: string = this.data.roomCode;
-        const completeApp = getApp<IAppOption>();
-        const role: string =
-            completeApp.globalData.selfUserId ===
-            completeApp.globalData.hostUserId
-                ? 'host'
-                : 'guest';
         void wx.redirectTo({
-            url:
-                `/packageB/pages/verdict-waiting/index` +
-                `?roomId=${roomId}&role=${role}`,
+            url: `/packageB/pages/verdict-waiting/index?roomId=${roomId}`,
         });
     },
 
