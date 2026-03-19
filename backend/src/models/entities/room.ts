@@ -27,14 +27,10 @@ export interface IParticipant {
  * Tracks accumulated ASR text and turn completion for both players
  */
 export interface ISpeechState {
-    /** Accumulated final ASR text for host */
-    hostText: string;
-    /** Accumulated final ASR text for guest */
-    guestText: string;
-    /** Whether host finished their turn */
-    hostFinished: boolean;
-    /** Whether guest finished their turn */
-    guestFinished: boolean;
+    /** Accumulated final ASR text per userId */
+    texts: { [userId: string]: string };
+    /** Whether each userId has finished their turn */
+    finished: { [userId: string]: boolean };
 }
 
 /**

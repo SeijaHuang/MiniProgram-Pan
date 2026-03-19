@@ -18,6 +18,7 @@ export type TSpeechTurnEndHandlerResult =
           roomId: string;
           userId: string;
           bothFinished: boolean;
+          nextSpeakerUserId?: string;
       }
     | {
           success: false;
@@ -50,38 +51,40 @@ export function handleSpeechTurnEnd(
     // 3. Initialize speech state if needed
     if (!room.speechState) {
         room.speechState = {
-            hostText: '',
-            guestText: '',
-            hostFinished: false,
-            guestFinished: false,
+            texts: {},
+            finished: {},
         };
     }
 
     // 4. Mark user's turn as finished
-    const isHost = userId === room.hostUserId;
-    if (isHost) {
-        room.speechState.hostFinished = true;
-    } else {
-        room.speechState.guestFinished = true;
-    }
+    room.speechState.finished[userId] = true;
 
     logger.log(
         'SpeechTurnEnd',
-        `${isHost ? 'Host' : 'Guest'} finished speaking in room ${roomId}`
+        `User ${userId} finished speaking in room ${roomId}`
     );
 
     // 5. Check if both finished
-    const bothFinished =
-        room.speechState.hostFinished && room.speechState.guestFinished;
+    const participantIds = room.participants.map(p => p.user.userId);
+    const bothFinished = participantIds.every(
+        uid => room.speechState!.finished[uid]
+    );
 
     if (bothFinished) {
         logger.log('SpeechTurnEnd', `Both players finished in room ${roomId}`);
+        return { success: true, roomId, userId, bothFinished: true };
     }
+
+    // 6. Find next speaker (the one who hasn't finished yet)
+    const nextSpeakerUserId = participantIds.find(
+        uid => !room.speechState!.finished[uid]
+    );
 
     return {
         success: true,
         roomId,
         userId,
-        bothFinished,
+        bothFinished: false,
+        nextSpeakerUserId,
     };
 }

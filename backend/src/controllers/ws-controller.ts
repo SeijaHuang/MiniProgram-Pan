@@ -627,6 +627,7 @@ export class WebSocketController {
                 type: EWSMessageType.SpeechTurnSwitch,
                 data: {
                     roomId: result.roomId,
+                    nextSpeakerUserId: result.nextSpeakerUserId ?? '',
                 },
                 timestamp: Date.now(),
             });

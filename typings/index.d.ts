@@ -9,6 +9,7 @@ interface IAppOption {
     roomId: string;
     roomCode: string;
     firstSpeakerUserId: string;
+    hostUserId: string;
   }
   userInfoReadyCallback?: WechatMiniprogram.GetUserInfoSuccessCallback,
 }

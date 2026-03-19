@@ -3,7 +3,6 @@
  */
 
 import { asrService } from '../../../services/asr-service';
-import { nicknameService } from '../../../services/nickname-service';
 import { stsService } from '../../../services/sts-service';
 import { wsManager } from '../../../services/websocket-manager';
 import type { IEmojiReceiveData } from '../../../types/emoji-websocket';
@@ -12,7 +11,7 @@ import type {
     IChatCompletePayload,
     ISpeechTurnSwitchPayload,
 } from '../../../types/verdict-ws';
-import { EWSMessageType, EPlayerRole } from '../../../types/websocket-common';
+import { EWSMessageType } from '../../../types/websocket-common';
 import { logger } from '../../../utils/logger';
 
 // 引入腾讯云语音识别插件
@@ -40,13 +39,6 @@ interface IReaction {
     animationData: WechatMiniprogram.AnimationExportResult;
 }
 
-interface IChatRoomOnLoadOptions {
-    roomCode?: string;
-    role?: string;
-    originalRole?: string;
-    opponentName?: string;
-}
-
 interface IChatRoomPageData {
     // 告状须知弹窗
     showNotification: boolean;
@@ -58,7 +50,6 @@ interface IChatRoomPageData {
 
     // 核心状态机字段
     phase: EPhase;
-    localRole: EPlayerRole;
     remaining: number;
     totalPerTurn: number;
 
@@ -120,7 +111,8 @@ interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     rpxToPx: number;
     asrManager: AsrManager; // 语音识别管理器
     stsCredentials: ISTSCredentials | null; // STS 临时凭证
-    _originalRole: EPlayerRole; // Room creator role (for verdict navigation)
+    currentSpeakerUserId: string; // UserId of current speaker
+    isSelfFirstSpeaker: boolean; // Whether self is first speaker (SpeakerA)
 }
 
 const EMOJI_LIST = [
@@ -185,7 +177,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         roomCode: '',
 
         phase: EPhase.SpeakerA,
-        localRole: EPlayerRole.Organizer,
         remaining: TOTAL_PER_TURN,
         totalPerTurn: TOTAL_PER_TURN,
 
@@ -235,29 +226,20 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     rpxToPx: 0.5,
     asrManager: null,
     stsCredentials: null,
-    _originalRole: EPlayerRole.Organizer,
+    currentSpeakerUserId: '',
+    isSelfFirstSpeaker: false,
 
-    onLoad(options: IChatRoomOnLoadOptions): void {
-        // 解析页面参数
-        const roomCode = options.roomCode ?? '';
-        const localRole: EPlayerRole =
-            options.role === EPlayerRole.Joiner
-                ? EPlayerRole.Joiner
-                : EPlayerRole.Organizer;
-        // originalRole: room creator role (independent of drum game result)
-        // Used for verdict navigation to match backend host/guest classification
-        this._originalRole =
-            options.originalRole === EPlayerRole.Joiner
-                ? EPlayerRole.Joiner
-                : EPlayerRole.Organizer;
-        const opponentName: string = options.opponentName
-            ? decodeURIComponent(options.opponentName)
-            : DEFAULT_OPPONENT_NAME;
-        const selfName: string = nicknameService.getNickName();
-        const hostName: string =
-            localRole === EPlayerRole.Organizer ? selfName : opponentName;
-        const guestName: string =
-            localRole === EPlayerRole.Joiner ? selfName : opponentName;
+    onLoad(_options): void {
+        const app = getApp<IAppOption>();
+        const {
+            selfUserId,
+            opponentNickname,
+            firstSpeakerUserId,
+            roomCode,
+            selfNickname,
+            hostUserId,
+        } = app.globalData;
+
         // 校验 roomCode
         if (!roomCode) {
             void wx.showToast({ title: '房间号无效', icon: 'error' });
@@ -267,11 +249,14 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        // 计算初始权限
-        const canSpeak: boolean = this.computeCanSpeak(
-            EPhase.SpeakerA,
-            localRole
-        );
+        this.currentSpeakerUserId = firstSpeakerUserId;
+        this.isSelfFirstSpeaker = selfUserId === firstSpeakerUserId;
+        const canSpeak: boolean = this.currentSpeakerUserId === selfUserId;
+
+        const opponentName: string = opponentNickname || DEFAULT_OPPONENT_NAME;
+        const isHost: boolean = selfUserId === hostUserId;
+        const hostName: string = isHost ? selfNickname : opponentName;
+        const guestName: string = isHost ? opponentName : selfNickname;
 
         // 计算 rpx → px 换算比例
         const sysInfo = wx.getSystemInfoSync();
@@ -287,7 +272,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         this.setData({
             roomCode,
-            localRole,
             totalPerTurn: TOTAL_PER_TURN,
             remaining: TOTAL_PER_TURN,
             phase: EPhase.SpeakerA,
@@ -372,21 +356,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
-     * 计算 canSpeak 权限
-     * SPEAKER_A 阶段：Organizer（赢家）先说
-     * SPEAKER_B 阶段：Joiner（输家）后说
-     */
-    computeCanSpeak(phase: EPhase, localRole: EPlayerRole): boolean {
-        if (phase === EPhase.SpeakerA) {
-            return localRole === EPlayerRole.Organizer;
-        }
-        if (phase === EPhase.SpeakerB) {
-            return localRole === EPlayerRole.Joiner;
-        }
-        return false;
-    },
-
-    /**
      * 获取倒计时 class
      */
     getCountdownClass(remaining: number): 'normal' | 'warn' | 'danger' {
@@ -467,7 +436,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      */
     initASRService(): void {
         const { roomCode } = this.data;
-        const userId: string | null = wx.getStorageSync('userId');
+        const userId: string = getApp<IAppOption>().globalData.selfUserId;
 
         if (!roomCode || !userId) {
             logger.warn(
@@ -500,27 +469,27 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
-     * 获取本地发言对应的 data key（基于角色，不受阶段切换影响）
-     * Organizer 在 SpeakerA 发言，Joiner 在 SpeakerB 发言
+     * 获取本地发言对应的 data key（基于是否先发言，不受阶段切换影响）
+     * 先发言者在 SpeakerA 发言，后发言者在 SpeakerB 发言
      */
     getLocalSpeechKeys(): {
         finalKey: keyof TSpeakerFinal;
         liveKey: keyof TSpeakerLive;
     } {
-        if (this.data.localRole === EPlayerRole.Organizer) {
+        if (this.isSelfFirstSpeaker) {
             return { finalKey: 'speakerAFinal', liveKey: 'speakerALive' };
         }
         return { finalKey: 'speakerBFinal', liveKey: 'speakerBLive' };
     },
 
     /**
-     * 获取对方发言对应的 data key（基于角色，不受阶段切换影响）
+     * 获取对方发言对应的 data key（基于是否先发言，不受阶段切换影响）
      */
     getOpponentSpeechKeys(): {
         finalKey: keyof TSpeakerFinal;
         liveKey: keyof TSpeakerLive;
     } {
-        if (this.data.localRole === EPlayerRole.Organizer) {
+        if (this.isSelfFirstSpeaker) {
             return { finalKey: 'speakerBFinal', liveKey: 'speakerBLive' };
         }
         return { finalKey: 'speakerAFinal', liveKey: 'speakerALive' };
@@ -837,7 +806,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 切换阶段
      */
     switchPhase(): void {
-        const { phase, localRole, totalPerTurn, canSpeak } = this.data;
+        const { phase, totalPerTurn, canSpeak } = this.data;
         // 根据当前阶段直接计算 liveKey（同步，无竞态问题）
         const liveKey: 'speakerALive' | 'speakerBLive' =
             phase === EPhase.SpeakerA ? 'speakerALive' : 'speakerBLive';
@@ -872,7 +841,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             });
             // 等待 CHAT_COMPLETE 消息触发跳转
         } else {
-            const nextCanSpeak = this.computeCanSpeak(nextPhase, localRole);
+            const phaseApp = getApp<IAppOption>();
+            this.currentSpeakerUserId = phaseApp.globalData.opponentUserId;
+            const nextCanSpeak: boolean =
+                this.currentSpeakerUserId === phaseApp.globalData.selfUserId;
 
             // 不再发言时停止倒计时（由新发言者自行启动）
             if (!nextCanSpeak && this.timerId) {
@@ -909,7 +881,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      */
     sendSpeechTurnEnd(): void {
         const roomId: string = this.data.roomCode;
-        const userId: string = wx.getStorageSync('userId') ?? '';
+        const userId: string = getApp<IAppOption>().globalData.selfUserId;
 
         if (!roomId || !userId) {
             logger.warn(
@@ -933,8 +905,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 第一位发言者结束后，服务器通知切换发言人
      * 已在正确阶段的一方（发送者）忽略，未切换的一方更新状态
      */
-    handleSpeechTurnSwitch(): void {
-        const { phase, localRole, totalPerTurn } = this.data;
+    handleSpeechTurnSwitch(payload: ISpeechTurnSwitchPayload): void {
+        const { phase, totalPerTurn } = this.data;
 
         // 已经不在 SpeakerA 阶段，忽略
         if (phase !== EPhase.SpeakerA) {
@@ -944,13 +916,12 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         logger.log('ChatRoom', 'SPEECH_TURN_SWITCH → SpeakerB');
 
+        this.currentSpeakerUserId = payload.nextSpeakerUserId;
+        const selfUserId: string = getApp<IAppOption>().globalData.selfUserId;
+        const nextCanSpeak: boolean = this.currentSpeakerUserId === selfUserId;
+
         // 显示"下一位"切换提示
         this.showSwitchNotification();
-
-        const nextCanSpeak: boolean = this.computeCanSpeak(
-            EPhase.SpeakerB,
-            localRole
-        );
 
         this.setData({
             phase: EPhase.SpeakerB,
@@ -1002,10 +973,12 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 直接跳转到 verdict-waiting
         const roomId: string = this.data.roomCode;
-        // Use _originalRole (room creator role) so currentRole on verdict page
-        // matches backend host/guest classification (based on room.hostUserId)
+        const completeApp = getApp<IAppOption>();
         const role: string =
-            this._originalRole === EPlayerRole.Organizer ? 'host' : 'guest';
+            completeApp.globalData.selfUserId ===
+            completeApp.globalData.hostUserId
+                ? 'host'
+                : 'guest';
         void wx.redirectTo({
             url:
                 `/packageB/pages/verdict-waiting/index` +
@@ -1232,7 +1205,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         }
 
         const roomId: string = this.data.roomCode;
-        const senderId: string = wx.getStorageSync('userId') ?? '';
+        const senderId: string = getApp<IAppOption>().globalData.selfUserId;
 
         if (!roomId || !senderId) {
             return;
@@ -1262,7 +1235,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
             switch (message.type) {
                 case EWSMessageType.SpeechTurnSwitch:
-                    this.handleSpeechTurnSwitch();
+                    this.handleSpeechTurnSwitch(
+                        message.data as ISpeechTurnSwitchPayload
+                    );
                     break;
                 case EWSMessageType.ChatComplete:
                     this.handleChatComplete(

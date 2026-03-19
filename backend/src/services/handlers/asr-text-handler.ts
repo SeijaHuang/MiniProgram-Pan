@@ -218,26 +218,19 @@ export function handleASRTextPush(
 
         // Accumulate final text into room's speech state
         if (text.trim()) {
-            const isHost = speakerId === room.hostUserId;
-
             if (!room.speechState) {
                 room.speechState = {
-                    hostText: '',
-                    guestText: '',
-                    hostFinished: false,
-                    guestFinished: false,
+                    texts: {},
+                    finished: {},
                 };
             }
 
-            if (isHost) {
-                room.speechState.hostText += text.trim() + ' ';
-            } else {
-                room.speechState.guestText += text.trim() + ' ';
-            }
+            room.speechState.texts[speakerId] =
+                (room.speechState.texts[speakerId] ?? '') + text.trim() + ' ';
 
             logger.log(
                 'ASR',
-                `Accumulated ${isHost ? 'host' : 'guest'} speech: ${isHost ? room.speechState.hostText.length : room.speechState.guestText.length} chars`
+                `Accumulated speech for ${speakerId}: ${room.speechState.texts[speakerId].length} chars`
             );
         }
 

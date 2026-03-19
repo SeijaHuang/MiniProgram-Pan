@@ -66,8 +66,15 @@ export class VerdictOrchestratorService {
             );
 
             // 6. Validate speeches are not empty
-            const hostText = room.speechState.hostText.trim();
-            const guestText = room.speechState.guestText.trim();
+            const guestUserId =
+                room.participants.find(p => p.user.userId !== room.hostUserId)
+                    ?.user.userId ?? '';
+            const hostText = (
+                room.speechState.texts[room.hostUserId] ?? ''
+            ).trim();
+            const guestText = (
+                room.speechState.texts[guestUserId] ?? ''
+            ).trim();
 
             if (!hostText && !guestText) {
                 throw new Error('Both speeches are empty');

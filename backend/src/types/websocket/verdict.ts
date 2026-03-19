@@ -25,6 +25,7 @@ export interface ISpeechTurnEndMessage extends IWSMessage<ISpeechTurnEndData> {
  */
 export interface ISpeechTurnSwitchData {
     roomId: string;
+    nextSpeakerUserId: string;
 }
 
 export interface ISpeechTurnSwitchMessage extends IWSMessage<ISpeechTurnSwitchData> {

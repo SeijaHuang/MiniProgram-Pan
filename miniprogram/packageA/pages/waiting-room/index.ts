@@ -609,6 +609,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         app.globalData.roomId = room.roomId;
         app.globalData.roomCode = room.roomCode;
         app.globalData.selfNickname = nicknameService.getNickName();
+        app.globalData.hostUserId = room.hostUserId;
 
         this.setData({
             currentRoom: room,

@@ -11,6 +11,7 @@
  */
 export interface ISpeechTurnSwitchPayload {
     roomId: string;
+    nextSpeakerUserId: string;
 }
 
 /**
