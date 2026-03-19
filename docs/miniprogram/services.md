@@ -154,19 +154,19 @@ export const nicknameService = new NicknameService();
 ```typescript
 interface IDrumServiceOptions {
     roomId: string;
-    selfRole: EPlayerRole;
     onReady: (
         serverTimeMs,
-        hostRole,
-        organizerName,
-        joinerName,
+        organizerUserId,
+        joinerUserId,
+        organizerNickname,
+        joinerNickname,
         receivedAtMs
     ) => void;
     onPlayerReady: (readyCount: number) => void;
     onStart: (startAtMs) => void;
-    onTap: (role, delta) => void;
+    onTap: (userId: string, delta: number) => void;
     onFinish: () => void;
-    onResult: (winnerRole) => void;
+    onResult: (winnerUserId: string) => void;
     onError: (message) => void;
 }
 ```
@@ -241,18 +241,16 @@ interface IVerdictListeningOptions {
 }
 ```
 
-**数据格式转换**:
+**数据格式转换**（PRD 重构后）:
 
-| 后端字段                                   | 前端字段                             | 转换说明                  |
-| ------------------------------------------ | ------------------------------------ | ------------------------- |
-| `radarChart.host/guest`                    | `battleStats.host/guest`             | 字段重命名                |
-| `radarChart.*.logicFallacy`                | `battleStats.*.logicSlippery`        | 维度键映射                |
-| `radarChart.*.coquettishDamage`            | `battleStats.*.charmAttack`          | 维度键映射                |
-| `verdict`                                  | `verdictSummary`                     | 字段重命名                |
-| `punishmentTask.role`                      | `punishmentTask.loserId`             | 字段重命名                |
-| `responsibility.thirdParty.factors[].name` | `responsibility.thirdParty[].reason` | 字段重命名                |
-| `secretReports[]`（数组 + role 字段）      | `secretReports.host/guest`（对象）   | 数组 → 对象               |
-| `punishmentTask`（无 deadline 字段）       | `punishmentTask.deadline`            | 固定值 "须在24小时内完成" |
+| 后端字段                                   | 前端字段                   | 转换说明                                    |
+| ------------------------------------------ | -------------------------- | ------------------------------------------- |
+| `verdict.winnerId/loserId`                 | `verdict.winnerId/loserId` | 均为真实 `userId`                           |
+| `responsibility.players[]`                 | `responsibility.players[]` | 数组内已含 `userId + nickname + percentage` |
+| `radarChart[]`                             | `battleStats.players[]`    | 后端数组 → 前端数组（内含 nickname）        |
+| `verdict`                                  | `verdictSummary`           | 字段重命名                                  |
+| `punishmentTask.loserUserId/loserNickname` | `punishmentTask.*`         | 直接渲染，无 role 映射                      |
+| `secretReports[]`                          | `secretReports[]`          | 每项含 `userId`，前端用 `selfUserId` 匹配   |
 
 **消息类型**:
 

@@ -88,7 +88,7 @@ enum EWSMessageType {
 
 **用途**:
 - 同步服务器时间
-- 传递玩家角色和昵称信息
+- 传递双方身份（userId）与昵称信息（不再下发 role）
 
 **消息格式**:
 ```typescript
@@ -97,9 +97,10 @@ interface IDrumReadyMessage {
     data: {
         roomId: string;
         serverTimeMs: number;    // 服务器当前时间戳（毫秒）
-        hostRole: EPlayerRole;   // 房主角色（始终为 Organizer）
-        organizerName: string;   // 房主显示名（默认"小冤家"）
-        joinerName: string;      // 加入者显示名（默认"家冤小"）
+        organizerUserId: string;     // 房主 userId
+        joinerUserId: string;        // 访客 userId
+        organizerNickname: string;   // 房主昵称
+        joinerNickname: string;      // 访客昵称
     };
     timestamp: number;
 }
@@ -112,9 +113,10 @@ interface IDrumReadyMessage {
     "data": {
         "roomId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
         "serverTimeMs": 1737849600000,
-        "hostRole": "ORGANIZER",
-        "organizerName": "小冤家",
-        "joinerName": "家冤小"
+        "organizerUserId": "user-12345",
+        "joinerUserId": "user-67890",
+        "organizerNickname": "小冤家",
+        "joinerNickname": "家冤小"
     },
     "timestamp": 1737849600000
 }
@@ -209,7 +211,7 @@ interface IDrumTapMessage {
     type: 'DRUM_TAP';
     data: {
         roomId: string;
-        role: EPlayerRole;    // 点击者角色
+        userId: string;       // 点击者 userId
         delta: number;        // 本批次点击次数
         clientTimeMs: number; // 客户端时间戳
     };
@@ -223,7 +225,7 @@ interface IDrumTapMessage {
     "type": "DRUM_TAP",
     "data": {
         "roomId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-        "role": "ORGANIZER",
+        "userId": "user-12345",
         "delta": 5,
         "clientTimeMs": 1737849605000
     },
@@ -275,9 +277,10 @@ interface IDrumResultMessage {
     type: 'DRUM_RESULT';
     data: {
         roomId: string;
-        organizerScore: number;  // 房主得分
-        joinerScore: number;     // 加入者得分
-        winnerRole: EPlayerRole; // 获胜者角色
+        scores: {                // key 为 userId
+            [userId: string]: number;
+        };
+        winnerUserId: string;    // 获胜者 userId
     };
     timestamp: number;
 }
@@ -289,9 +292,11 @@ interface IDrumResultMessage {
     "type": "DRUM_RESULT",
     "data": {
         "roomId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-        "organizerScore": 85,
-        "joinerScore": 72,
-        "winnerRole": "ORGANIZER"
+        "scores": {
+            "user-12345": 85,
+            "user-67890": 72
+        },
+        "winnerUserId": "user-12345"
     },
     "timestamp": 1737849613100
 }
@@ -327,11 +332,13 @@ enum EGamePhase {
 interface IDrumGameState {
     roomId: string;
     phase: EGamePhase;
-    hostRole: EPlayerRole;      // 始终为 ORGANIZER
-    organizer: IUser;           // 房主用户信息
-    joiner: IUser;              // 加入者用户信息
-    organizerScore: number;     // 房主当前得分
-    joinerScore: number;        // 加入者当前得分
+    organizerUserId: string;    // 房主 userId
+    joinerUserId: string;       // 访客 userId
+    organizer: IUser;           // 房主用户信息（含 userId + nickname）
+    joiner: IUser;              // 访客用户信息（含 userId + nickname）
+    scores: {                   // 当前得分（key 为 userId）
+        [userId: string]: number;
+    };
     startAtMs: number;          // 游戏开始时间
     endAtMs: number;            // 游戏结束时间
 }
@@ -341,9 +348,8 @@ interface IDrumGameState {
 
 ```typescript
 interface IDrumGameResult {
-    organizerScore: number;
-    joinerScore: number;
-    winnerRole: EPlayerRole;
+    scores: { [userId: string]: number };
+    winnerUserId: string;
 }
 ```
 
@@ -409,7 +415,7 @@ export const DRUM_CONFIG = {
 
 | 错误码 | 场景 | 说明 |
 |--------|------|------|
-| `INVALID_PAYLOAD` | 消息格式错误 | 检查 roomId、role、delta 字段 |
+| `INVALID_PAYLOAD` | 消息格式错误 | 检查 roomId、userId、delta 字段 |
 | `ROOM_NOT_FOUND` | 游戏不存在 | 房间可能已关闭 |
 | `ROOM_NOT_READY` | 游戏未在进行中 | 只有 RUNNING 阶段才接受点击 |
 
@@ -480,9 +486,10 @@ private static startDrumGame(roomId: string): void {
         data: {
             roomId,
             serverTimeMs: Date.now(),
-            hostRole: game.hostRole,
-            organizerName,
-            joinerName,
+            organizerUserId: game.organizerUserId,
+            joinerUserId: game.joinerUserId,
+            organizerNickname,
+            joinerNickname,
         },
         timestamp: Date.now(),
     });
@@ -520,7 +527,7 @@ export function handleDrumTap(message: IDrumTapMessage): TDrumTapHandlerResult {
         return { success: false, code: EWSErrorCode.InvalidPayload, message: '...' };
     }
 
-    const { roomId, role, delta } = validation.data;
+    const { roomId, userId, delta } = validation.data;
 
     // 检查游戏存在
     const game = drumGameManager.getGame(roomId);
@@ -534,24 +541,20 @@ export function handleDrumTap(message: IDrumTapMessage): TDrumTapHandlerResult {
     }
 
     // 记录点击
-    drumGameManager.recordTap(roomId, role, delta);
+    drumGameManager.recordTap(roomId, userId, delta);
 
-    return { success: true, roomId, role, delta };
+    return { success: true, roomId, userId, delta };
 }
 ```
 
 #### 3. 计分逻辑 (drum-game-manager.ts)
 
 ```typescript
-recordTap(roomId: string, role: EPlayerRole, delta: number): IDrumGameState | undefined {
+recordTap(roomId: string, userId: string, delta: number): IDrumGameState | undefined {
     const game = this.games.get(roomId);
     if (!game || game.phase !== EGamePhase.Running) return game;
 
-    if (role === EPlayerRole.Organizer) {
-        game.organizerScore += delta;
-    } else {
-        game.joinerScore += delta;
-    }
+    game.scores[userId] = (game.scores[userId] ?? 0) + delta;
 
     return game;
 }
@@ -560,22 +563,16 @@ calculateResult(roomId: string): IDrumGameResult | undefined {
     const game = this.games.get(roomId);
     if (!game) return undefined;
 
-    let winnerRole: EPlayerRole;
-    if (game.organizerScore > game.joinerScore) {
-        winnerRole = EPlayerRole.Organizer;
-    } else if (game.joinerScore > game.organizerScore) {
-        winnerRole = EPlayerRole.Joiner;
-    } else {
-        // 平局：房主获胜
-        winnerRole = EPlayerRole.Organizer;
-    }
+    const organizerScore = game.scores[game.organizerUserId] ?? 0;
+    const joinerScore = game.scores[game.joinerUserId] ?? 0;
+    const winnerUserId =
+        organizerScore >= joinerScore ? game.organizerUserId : game.joinerUserId;
 
     game.phase = EGamePhase.Finished;
 
     return {
-        organizerScore: game.organizerScore,
-        joinerScore: game.joinerScore,
-        winnerRole,
+        scores: game.scores,
+        winnerUserId,
     };
 }
 ```
@@ -638,7 +635,7 @@ calculateResult(roomId: string): IDrumGameResult | undefined {
 wscat -c ws://localhost:8080/ws
 
 # 发送点击消息
-{"type":"DRUM_TAP","data":{"roomId":"test-room","role":"ORGANIZER","delta":5,"clientTimeMs":1737849605000}}
+{"type":"DRUM_TAP","data":{"roomId":"test-room","userId":"user-12345","delta":5,"clientTimeMs":1737849605000}}
 ```
 
 ### 单元测试场景

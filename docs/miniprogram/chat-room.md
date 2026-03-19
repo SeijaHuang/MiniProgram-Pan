@@ -317,19 +317,17 @@ type ChatRoomState =
 
 ### 9.2 生命周期管理
 
-- **onLoad**: 解析 URL 参数（`roomCode`、`role`、`opponentName`），初始化 WebSocket 连接，注册消息监听
+- **onLoad**: 从 `getApp().globalData` 读取 `roomCode/selfUserId/opponentUserId/firstSpeakerUserId` 等身份与房间信息，初始化状态机与 WebSocket 监听
 - **onShow**: 恢复页面状态，检查连接状态
 - **onUnload**: 取消 WebSocket 监听，关闭连接
 
-**URL 参数说明**:
+**页面入参（重构后）**:
 
-| 参数           | 类型     | 说明                                                     |
-| -------------- | -------- | -------------------------------------------------------- |
-| `roomCode`     | `string` | 房间 ID（来自 drum-room 跳转）                           |
-| `role`         | `string` | 当前用户角色（`host` / `guest`）                         |
-| `opponentName` | `string` | 对手昵称（`encodeURIComponent` 编码，由 drum-room 传入） |
+- **不再通过 URL 传递任何身份字段**（`userId` / `nickname` / `role` / `opponentName` 均移除）
+- `roomCode`/双方昵称与 userId 在 Waiting Room 收到 `JOIN_ACK` 后写入 `globalData`
+- `firstSpeakerUserId` 在 Drum Room 收到 `DRUM_RESULT` 后写入 `globalData`，Chat Room 用它决定谁先发言
 
-`opponentName` 用于 `buildListenerHints(name)` 生成含对方姓名的监听提示文案（如「静听{对方}发言中…」），替代原先的静态文案数组。
+监听提示文案（如「静听{对方}发言中…」）使用 `globalData.opponentNickname` 构造，无需 URL 传参。
 
 ---
 

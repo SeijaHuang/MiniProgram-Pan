@@ -68,10 +68,7 @@
   type: "JOIN_ROOM";
   data: {
     roomCode: string;     // 6位房间代码
-    user: {
-      userId: string;     // 用户唯一标识
-      nickname: string;   // 用户昵称
-    }
+    nickname: string;     // 用户昵称（前端只传昵称，userId 由后端生成）
   };
   timestamp: number;      // 客户端时间戳
 }
@@ -83,10 +80,7 @@
   "type": "JOIN_ROOM",
   "data": {
     "roomCode": "A1B2C3",
-    "user": {
-      "userId": "user-67890",
-      "nickname": "Bob"
-    }
+    "nickname": "Bob"
   },
   "timestamp": 1737849600000
 }
@@ -103,6 +97,7 @@
 {
   type: "JOIN_ACK";
   data: {
+    selfUserId: string; // 当前连接者自己的 userId（后端生成）
     room: {
       roomId: string;
       roomCode: string;
@@ -121,6 +116,7 @@
 {
   "type": "JOIN_ACK",
   "data": {
+    "selfUserId": "user-12345",
     "room": {
       "roomId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
       "roomCode": "A1B2C3",
@@ -147,6 +143,7 @@
 {
   "type": "JOIN_ACK",
   "data": {
+    "selfUserId": "user-67890",
     "room": {
       "roomId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
       "roomCode": "A1B2C3",
@@ -278,10 +275,10 @@ class RoomWebSocketService {
     };
   }
 
-  joinRoom(roomCode: string, user: IUser) {
+  joinRoom(roomCode: string, nickname: string) {
     const message = {
       type: 'JOIN_ROOM',
-      data: { roomCode, user },
+      data: { roomCode, nickname },
       timestamp: Date.now()
     };
 
@@ -300,8 +297,10 @@ class RoomWebSocketService {
     }
   }
 
-  private onJoinSuccess(room: IRoom) {
+  private onJoinSuccess(data: { selfUserId: string; room: IRoom }) {
+    const { selfUserId, room } = data;
     console.log('Joined room:', room.roomCode);
+    console.log('Self userId:', selfUserId);
     console.log('Participants:', room.participants.length);
     console.log('Status:', room.status);
 
@@ -335,19 +334,21 @@ class RoomWebSocketService {
 // miniprogram/services/room-websocket-service.ts
 class RoomWebSocketService {
   joinRoom(roomCode: string): void {
-    const user = this.getCurrentUser();
+    const nickname = this.getCurrentNickname();
 
     webSocketManager.send({
       type: 'JOIN_ROOM',
-      data: { roomCode, user }
+      data: { roomCode, nickname }
     });
   }
 
-  private handleJoinAck(room: IRoom): void {
+  private handleJoinAck(data: { selfUserId: string; room: IRoom }): void {
+    const { selfUserId, room } = data;
     // 更新页面数据
     const page = getCurrentPages().pop() as any;
     page.setData({
       room,
+      selfUserId,
       isReady: room.status === 'READY'
     });
 
@@ -391,7 +392,7 @@ export class JoinRoomHandler {
     connectionId: string,
     message: IJoinRoomMessage
   ): Promise<void> {
-    const { roomCode, user } = message.data;
+    const { roomCode, nickname } = message.data;
 
     // 1. 查找房间
     const room = await this.roomRepository.findByCode(roomCode);
@@ -412,18 +413,12 @@ export class JoinRoomHandler {
       return;
     }
 
-    // 4. 检查是否已加入
-    const alreadyJoined = room.participants.some(
-      p => p.user.userId === user.userId
-    );
-    if (alreadyJoined) {
-      this.sendError(connectionId, 'ALREADY_JOINED');
-      return;
-    }
+    // 4. 生成 userId（后端权威）
+    const userId = uuidv4();
 
     // 5. 添加参与者
     room.participants.push({
-      user,
+      user: { userId, nickname },
       joinedAt: Date.now()
     });
 
@@ -436,27 +431,28 @@ export class JoinRoomHandler {
     await this.roomRepository.save(room);
 
     // 8. 绑定连接与用户/房间
-    this.wsManager.bindConnection(connectionId, user.userId, room.roomId);
+    this.wsManager.bindConnection(connectionId, userId, room.roomId);
 
     // 9. 广播给所有参与者
     this.broadcastJoinAck(room);
   }
 
   private broadcastJoinAck(room: IRoom): void {
-    const message: IJoinAckMessage = {
-      type: 'JOIN_ACK',
-      data: { room },
-      timestamp: Date.now()
-    };
-
-    // 发送给房间内所有参与者
+    // 发送给房间内所有参与者（每个连接拿到各自的 selfUserId）
     room.participants.forEach(participant => {
       const connectionId = this.wsManager.getConnectionId(
         participant.user.userId
       );
-      if (connectionId) {
-        this.wsManager.send(connectionId, message);
+      if (!connectionId) {
+        return;
       }
+
+      const message: IJoinAckMessage = {
+        type: 'JOIN_ACK',
+        data: { selfUserId: participant.user.userId, room },
+        timestamp: Date.now()
+      };
+      this.wsManager.send(connectionId, message);
     });
   }
 }
@@ -474,10 +470,7 @@ export class JoinRoomHandler {
   "type": "JOIN_ROOM",
   "data": {
     "roomCode": "A1B2C3",
-    "user": {
-      "userId": "user-001",
-      "nickname": "Alice"
-    }
+    "nickname": "Alice"
   },
   "timestamp": 1737849600000
 }
@@ -486,8 +479,9 @@ export class JoinRoomHandler {
 {
   "type": "JOIN_ACK",
   "data": {
+    "selfUserId": "<generated-u1>",
     "room": {
-      "participants": [{ "user": { "userId": "user-001" } }],
+      "participants": [{ "user": { "userId": "<generated-u1>" } }],
       "status": "WAITING"
     }
   }
@@ -504,10 +498,7 @@ export class JoinRoomHandler {
   "type": "JOIN_ROOM",
   "data": {
     "roomCode": "A1B2C3",
-    "user": {
-      "userId": "user-002",
-      "nickname": "Bob"
-    }
+    "nickname": "Bob"
   },
   "timestamp": 1737849700000
 }
@@ -516,10 +507,11 @@ export class JoinRoomHandler {
 {
   "type": "JOIN_ACK",
   "data": {
+    "selfUserId": "<generated-u2>", // 注意：广播给不同客户端时，该字段不同
     "room": {
       "participants": [
-        { "user": { "userId": "user-001" } },
-        { "user": { "userId": "user-002" } }
+        { "user": { "userId": "<generated-u1>" } },
+        { "user": { "userId": "<generated-u2>" } }
       ],
       "status": "READY"
     }
@@ -537,10 +529,7 @@ export class JoinRoomHandler {
   "type": "JOIN_ROOM",
   "data": {
     "roomCode": "A1B2C3",
-    "user": {
-      "userId": "user-003",
-      "nickname": "Charlie"
-    }
+    "nickname": "Charlie"
   },
   "timestamp": 1737849800000
 }
@@ -565,10 +554,7 @@ export class JoinRoomHandler {
   "type": "JOIN_ROOM",
   "data": {
     "roomCode": "INVALID",
-    "user": {
-      "userId": "user-004",
-      "nickname": "Dave"
-    }
+    "nickname": "Dave"
   },
   "timestamp": 1737849900000
 }

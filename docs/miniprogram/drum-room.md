@@ -435,7 +435,7 @@ enum EDrumMessageType {
     type: 'DRUM_TAP',
     data: {
         roomId: string,
-        role: 'ORGANIZER' | 'JOINER',
+        userId: string,
         delta: number,          // 批量点击次数
         clientTimeMs: number,
     },
@@ -465,9 +465,8 @@ enum EDrumMessageType {
     type: 'DRUM_RESULT',
     data: {
         roomId: string,
-        organizerScore: number,
-        joinerScore: number,
-        winnerRole: 'ORGANIZER' | 'JOINER',
+        scores: Record<string, number>, // key = userId
+        winnerUserId: string,
     },
     timestamp: number,
 }
@@ -487,12 +486,12 @@ drumService.startListening();
 ```typescript
 drumService.initialize({
     roomId: string,
-    selfRole: EPlayerRole,
     onReady: (
         serverTimeMs,
-        hostRole,
-        organizerName,
-        joinerName,
+        organizerUserId,
+        joinerUserId,
+        organizerNickname,
+        joinerNickname,
         receivedAtMs
     ) => {
         // 处理 DRUM_READY：同步服务器时间
@@ -503,13 +502,13 @@ drumService.initialize({
         this._startAtMs = startAtMs;
         this._endAtMs = startAtMs + RUNNING_DURATION_MS;
     },
-    onTap: (role, delta) => {
+    onTap: (userId, delta) => {
         // 处理对手点击：更新对手分数
     },
     onFinish: () => {
         // 处理 DRUM_FINISH：停止游戏
     },
-    onResult: winnerRole => {
+    onResult: winnerUserId => {
         // 处理 DRUM_RESULT：显示结果
     },
     onError: message => {

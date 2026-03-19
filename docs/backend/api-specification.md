@@ -901,36 +901,35 @@ Chat Room 中双方轮流发言，每人 60 秒。发言结束时客户端通知
     "roomId": string,
     "verdict": {
       "caseNumber": string,           // 案件编号
-      "winnerId": "host" | "guest",   // 胜者角色
-      "loserId": "host" | "guest",    // 败者角色
+      "winnerId": string,             // 胜者 userId
+      "loserId": string,              // 败者 userId
+      "participants": [               // userId → nickname 映射（后端权威）
+        { "userId": string, "nickname": string },
+        { "userId": string, "nickname": string }
+      ],
       "responsibility": {
-        "host": number,               // 房主责任百分比
-        "guest": number,              // 访客责任百分比
-        "thirdParty": {
-          "factors": [
-            {
-              "name": string,         // 因素名称
-              "percentage": number,   // 百分比
-              "emoji": string         // 表情符号
-            }
-          ]
-        }
+        "players": [
+          { "userId": string, "nickname": string, "percentage": number },
+          { "userId": string, "nickname": string, "percentage": number }
+        ],
+        "thirdParty": [
+          { "reason": string, "percentage": number, "emoji": string }
+        ]
       },
-      "radarChart": {
-        "host": IVerdictDimensionScores,
-        "guest": IVerdictDimensionScores
-      },
+      "radarChart": [
+        { "userId": string, "nickname": string, "scores": IVerdictDimensionScores },
+        { "userId": string, "nickname": string, "scores": IVerdictDimensionScores }
+      ],
       "verdict": string,              // 大老爷赠言
       "punishmentTask": {
-        "role": "host" | "guest",     // 被罚者角色
-        "task": string                // 惩罚任务
+        "loserUserId": string,
+        "loserNickname": string,
+        "task": string,
+        "deadline": string
       },
-      "secretReports": [              // 私密战报（每人一份）
-        {
-          "role": "host" | "guest",
-          "highestDimension": string,
-          "advice": string
-        }
+      "secretReports": [              // 私密反馈（每人一份）
+        { "userId": string, "title": string, "advice": string },
+        { "userId": string, "title": string, "advice": string }
       ]
     }
   },
