@@ -28,6 +28,7 @@ docs/
     ├── waiting-room.md         # 等待页
     ├── drum-room.md            # 震天鼓抢麦页
     ├── chat-room.md            # 对簿公堂页
+    ├── verdict-waiting.md      # 判决等待页（LLM 分析加载动画）
     ├── verdict.md              # 判决书页（AI 判决结果）
     ├── components.md           # 组件文档
     └── services.md             # 服务层说明
@@ -97,7 +98,7 @@ docs/
 
 #### Verdict Waiting（判决等待页）
 
-- **文件**: (无独立文档，功能说明见下方)
+- **文件**: `miniprogram/verdict-waiting.md`
 - **页面路径**: `packageB/pages/verdict-waiting/index`
 - **功能**: LLM 判决生成期间的等待页面，通过 WebSocket 接收判决结果
 - **核心特性**:

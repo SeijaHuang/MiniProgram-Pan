@@ -40,6 +40,13 @@ interface IReaction {
     animationData: WechatMiniprogram.AnimationExportResult;
 }
 
+interface IChatRoomOnLoadOptions {
+    roomCode?: string;
+    role?: string;
+    originalRole?: string;
+    opponentName?: string;
+}
+
 interface IChatRoomPageData {
     // 告状须知弹窗
     showNotification: boolean;
@@ -230,7 +237,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     stsCredentials: null,
     _originalRole: EPlayerRole.Organizer,
 
-    onLoad(options): void {
+    onLoad(options: IChatRoomOnLoadOptions): void {
         // 解析页面参数
         const roomCode = options.roomCode ?? '';
         const localRole: EPlayerRole =

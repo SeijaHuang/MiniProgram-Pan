@@ -243,12 +243,16 @@ interface IVerdictListeningOptions {
 
 **数据格式转换**:
 
-| 后端字段           | 前端字段                   | 转换说明    |
-| ------------------ | -------------------------- | ----------- |
-| `logicFallacy`     | `logicSlippery`            | 维度键映射  |
-| `coquettishDamage` | `charmAttack`              | 维度键映射  |
-| `factors[].name`   | `factors[].reason`         | 字段重命名  |
-| `secretReports[]`  | `secretReports.host/guest` | 数组 → 对象 |
+| 后端字段                                   | 前端字段                             | 转换说明                  |
+| ------------------------------------------ | ------------------------------------ | ------------------------- |
+| `radarChart.host/guest`                    | `battleStats.host/guest`             | 字段重命名                |
+| `radarChart.*.logicFallacy`                | `battleStats.*.logicSlippery`        | 维度键映射                |
+| `radarChart.*.coquettishDamage`            | `battleStats.*.charmAttack`          | 维度键映射                |
+| `verdict`                                  | `verdictSummary`                     | 字段重命名                |
+| `punishmentTask.role`                      | `punishmentTask.loserId`             | 字段重命名                |
+| `responsibility.thirdParty.factors[].name` | `responsibility.thirdParty[].reason` | 字段重命名                |
+| `secretReports[]`（数组 + role 字段）      | `secretReports.host/guest`（对象）   | 数组 → 对象               |
+| `punishmentTask`（无 deadline 字段）       | `punishmentTask.deadline`            | 固定值 "须在24小时内完成" |
 
 **消息类型**:
 
@@ -268,17 +272,17 @@ interface IVerdictListeningOptions {
 
 **核心方法**:
 
-- `initialize()`: 注册 WebSocket 消息回调
+- `initialize()`: 注册 WebSocket 消息回调（监听 POST_GAME_EFFECT）
 - `sendAction(roomId, action, remaining)`: 发送赛后互动动作
-- `sendLeaveTogether(roomId)`: 发送共同退堂请求
 - `onEffect(callback)`: 注册特效接收回调
-- `onLeaveAck(callback)`: 注册退堂确认回调
 - `destroy()`: 清理回调
 
 **消息类型**:
 
-- 发送: `POST_GAME_EFFECT`, `LEAVE_TOGETHER`
-- 接收: `POST_GAME_EFFECT`, `LEAVE_TOGETHER_ACK`
+- 发送: `POST_GAME_ACTION`（execute_punishment / beg_for_mercy）
+- 接收: `POST_GAME_EFFECT`
+
+> ⚠️ 注意：共同退堂（`LEAVE_ROOM` / `LEAVE_ROOM_ACK`）由页面直接通过 `wsManager` 处理，不经过 PostGameService。
 
 ## 使用约定与注意事项
 

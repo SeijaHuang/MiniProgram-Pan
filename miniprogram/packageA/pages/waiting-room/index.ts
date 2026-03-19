@@ -27,6 +27,10 @@ type ViewMode = 'entry' | 'host_waiting' | 'guest_waiting';
  */
 type ErrorType = 'length' | 'not_found' | 'full' | 'started' | null;
 
+interface IWaitingRoomOnLoadOptions {
+    room_id?: string;
+}
+
 /**
  * 页面数据接口
  */
@@ -143,7 +147,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     isJoiningRoom: false,
     pendingRoomId: null,
 
-    onLoad(options: Record<string, string | undefined>): void {
+    onLoad(options: IWaitingRoomOnLoadOptions): void {
         this.initAnimations();
         this.initWebSocket();
         this.initUser();

@@ -32,6 +32,11 @@ interface ICanvas2DContext {
     measureText(text: string): { width: number };
 }
 
+interface IVerdictOnLoadOptions {
+    roomId?: string;
+    role?: string;
+}
+
 /** Fields callback result for canvas node query */
 interface ICanvasNodeResult {
     node: WechatMiniprogram.Canvas | null;
@@ -139,10 +144,10 @@ Page({
     _animTimers: [] as number[],
     _roomId: '' as string,
 
-    onLoad(options: Record<string, string | undefined>): void {
+    onLoad(options: IVerdictOnLoadOptions): void {
         this._roomId = options.roomId ?? '';
         const currentRole: 'host' | 'guest' =
-            (options.role as 'host' | 'guest') ?? 'host';
+            options.role === 'guest' ? 'guest' : 'host';
 
         // Try to get verdict from service cache
         const verdict: IVerdictResult | null = verdictService.getResult();
