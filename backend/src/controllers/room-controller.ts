@@ -14,7 +14,6 @@ import type { IBaseResponse, ICreateRoomResponseData } from '../types/http';
 import { EHttpErrorCode } from '../types/http';
 import { roomService } from '../services/core/room/room.service';
 import { CreateRoomRequestSchema } from '../models/schemas/http-request.schema';
-import type { ICreateRoomDto } from '../models/dto/request/create-room.dto';
 import { logger } from '../utils/logger';
 
 export class RoomController {
@@ -22,10 +21,7 @@ export class RoomController {
      * Create a new room
      * POST /v1/rooms
      */
-    static createRoom(
-        req: Request<unknown, unknown, ICreateRoomDto>,
-        res: Response
-    ): void {
+    static createRoom(req: Request<unknown, unknown>, res: Response): void {
         try {
             // Validate request body with Zod
             const validation = CreateRoomRequestSchema.safeParse(req.body);
@@ -43,9 +39,7 @@ export class RoomController {
                 return;
             }
 
-            // Type-safe: validation.data is typed as ICreateRoomDto
-            const { creator } = validation.data;
-            const room = roomService.createRoom(creator.userId);
+            const room = roomService.createRoom();
 
             const response: IBaseResponse<ICreateRoomResponseData> = {
                 success: true,

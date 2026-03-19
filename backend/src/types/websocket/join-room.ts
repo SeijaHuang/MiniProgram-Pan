@@ -5,7 +5,6 @@
 
 import type { IWSMessage } from './base';
 import { EWSMessageType } from './base';
-import type { IUser } from '../../models/entities/user';
 import type { IRoom } from '../../models/entities/room';
 
 // ==================== Client → Server ====================
@@ -19,7 +18,7 @@ export interface IJoinRoomMessage extends IWSMessage<IJoinRoomData> {
 
 export interface IJoinRoomData {
     roomCode: string;
-    user: IUser;
+    nickname: string;
 }
 
 // ==================== Server → Client ====================
@@ -27,7 +26,7 @@ export interface IJoinRoomData {
 /**
  * JOIN_ACK: Authoritative confirmation of room join
  * CRITICAL: Must include full room state
- * CRITICAL: Sent to ALL participants
+ * CRITICAL: Sent individually per participant (selfUserId varies)
  */
 export interface IJoinAckMessage extends IWSMessage<IJoinAckData> {
     type: EWSMessageType.JoinAck;
@@ -35,4 +34,5 @@ export interface IJoinAckMessage extends IWSMessage<IJoinAckData> {
 
 export interface IJoinAckData {
     room: IRoom;
+    selfUserId: string;
 }

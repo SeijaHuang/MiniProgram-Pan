@@ -7,7 +7,7 @@
  * CRITICAL: Enforces max 2 participants per room
  */
 
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import type { IRoom, IParticipant } from '../../models/entities/room';
 import type { IUser } from '../../models/entities/user';
 import { ERoomStatus } from '../../models/entities/room';
@@ -32,9 +32,9 @@ export class RoomManager {
      * Create a new room
      * CRITICAL: Room is created EMPTY - users must JOIN via WebSocket
      * CRITICAL: Initial status is WAITING with 0 participants
-     * CRITICAL: hostUserId is set at creation time
+     * CRITICAL: hostUserId is assigned when the first participant joins
      */
-    createRoom(hostUserId: string): IRoom {
+    createRoom(): IRoom {
         const roomId = this.generateRoomId();
         const roomCode = this.generateRoomCode();
         const now = Date.now();
@@ -42,7 +42,7 @@ export class RoomManager {
         const room: IRoom = {
             roomId,
             roomCode,
-            hostUserId,
+            hostUserId: randomUUID(), // Placeholder; overwritten on first JOIN_ROOM
             participants: [], // Empty - users will join via WebSocket
             status: ERoomStatus.Waiting,
             createdAt: now,
@@ -53,7 +53,7 @@ export class RoomManager {
 
         logger.log(
             'RoomManager',
-            `Room created: ${roomId} (code: ${roomCode}, host: ${hostUserId}) - waiting for participants`
+            `Room created: ${roomId} (code: ${roomCode}) - waiting for participants`
         );
 
         return room;
@@ -126,6 +126,11 @@ export class RoomManager {
             joinedAt: Date.now(),
         };
         room.participants.push(participant);
+
+        // First joiner is the host — assign their UUID as hostUserId
+        if (room.participants.length === 1) {
+            room.hostUserId = user.userId;
+        }
 
         // State transition: WAITING → READY (when 2nd user joins)
         if (room.participants.length === 2) {

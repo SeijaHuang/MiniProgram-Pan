@@ -184,14 +184,18 @@ export class WebSocketController {
             return;
         }
 
-        // Broadcast JOIN_ACK to ALL participants
-        connectionManager.broadcastToRoom(result.room.roomId, {
-            type: EWSMessageType.JoinAck,
-            data: {
-                room: result.room,
-            },
-            timestamp: Date.now(),
-        });
+        // Send JOIN_ACK individually to each participant so selfUserId is correct
+        const joinAckTimestamp = Date.now();
+        for (const participant of result.room.participants) {
+            connectionManager.sendToUser(participant.user.userId, {
+                type: EWSMessageType.JoinAck,
+                data: {
+                    room: result.room,
+                    selfUserId: participant.user.userId,
+                },
+                timestamp: joinAckTimestamp,
+            });
+        }
 
         // If room is ready (2 players), initialize drum game and wait for
         // frontend to send DRUM_START_REQUEST before launching

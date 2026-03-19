@@ -9,15 +9,13 @@
  */
 
 import { z } from 'zod';
-import { UserSchema } from './ws-message.schema';
 
 /**
  * Create Room Request Schema
  * POST /v1/rooms
+ * No user identity required — creator joins via JOIN_ROOM WebSocket message
  */
-export const CreateRoomRequestSchema = z.object({
-    creator: UserSchema,
-});
+export const CreateRoomRequestSchema = z.object({});
 
 /**
  * Type inference from schemas

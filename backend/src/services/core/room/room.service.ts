@@ -16,9 +16,9 @@ export class RoomService {
      * Create a new room with business logic
      * Orchestrates: room creation + caching + event emission
      */
-    createRoom(hostUserId: string): IRoom {
+    createRoom(): IRoom {
         // Delegate to RoomManager (domain service)
-        const room = roomManager.createRoom(hostUserId);
+        const room = roomManager.createRoom();
 
         // Future: Add caching
         // await cacheService.set(`room:${room.code}`, room);

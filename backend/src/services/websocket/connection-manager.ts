@@ -98,6 +98,21 @@ export class ConnectionManager {
     }
 
     /**
+     * Send message to a specific user by userId
+     */
+    sendToUser(userId: string, message: unknown): void {
+        const connectionId = this.userToConnection.get(userId);
+        if (!connectionId) {
+            logger.warn(
+                'ConnectionManager',
+                `No connection found for user ${userId}, cannot send message`
+            );
+            return;
+        }
+        this.sendToConnection(connectionId, message);
+    }
+
+    /**
      * Broadcast message to all participants in a room
      * CRITICAL: This is the ONLY way to broadcast messages
      */
