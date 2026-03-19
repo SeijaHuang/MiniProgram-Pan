@@ -7,5 +7,6 @@ export type {
     IThirdPartyFactor,
     IRadarScores,
     IJudgmentResponse,
+    IPlayerInfo,
     ICreateJudgmentRequest,
 } from './judgment';

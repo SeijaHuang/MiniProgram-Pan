@@ -86,88 +86,57 @@ export interface IVerdictRetryMessage extends IWSMessage<IVerdictRetryData> {
 }
 
 /**
- * Frontend Verdict Result Format
- * This matches the expected format on the frontend
- */
-
-/**
- * Third-party factor with emoji
- */
-export interface IVerdictThirdPartyFactor {
-    name: string;
-    percentage: number;
-    emoji: string;
-}
-
-/**
- * Dimension scores with English keys
- */
-export interface IVerdictDimensionScores {
-    mouthHard: number;
-    oldAccountDigging: number;
-    logicFallacy: number;
-    coquettishDamage: number;
-    survivalInstinct: number;
-    victimActing: number;
-}
-
-/**
- * Responsibility distribution
- */
-export interface IVerdictResponsibility {
-    host: number;
-    guest: number;
-    thirdParty: {
-        factors: IVerdictThirdPartyFactor[];
-    };
-}
-
-/**
- * Radar chart data
- */
-export interface IVerdictRadarChart {
-    host: IVerdictDimensionScores;
-    guest: IVerdictDimensionScores;
-}
-
-/**
- * Punishment task for loser
- */
-export interface IVerdictPunishmentTask {
-    role: 'host' | 'guest';
-    task: string;
-}
-
-/**
- * Secret report for a player
- */
-export interface IVerdictSecretReport {
-    role: 'host' | 'guest';
-    highestDimension: string;
-    advice: string;
-}
-
-/**
  * Complete verdict result structure
  * This is the format sent to the frontend
  */
 export interface IVerdictResult {
     /** Case number */
     caseNumber: string;
-    /** Winner role */
-    winnerId: 'host' | 'guest';
-    /** Loser role */
-    loserId: 'host' | 'guest';
+    /** Winner's real userId */
+    winnerId: string;
+    /** Loser's real userId */
+    loserId: string;
     /** Responsibility distribution */
-    responsibility: IVerdictResponsibility;
-    /** Radar chart scores */
-    radarChart: IVerdictRadarChart;
+    responsibility: {
+        players: Array<{
+            userId: string;
+            nickname: string;
+            percentage: number;
+        }>;
+        thirdParty: Array<{
+            reason: string;
+            percentage: number;
+            emoji: string;
+        }>;
+    };
+    /** Radar chart scores per player */
+    radarChart: Array<{
+        userId: string;
+        nickname: string;
+        scores: {
+            mouthHard: number;
+            oldAccountDigging: number;
+            logicFallacy: number;
+            coquettishDamage: number;
+            survivalInstinct: number;
+            victimActing: number;
+        };
+    }>;
     /** Judge's verdict message */
-    verdict: string;
+    verdictSummary: string;
     /** Punishment task for loser */
-    punishmentTask: IVerdictPunishmentTask;
+    punishmentTask: {
+        loserUserId: string;
+        loserNickname: string;
+        task: string;
+        deadline: string;
+    };
     /** Secret reports for both players */
-    secretReports: IVerdictSecretReport[];
+    secretReports: Array<{
+        userId: string;
+        title: string;
+        advice: string;
+    }>;
 }
 
 /**
