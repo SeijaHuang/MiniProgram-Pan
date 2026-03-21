@@ -44,7 +44,7 @@
     <scroll-view
         class="chat-room__dialog"
         scroll-y="{{true}}"
-        scroll-into-view="{{speakerBFinal || speakerBLive ? 'msg-speaker-b' : ''}}"
+        scroll-into-view="{{(speakerBFinal || speakerBLive) ? 'msg-speaker-b' : (speakerAFinal || speakerALive) ? 'msg-speaker-a' : ''}}"
         scroll-with-animation="{{true}}"
     >
         <view class="chat-room__dialog-inner">

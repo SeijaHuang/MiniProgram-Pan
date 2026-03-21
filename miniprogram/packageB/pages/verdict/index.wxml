@@ -89,8 +89,8 @@
             </text>
             <radar-chart
                 id="radarChart"
-                hostScores="{{ verdict.battleStats.host }}"
-                guestScores="{{ verdict.battleStats.guest }}"
+                hostScores="{{ hostRadarScores }}"
+                guestScores="{{ guestRadarScores }}"
                 hostName="{{ hostNickName }}"
                 guestName="{{ guestNickName }}"
                 size="{{ 500 }}"

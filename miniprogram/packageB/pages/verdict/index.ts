@@ -89,6 +89,9 @@ interface IVerdictPageData {
     // 双方昵称
     hostNickName: string;
     guestNickName: string;
+    // Radar chart scores (derived from verdict.radarChart by userId)
+    hostRadarScores: IDimensionScores;
+    guestRadarScores: IDimensionScores;
     // Effect queue fields
     effectQueue: IEffectQueueItem[];
     isPlayingEffect: boolean;
@@ -122,6 +125,22 @@ Page({
         myTopScore: 0,
         hostNickName: '玩家1',
         guestNickName: '玩家2',
+        hostRadarScores: {
+            mouthHard: 0,
+            oldAccountDigging: 0,
+            logicSlippery: 0,
+            charmAttack: 0,
+            survivalInstinct: 0,
+            victimActing: 0,
+        },
+        guestRadarScores: {
+            mouthHard: 0,
+            oldAccountDigging: 0,
+            logicSlippery: 0,
+            charmAttack: 0,
+            survivalInstinct: 0,
+            victimActing: 0,
+        },
         effectQueue: [] as IEffectQueueItem[],
         isPlayingEffect: false,
         showEffectOverlay: false,
@@ -243,6 +262,26 @@ Page({
         const hostNickName: string = hostPlayer?.nickname || '玩家1';
         const guestNickName: string = guestPlayer?.nickname || '玩家2';
 
+        // Derive radar scores for host/guest
+        const emptyScores: IDimensionScores = {
+            mouthHard: 0,
+            oldAccountDigging: 0,
+            logicSlippery: 0,
+            charmAttack: 0,
+            survivalInstinct: 0,
+            victimActing: 0,
+        };
+        const hostRadarEntry = verdict.radarChart.find(
+            p => p.userId === hostUserId
+        );
+        const guestRadarEntry = verdict.radarChart.find(
+            p => p.userId !== hostUserId
+        );
+        const hostRadarScores: IDimensionScores =
+            hostRadarEntry?.scores ?? emptyScores;
+        const guestRadarScores: IDimensionScores =
+            guestRadarEntry?.scores ?? emptyScores;
+
         this.setData({
             loading: false,
             verdict,
@@ -253,6 +292,8 @@ Page({
             myTopScore: topVal,
             hostNickName,
             guestNickName,
+            hostRadarScores,
+            guestRadarScores,
         });
 
         // Start entrance animations

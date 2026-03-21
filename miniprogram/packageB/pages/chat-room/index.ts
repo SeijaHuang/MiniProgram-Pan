@@ -1045,7 +1045,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 跳转到 verdict-waiting 页面
      */
     doRedirectToVerdictWaiting(): void {
-        const roomId: string = this.data.roomCode;
+        const roomId: string = this.data.roomId;
         void wx.redirectTo({
             url: `/packageB/pages/verdict-waiting/index?roomId=${roomId}`,
         });
@@ -1269,7 +1269,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        const roomId: string = this.data.roomCode;
+        const roomId: string = this.data.roomId;
         const senderId: string = getApp<IAppOption>().globalData.selfUserId;
 
         if (!roomId || !senderId) {

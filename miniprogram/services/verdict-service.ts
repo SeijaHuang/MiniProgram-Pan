@@ -58,9 +58,8 @@ class VerdictService {
      * Map backend verdict result to frontend IVerdictResult format
      */
     private mapVerdictResult(backend: IBackendVerdictResult): IVerdictResult {
-        // Map third-party factors: backend uses "name", frontend uses "reason"
-        const thirdParty = backend.responsibility.thirdParty.factors.map(f => ({
-            reason: f.name,
+        const thirdParty = backend.responsibility.thirdParty.map(f => ({
+            reason: f.reason,
             percentage: f.percentage,
             emoji: f.emoji,
         }));
@@ -79,10 +78,9 @@ class VerdictService {
             scores: this.mapDimensionScores(p.scores),
         }));
 
-        // Map secret reports: backend uses highestDimension, frontend uses title
         const secretReports = backend.secretReports.map(r => ({
             userId: r.userId,
-            title: r.highestDimension,
+            title: r.title,
             advice: r.advice,
         }));
 
@@ -92,12 +90,12 @@ class VerdictService {
             loserId: backend.loserId,
             responsibility: { players, thirdParty },
             radarChart,
-            verdictSummary: backend.verdict,
+            verdictSummary: backend.verdictSummary,
             punishmentTask: {
                 loserUserId: backend.punishmentTask.loserUserId,
                 loserNickname: backend.punishmentTask.loserNickname,
                 task: backend.punishmentTask.task,
-                deadline: '须在24小时内完成',
+                deadline: backend.punishmentTask.deadline,
             },
             secretReports,
         };
@@ -163,14 +161,10 @@ class VerdictService {
     async fetchVerdict(roomId: string): Promise<IVerdictResult> {
         return new Promise<IVerdictResult>((resolve, reject) => {
             wx.request({
-                url: `${API_BASE_URL}/v1/rooms/${roomId}/judgments`,
-                method: 'POST',
+                url: `${API_BASE_URL}/v1/rooms/${roomId}/verdict`,
+                method: 'GET',
                 header: {
                     'content-type': 'application/json',
-                },
-                data: {
-                    player1Speech: '',
-                    player2Speech: '',
                 },
                 success: (
                     res: WechatMiniprogram.RequestSuccessCallbackResult

@@ -39,7 +39,7 @@ export interface IBackendDimensionScores {
  * Backend third-party factor format
  */
 export interface IBackendThirdPartyFactor {
-    name: string;
+    reason: string;
     percentage: number;
     emoji: string;
 }
@@ -49,7 +49,7 @@ export interface IBackendThirdPartyFactor {
  */
 export interface IBackendSecretReport {
     userId: string;
-    highestDimension: string;
+    title: string;
     advice: string;
 }
 
@@ -67,20 +67,19 @@ export interface IBackendVerdictResult {
             nickname: string;
             percentage: number;
         }>;
-        thirdParty: {
-            factors: IBackendThirdPartyFactor[];
-        };
+        thirdParty: IBackendThirdPartyFactor[];
     };
     radarChart: Array<{
         userId: string;
         nickname: string;
         scores: IBackendDimensionScores;
     }>;
-    verdict: string;
+    verdictSummary: string;
     punishmentTask: {
         loserUserId: string;
         loserNickname: string;
         task: string;
+        deadline: string;
     };
     secretReports: IBackendSecretReport[];
 }
