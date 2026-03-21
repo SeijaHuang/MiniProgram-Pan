@@ -55,7 +55,7 @@
                 class="chat-room__section"
             >
                 <view class="chat-room__section-title">
-                    <text>{{hostName}}的诉状</text>
+                    <text>{{speakerAName}}的诉状</text>
                 </view>
                 <view class="chat-room__section-text">
                     <text>{{speakerAFinal}}{{speakerALive}}</text>
@@ -77,7 +77,7 @@
                 class="chat-room__section"
             >
                 <view class="chat-room__section-title">
-                    <text>{{guestName}}的诉状</text>
+                    <text>{{speakerBName}}的诉状</text>
                 </view>
                 <view class="chat-room__section-text">
                     <text>{{speakerBFinal}}{{speakerBLive}}</text>
@@ -154,7 +154,7 @@
         catchtouchmove="preventTouchMove"
     >
         <view class="chat-room__switch-content">
-            <text class="chat-room__switch-text">下一位</text>
+            <text class="chat-room__switch-text">{{switchNotificationText}}</text>
         </view>
     </view>
 
