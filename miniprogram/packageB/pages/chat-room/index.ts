@@ -65,6 +65,8 @@ interface IChatRoomPageData {
 
     // 录音状态
     isRecording: boolean;
+    // 手指是否按住麦克风（touchstart 后、touchend/cancel 前）
+    micPressed: boolean;
 
     // 表情系统
     myReactions: IReaction[];
@@ -192,6 +194,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         countdownClass: 'normal',
 
         isRecording: false,
+        micPressed: false,
 
         myReactions: [],
         opponentReactions: [],
@@ -303,6 +306,11 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 初始化语音识别管理器
         this.initAsrManager();
+
+        // 预热 STS 凭证（发言者首次按麦时无需等待网络）
+        if (canSpeak) {
+            this.prewarmStsCredentials();
+        }
 
         // 权限检查移到用户按下麦克风时进行
     },
@@ -588,6 +596,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 isRecognizing: true,
                 recognizeError: null,
             });
+            // 识别真正开始时给一次中等震动，提示用户可以开口说话
+            if (this.data.canSpeak) {
+                void wx.vibrateShort({ type: 'medium' });
+            }
         };
 
         // 3. 识别变化时（发送 partial，节流后）
@@ -698,6 +710,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         this.setData({
             recognizeError: errorMessage,
             isRecognizing: false,
+            micPressed: false,
             [liveKey]: '',
         });
 
@@ -982,6 +995,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         if (nextCanSpeak) {
             this.stopListenerHintRotation();
+            // 预热 STS 凭证，让第二发言者首次按麦时无需等待网络
+            this.prewarmStsCredentials();
         } else {
             this.startListenerHintRotation();
         }
@@ -1067,6 +1082,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
+        // 手指按下：立即进入"连接中"状态
+        this.setData({ micPressed: true });
+
         // 如果已有权限，直接开始录音
         if (this.data.hasMicPermission) {
             // 首次按下麦克风时启动倒计时
@@ -1085,6 +1103,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 麦克风松开
      */
     onMicTouchEnd(): void {
+        this.setData({ micPressed: false });
         this.stopRecording();
     },
 
@@ -1092,6 +1111,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 麦克风触摸取消
      */
     onMicTouchCancel(): void {
+        this.setData({ micPressed: false });
         this.stopRecording();
     },
 
@@ -1154,6 +1174,17 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 权限已在 onMicTouchStart 中检查过，直接启动 ASR
         this.startAsrWithCredentials();
+    },
+
+    /**
+     * 预热 STS 凭证缓存（fire-and-forget）
+     * 提前触发一次 getCredentials，使缓存在用户按麦前就已就绪
+     * 错误静默处理：预热失败不影响正常流程，startAsrWithCredentials 会再次尝试
+     */
+    prewarmStsCredentials(): void {
+        stsService.getCredentials().catch((err: unknown) => {
+            logger.warn('ChatRoom', 'STS prewarm failed (non-fatal):', err);
+        });
     },
 
     /**

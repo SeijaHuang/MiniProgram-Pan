@@ -88,25 +88,25 @@
 
     <!-- 麦克风按钮（仅发言者显示） -->
     <view wx:if="{{canSpeak}}" class="chat-room__mic-area">
+        <text class="chat-room__mic-label">
+            {{isRecognizing ? '松开结束' : micPressed ? '正在连线大判官…' : '按住说话'}}
+        </text>
         <view class="chat-room__mic-buttons">
             <view
-                class="chat-room__mic {{isRecording ? 'chat-room__mic--recording' : 'chat-room__mic--active'}}"
+                class="chat-room__mic {{isRecognizing ? 'chat-room__mic--recording' : micPressed ? 'chat-room__mic--connecting' : 'chat-room__mic--active'}}"
                 bindtouchstart="onMicTouchStart"
                 bindtouchend="onMicTouchEnd"
                 bindtouchcancel="onMicTouchCancel"
             >
                 <text class="chat-room__mic-icon">🎤</text>
             </view>
-            <view 
+            <view
                 class="chat-room__end-btn"
                 bindtap="onEndEarlyTap"
             >
                 <text class="chat-room__end-btn-icon">✕</text>
             </view>
         </view>
-        <text class="chat-room__mic-label">
-            {{isRecording ? '松开结束' : '按住说话'}}
-        </text>
     </view>
 
     <!-- 底部表情面板（仅非发言者显示） -->
