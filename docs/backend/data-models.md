@@ -559,9 +559,10 @@ interface IDrumReadyMessage {
   data: {
     roomId: string;
     serverTimeMs: number;        // 服务器当前时间（同步基准）
-    hostRole: EPlayerRole;       // 房主角色
-    organizerName: string;       // 房主昵称（或默认 '小冤家'）
-    joinerName: string;          // 加入者昵称（或默认 '家冤小'）
+    organizerUserId: string;     // 房主 userId
+    joinerUserId: string;        // 加入者 userId
+    organizerNickname: string;   // 房主昵称
+    joinerNickname: string;      // 加入者昵称
   };
   timestamp: number;
 }
@@ -569,7 +570,7 @@ interface IDrumReadyMessage {
 
 #### IDrumStartMessage
 
-游戏开始消息（Server → All），DRUM_READY 同时发送。
+游戏开始消息（Server → All），双方均发送 DRUM_START_REQUEST 后发送。
 
 ```typescript
 interface IDrumStartMessage {

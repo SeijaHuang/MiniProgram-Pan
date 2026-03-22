@@ -310,8 +310,8 @@ interface IDrumResultMessage {
 
 ```typescript
 enum EPlayerRole {
-    Organizer = 'ORGANIZER',  // 房主（第一个加入的玩家）
-    Joiner = 'JOINER',        // 加入者（第二个加入的玩家）
+    Organizer = 'Organizer',  // 房主（第一个加入的玩家）
+    Joiner = 'Joiner',        // 加入者（第二个加入的玩家）
 }
 ```
 
@@ -473,14 +473,9 @@ backend/src/
 #### 1. 游戏初始化 (ws-controller.ts)
 
 ```typescript
-private static startDrumGame(roomId: string): void {
-    const room = roomManager.getRoomById(roomId);
-    if (!room) return;
-
-    // 初始化游戏状态
+// Step 1: 房间满员后，广播 DRUM_READY（含玩家信息和时间同步）
+private static broadcastDrumReady(roomId: string): void {
     const game = drumGameManager.initGame(room);
-
-    // 发送 DRUM_READY
     connectionManager.broadcastToRoom(roomId, {
         type: EWSMessageType.DrumReady,
         data: {
@@ -493,20 +488,21 @@ private static startDrumGame(roomId: string): void {
         },
         timestamp: Date.now(),
     });
+}
 
-    // 计算时间节点
+// Step 2: 每收到一个 DRUM_START_REQUEST，广播 DRUM_PLAYER_READY（readyCount）
+// Step 3: 双方均就绪后，广播 DRUM_START 并调度游戏结束
+private static startDrumGame(roomId: string): void {
     const startAtMs = Date.now() + DRUM_CONFIG.COUNTDOWN_MS;
     const endAtMs = startAtMs + DRUM_CONFIG.GAME_DURATION_MS;
     drumGameManager.setTiming(roomId, startAtMs, endAtMs);
 
-    // 发送 DRUM_START
     connectionManager.broadcastToRoom(roomId, {
         type: EWSMessageType.DrumStart,
         data: { roomId, startAtMs },
         timestamp: Date.now(),
     });
 
-    // 调度阶段转换
     setTimeout(() => {
         drumGameManager.setPhase(roomId, EGamePhase.Running);
     }, DRUM_CONFIG.COUNTDOWN_MS);

@@ -178,7 +178,7 @@ interface IDrumServiceOptions {
 
 **消息队列机制**:
 
-当 handlers 未就绪时（页面跳转期间），`DRUM_READY` 和 `DRUM_START` 消息会被队列，
+当 handlers 未就绪时（页面跳转期间），`DRUM_READY`、`DRUM_PLAYER_READY`、`DRUM_START` 消息会被队列，
 并记录原始接收时间 `receivedAtMs`。`initialize()` 调用后会处理队列消息，
 使用原始接收时间进行时间同步，避免队列延迟影响偏移计算。
 

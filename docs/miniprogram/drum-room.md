@@ -386,7 +386,9 @@ Drum Room 使用以下服务层：
 
 ```typescript
 enum EDrumMessageType {
-    DrumReady = 'DRUM_READY', // Server -> Client: 房间就绪，同步时间和角色
+    DrumReady = 'DRUM_READY', // Server -> Client: 房间就绪，同步时间和玩家信息
+    DrumStartRequest = 'DRUM_START_REQUEST', // Client -> Server: 玩家准备好，请求开始
+    DrumPlayerReady = 'DRUM_PLAYER_READY', // Server -> Client: 广播某玩家已就绪（readyCount）
     DrumStart = 'DRUM_START', // Server -> Client: 游戏开始信号（含 startAtMs）
     DrumTap = 'DRUM_TAP', // 双向: 点击事件
     DrumFinish = 'DRUM_FINISH', // Server -> Client: 游戏结束信号
@@ -404,10 +406,11 @@ enum EDrumMessageType {
     type: 'DRUM_READY',
     data: {
         roomId: string,
-        serverTimeMs: number,   // 服务器时间戳（用于时间同步）
-        hostRole: 'ORGANIZER' | 'JOINER',
-        organizerName: string,
-        joinerName: string,
+        serverTimeMs: number,        // 服务器时间戳（用于时间同步）
+        organizerUserId: string,     // 房主 userId
+        joinerUserId: string,        // 加入者 userId
+        organizerNickname: string,   // 房主昵称
+        joinerNickname: string,      // 加入者昵称
     },
     timestamp: number,
 }
@@ -494,8 +497,11 @@ drumService.initialize({
         joinerNickname,
         receivedAtMs
     ) => {
-        // 处理 DRUM_READY：同步服务器时间
+        // 处理 DRUM_READY：同步服务器时间，显示「开始游戏」按钮
         setServerTimeOffset(serverTimeMs, receivedAtMs);
+    },
+    onPlayerReady: (readyCount: number) => {
+        // 处理 DRUM_PLAYER_READY：更新 UI（「等待对方准备」状态）
     },
     onStart: startAtMs => {
         // 处理 DRUM_START：计算游戏开始/结束时间
@@ -539,7 +545,7 @@ drumService.cleanup();
 DrumService 实现了消息队列机制，解决页面跳转期间消息丢失问题：
 
 1. **提前监听**：在 waiting-room 页面调用 `drumService.startListening()`
-2. **消息入队**：`DRUM_READY` 和 `DRUM_START` 消息在 handlers 未就绪时入队
+2. **消息入队**：`DRUM_READY`、`DRUM_PLAYER_READY`、`DRUM_START` 消息在 handlers 未就绪时入队
 3. **记录接收时间**：每条入队消息记录 `receivedAtMs`，用于精确时间同步
 4. **延迟处理**：在 drum-room 页面 `initialize()` 后处理队列消息
 
@@ -575,7 +581,7 @@ getTimeRemainingMs(targetMs); // targetMs - nowServerMs()
     - 房间满员后调用 `drumService.startListening()` 提前监听
     - 启动前端倒计时，倒计时结束后跳转至 drum-room
 - **drum-room onLoad**:
-    - 解析页面参数（roomId, selfRole, hostRole, playerNames）
+    - 解析页面参数（roomId 等）
     - 调用 `drumService.initialize(options)` 设置回调并处理队列消息
     - 等待 DRUM_READY/DRUM_START 消息触发游戏流程
 - **drum-room onUnload**:
@@ -712,7 +718,7 @@ getTimeRemainingMs(targetMs); // targetMs - nowServerMs()
     - DrumService 完整实现消息发送和接收
     - 消息队列机制处理页面跳转期间的消息
     - 后端 DrumGameManager 管理游戏状态
-    - 完整消息流程：DRUM_READY → DRUM_START → DRUM_TAP → DRUM_FINISH → DRUM_RESULT
+    - 完整消息流程：DRUM_READY → DRUM_START_REQUEST → DRUM_PLAYER_READY → DRUM_START → DRUM_TAP → DRUM_FINISH → DRUM_RESULT
 - ✅ **已完成** - 时间同步机制
     - 服务器时间偏移计算（`setServerTimeOffset`）
     - 基于服务器时间的倒计时（`nowServerMs`、`getTimeRemainingMs`）
