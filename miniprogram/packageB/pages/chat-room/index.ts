@@ -3,7 +3,6 @@
  */
 
 import { asrService } from '../../../services/asr-service';
-import { nicknameService } from '../../../services/nickname-service';
 import { stsService } from '../../../services/sts-service';
 import { wsManager } from '../../../services/websocket-manager';
 import type { IEmojiReceiveData } from '../../../types/emoji-websocket';
@@ -12,7 +11,7 @@ import type {
     IChatCompletePayload,
     ISpeechTurnSwitchPayload,
 } from '../../../types/verdict-ws';
-import { EWSMessageType, EPlayerRole } from '../../../types/websocket-common';
+import { EWSMessageType } from '../../../types/websocket-common';
 import { logger } from '../../../utils/logger';
 
 // 引入腾讯云语音识别插件
@@ -47,11 +46,10 @@ interface IChatRoomPageData {
     showEndEarlyNotification: boolean;
 
     // 房间标识
-    roomCode: string;
+    roomId: string;
 
     // 核心状态机字段
     phase: EPhase;
-    localRole: EPlayerRole;
     remaining: number;
     totalPerTurn: number;
 
@@ -60,12 +58,15 @@ interface IChatRoomPageData {
 
     // 切换提示
     showSwitchNotification: boolean;
+    switchNotificationText: string;
 
     // 倒计时状态
     countdownClass: 'normal' | 'warn' | 'danger';
 
     // 录音状态
     isRecording: boolean;
+    // 手指是否按住麦克风（touchstart 后、touchend/cancel 前）
+    micPressed: boolean;
 
     // 表情系统
     myReactions: IReaction[];
@@ -93,10 +94,10 @@ interface IChatRoomPageData {
     listenerHint: string;
     // 对方昵称
     opponentName: string;
-    // 原告（Organizer）昵称
-    hostName: string;
-    // 被告（Joiner）昵称
-    guestName: string;
+    // 第一发言人昵称
+    speakerAName: string;
+    // 第二发言人昵称
+    speakerBName: string;
 }
 
 type TSpeakerFinal = Pick<IChatRoomPageData, 'speakerAFinal' | 'speakerBFinal'>;
@@ -113,7 +114,11 @@ interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     rpxToPx: number;
     asrManager: AsrManager; // 语音识别管理器
     stsCredentials: ISTSCredentials | null; // STS 临时凭证
-    _originalRole: EPlayerRole; // Room creator role (for verdict navigation)
+    currentSpeakerUserId: string; // UserId of current speaker
+    isSelfFirstSpeaker: boolean; // Whether self is first speaker (SpeakerA)
+    // ASR 完成后的待执行动作（用于确保录音结果先于控制消息发出）
+    pendingAfterAsrComplete: 'sendTurnEnd' | 'redirect' | null;
+    pendingAfterAsrCompleteTimerId: number | null;
 }
 
 const EMOJI_LIST = [
@@ -175,20 +180,21 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         showNotification: true,
         showEndEarlyNotification: false,
 
-        roomCode: '',
+        roomId: '',
 
         phase: EPhase.SpeakerA,
-        localRole: EPlayerRole.Organizer,
         remaining: TOTAL_PER_TURN,
         totalPerTurn: TOTAL_PER_TURN,
 
         canSpeak: true,
 
         showSwitchNotification: false,
+        switchNotificationText: '下一位',
 
         countdownClass: 'normal',
 
         isRecording: false,
+        micPressed: false,
 
         myReactions: [],
         opponentReactions: [],
@@ -214,9 +220,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         listenerHint: '',
         // 对方昵称
         opponentName: '',
-        // 原告/被告昵称
-        hostName: '小美',
-        guestName: '大壮',
+        // 第一/第二发言人昵称
+        speakerAName: '',
+        speakerBName: '',
     },
 
     timerId: null,
@@ -228,31 +234,23 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     rpxToPx: 0.5,
     asrManager: null,
     stsCredentials: null,
-    _originalRole: EPlayerRole.Organizer,
+    currentSpeakerUserId: '',
+    isSelfFirstSpeaker: false,
+    pendingAfterAsrComplete: null,
+    pendingAfterAsrCompleteTimerId: null,
 
-    onLoad(options): void {
-        // 解析页面参数
-        const roomCode = options.roomCode ?? '';
-        const localRole: EPlayerRole =
-            options.role === EPlayerRole.Joiner
-                ? EPlayerRole.Joiner
-                : EPlayerRole.Organizer;
-        // originalRole: room creator role (independent of drum game result)
-        // Used for verdict navigation to match backend host/guest classification
-        this._originalRole =
-            options.originalRole === EPlayerRole.Joiner
-                ? EPlayerRole.Joiner
-                : EPlayerRole.Organizer;
-        const opponentName: string = options.opponentName
-            ? decodeURIComponent(options.opponentName)
-            : DEFAULT_OPPONENT_NAME;
-        const selfName: string = nicknameService.getNickName();
-        const hostName: string =
-            localRole === EPlayerRole.Organizer ? selfName : opponentName;
-        const guestName: string =
-            localRole === EPlayerRole.Joiner ? selfName : opponentName;
+    onLoad(_options): void {
+        const app = getApp<IAppOption>();
+        const {
+            selfUserId,
+            opponentNickname,
+            firstSpeakerUserId,
+            roomId,
+            selfNickname,
+        } = app.globalData;
+
         // 校验 roomCode
-        if (!roomCode) {
+        if (!roomId) {
             void wx.showToast({ title: '房间号无效', icon: 'error' });
             setTimeout(() => {
                 void wx.navigateBack();
@@ -260,11 +258,17 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        // 计算初始权限
-        const canSpeak: boolean = this.computeCanSpeak(
-            EPhase.SpeakerA,
-            localRole
-        );
+        this.currentSpeakerUserId = firstSpeakerUserId;
+        this.isSelfFirstSpeaker = selfUserId === firstSpeakerUserId;
+        const canSpeak: boolean = this.currentSpeakerUserId === selfUserId;
+
+        const opponentName: string = opponentNickname || DEFAULT_OPPONENT_NAME;
+        const speakerAName: string = this.isSelfFirstSpeaker
+            ? selfNickname
+            : opponentName;
+        const speakerBName: string = this.isSelfFirstSpeaker
+            ? opponentName
+            : selfNickname;
 
         // 计算 rpx → px 换算比例
         const sysInfo = wx.getSystemInfoSync();
@@ -279,8 +283,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             });
 
         this.setData({
-            roomCode,
-            localRole,
+            roomId,
             totalPerTurn: TOTAL_PER_TURN,
             remaining: TOTAL_PER_TURN,
             phase: EPhase.SpeakerA,
@@ -289,8 +292,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             emojiAnimations,
             listenerHint: canSpeak ? '' : this.pickListenerHint(opponentName),
             opponentName,
-            hostName,
-            guestName,
+            speakerAName,
+            speakerBName,
         });
 
         // 非发言者启动提示文案轮播
@@ -303,6 +306,11 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 初始化语音识别管理器
         this.initAsrManager();
+
+        // 预热 STS 凭证（发言者首次按麦时无需等待网络）
+        if (canSpeak) {
+            this.prewarmStsCredentials();
+        }
 
         // 权限检查移到用户按下麦克风时进行
     },
@@ -346,6 +354,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             this.switchNotificationTimerId = null;
         }
 
+        // 清理 ASR pending action 定时器
+        if (this.pendingAfterAsrCompleteTimerId) {
+            clearTimeout(this.pendingAfterAsrCompleteTimerId);
+            this.pendingAfterAsrCompleteTimerId = null;
+        }
+        this.pendingAfterAsrComplete = null;
+
         // 停止语音识别
         if (this.asrManager && this.data.isRecording) {
             this.asrManager.stop();
@@ -362,21 +377,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         );
         this.myReactionTimeouts = [];
         this.opponentReactionTimeouts = [];
-    },
-
-    /**
-     * 计算 canSpeak 权限
-     * SPEAKER_A 阶段：Organizer（赢家）先说
-     * SPEAKER_B 阶段：Joiner（输家）后说
-     */
-    computeCanSpeak(phase: EPhase, localRole: EPlayerRole): boolean {
-        if (phase === EPhase.SpeakerA) {
-            return localRole === EPlayerRole.Organizer;
-        }
-        if (phase === EPhase.SpeakerB) {
-            return localRole === EPlayerRole.Joiner;
-        }
-        return false;
     },
 
     /**
@@ -446,7 +446,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             this.switchNotificationTimerId = null;
         }
         await wx.vibrateLong();
-        this.setData({ showSwitchNotification: true });
+        this.setData({
+            showSwitchNotification: true,
+            switchNotificationText: '下一位',
+        });
 
         this.switchNotificationTimerId = setTimeout(() => {
             this.setData({ showSwitchNotification: false });
@@ -459,19 +462,19 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 处理 ASR 文本的 WebSocket 同步
      */
     initASRService(): void {
-        const { roomCode } = this.data;
-        const userId: string | null = wx.getStorageSync('userId');
+        const { roomId } = this.data;
+        const userId: string = getApp<IAppOption>().globalData.selfUserId;
 
-        if (!roomCode || !userId) {
+        if (!roomId || !userId) {
             logger.warn(
                 'ChatRoom',
-                'Cannot init ASR service: missing roomCode or userId'
+                'Cannot init ASR service: missing roomId or userId'
             );
             return;
         }
 
         asrService.initialize({
-            roomId: roomCode,
+            roomId,
             speakerId: userId,
             onASRTextReceive: (
                 _speakerId: string,
@@ -493,27 +496,27 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
-     * 获取本地发言对应的 data key（基于角色，不受阶段切换影响）
-     * Organizer 在 SpeakerA 发言，Joiner 在 SpeakerB 发言
+     * 获取本地发言对应的 data key（基于是否先发言，不受阶段切换影响）
+     * 先发言者在 SpeakerA 发言，后发言者在 SpeakerB 发言
      */
     getLocalSpeechKeys(): {
         finalKey: keyof TSpeakerFinal;
         liveKey: keyof TSpeakerLive;
     } {
-        if (this.data.localRole === EPlayerRole.Organizer) {
+        if (this.isSelfFirstSpeaker) {
             return { finalKey: 'speakerAFinal', liveKey: 'speakerALive' };
         }
         return { finalKey: 'speakerBFinal', liveKey: 'speakerBLive' };
     },
 
     /**
-     * 获取对方发言对应的 data key（基于角色，不受阶段切换影响）
+     * 获取对方发言对应的 data key（基于是否先发言，不受阶段切换影响）
      */
     getOpponentSpeechKeys(): {
         finalKey: keyof TSpeakerFinal;
         liveKey: keyof TSpeakerLive;
     } {
-        if (this.data.localRole === EPlayerRole.Organizer) {
+        if (this.isSelfFirstSpeaker) {
             return { finalKey: 'speakerBFinal', liveKey: 'speakerBLive' };
         }
         return { finalKey: 'speakerAFinal', liveKey: 'speakerALive' };
@@ -593,6 +596,10 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 isRecognizing: true,
                 recognizeError: null,
             });
+            // 识别真正开始时给一次中等震动，提示用户可以开口说话
+            if (this.data.canSpeak) {
+                void wx.vibrateShort({ type: 'medium' });
+            }
         };
 
         // 3. 识别变化时（发送 partial，节流后）
@@ -632,7 +639,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             }
         };
 
-        // 5. 识别结束 — 仅处理未被 OnSentenceEnd 捕获的残余文本
+        // 5. 识别结束 — 仅处理未被 OnSentenceEnd 捕获的残余文本，然后执行挂起的动作
         manager.OnRecognitionComplete = (res: unknown) => {
             logger.log('ChatRoom', '识别结束', res);
             const { finalKey, liveKey } = this.getLocalSpeechKeys();
@@ -657,6 +664,21 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                     [liveKey]: '',
                     isRecognizing: false,
                 });
+            }
+
+            // 清除兜底超时
+            if (this.pendingAfterAsrCompleteTimerId) {
+                clearTimeout(this.pendingAfterAsrCompleteTimerId);
+                this.pendingAfterAsrCompleteTimerId = null;
+            }
+
+            // 执行挂起的动作（录音结果已全部发送，现在安全地发控制消息或跳转）
+            const pending = this.pendingAfterAsrComplete;
+            this.pendingAfterAsrComplete = null;
+            if (pending === 'sendTurnEnd') {
+                this.sendSpeechTurnEnd();
+            } else if (pending === 'redirect') {
+                this.doRedirectToVerdictWaiting();
             }
         };
 
@@ -688,6 +710,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         this.setData({
             recognizeError: errorMessage,
             isRecognizing: false,
+            micPressed: false,
             [liveKey]: '',
         });
 
@@ -830,18 +853,28 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 切换阶段
      */
     switchPhase(): void {
-        const { phase, localRole, totalPerTurn, canSpeak } = this.data;
+        const { phase, totalPerTurn, canSpeak } = this.data;
         // 根据当前阶段直接计算 liveKey（同步，无竞态问题）
         const liveKey: 'speakerALive' | 'speakerBLive' =
             phase === EPhase.SpeakerA ? 'speakerALive' : 'speakerBLive';
 
-        // 强制停止语音识别
+        // 强制停止语音识别，并在 ASR 完成后发送控制消息（确保录音结果先到后端）
         if (this.asrManager && this.data.isRecording) {
+            if (canSpeak) {
+                // 先设置 pending 再 stop，避免回调比赋值先到
+                this.pendingAfterAsrComplete = 'sendTurnEnd';
+                // 兜底：3 秒内 OnRecognitionComplete 未触发则直接发送
+                this.pendingAfterAsrCompleteTimerId = setTimeout(() => {
+                    if (this.pendingAfterAsrComplete === 'sendTurnEnd') {
+                        this.pendingAfterAsrComplete = null;
+                        this.sendSpeechTurnEnd();
+                    }
+                    this.pendingAfterAsrCompleteTimerId = null;
+                }, 3000) as unknown as number;
+            }
             this.asrManager.stop();
-        }
-
-        // 发送 SPEECH_TURN_END（仅当本轮是我方发言时）
-        if (canSpeak) {
+        } else if (canSpeak) {
+            // 未在录音，直接发送
             this.sendSpeechTurnEnd();
         }
 
@@ -865,7 +898,13 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             });
             // 等待 CHAT_COMPLETE 消息触发跳转
         } else {
-            const nextCanSpeak = this.computeCanSpeak(nextPhase, localRole);
+            const phaseApp = getApp<IAppOption>();
+            // 第二发言人是非第一发言人的那一方
+            this.currentSpeakerUserId = this.isSelfFirstSpeaker
+                ? phaseApp.globalData.opponentUserId
+                : phaseApp.globalData.selfUserId;
+            const nextCanSpeak: boolean =
+                this.currentSpeakerUserId === phaseApp.globalData.selfUserId;
 
             // 不再发言时停止倒计时（由新发言者自行启动）
             if (!nextCanSpeak && this.timerId) {
@@ -901,8 +940,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 当本方发言轮次结束时调用
      */
     sendSpeechTurnEnd(): void {
-        const roomId: string = this.data.roomCode;
-        const userId: string = wx.getStorageSync('userId') ?? '';
+        const roomId: string = this.data.roomId;
+        const userId: string = getApp<IAppOption>().globalData.selfUserId;
 
         if (!roomId || !userId) {
             logger.warn(
@@ -926,8 +965,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 第一位发言者结束后，服务器通知切换发言人
      * 已在正确阶段的一方（发送者）忽略，未切换的一方更新状态
      */
-    handleSpeechTurnSwitch(): void {
-        const { phase, localRole, totalPerTurn } = this.data;
+    handleSpeechTurnSwitch(payload: ISpeechTurnSwitchPayload): void {
+        const { phase, totalPerTurn } = this.data;
 
         // 已经不在 SpeakerA 阶段，忽略
         if (phase !== EPhase.SpeakerA) {
@@ -937,13 +976,12 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         logger.log('ChatRoom', 'SPEECH_TURN_SWITCH → SpeakerB');
 
+        this.currentSpeakerUserId = payload.nextSpeakerUserId;
+        const selfUserId: string = getApp<IAppOption>().globalData.selfUserId;
+        const nextCanSpeak: boolean = this.currentSpeakerUserId === selfUserId;
+
         // 显示"下一位"切换提示
         this.showSwitchNotification();
-
-        const nextCanSpeak: boolean = this.computeCanSpeak(
-            EPhase.SpeakerB,
-            localRole
-        );
 
         this.setData({
             phase: EPhase.SpeakerB,
@@ -957,6 +995,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         if (nextCanSpeak) {
             this.stopListenerHintRotation();
+            // 预热 STS 凭证，让第二发言者首次按麦时无需等待网络
+            this.prewarmStsCredentials();
         } else {
             this.startListenerHintRotation();
         }
@@ -966,7 +1006,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
     /**
      * 处理 CHAT_COMPLETE 消息
-     * 双方发言均已结束，显示过渡 UI 后跳转 verdict-waiting
+     * 双方发言均已结束：先强制停录音、确保 ASR 结果发送完毕，再跳转 verdict-waiting
      */
     handleChatComplete(_payload: IChatCompletePayload): void {
         // 防止重复处理
@@ -976,33 +1016,53 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         logger.log('ChatRoom', 'CHAT_COMPLETE received');
 
-        // 停止所有录音/识别
-        this.stopRecording();
-
-        // 清理定时器
+        // 清理倒计时定时器
         if (this.timerId) {
             clearInterval(this.timerId);
             this.timerId = null;
         }
+        this.stopListenerHintRotation();
 
+        const wasRecording: boolean = this.data.isRecording;
+
+        // 显示"判官已知悉"过渡遮罩（不启动自动隐藏，跳转前保持可见）
         this.setData({
             phase: EPhase.Done,
             isCompleted: true,
             canSpeak: false,
             remaining: 0,
             isRecording: false,
+            showSwitchNotification: true,
+            switchNotificationText: '判官已知悉',
         });
 
-        // 直接跳转到 verdict-waiting
-        const roomId: string = this.data.roomCode;
-        // Use _originalRole (room creator role) so currentRole on verdict page
-        // matches backend host/guest classification (based on room.hostUserId)
-        const role: string =
-            this._originalRole === EPlayerRole.Organizer ? 'host' : 'guest';
+        if (this.asrManager && wasRecording) {
+            // 等 OnRecognitionComplete 回调确认最后一段文本已发出，再跳转
+            this.pendingAfterAsrComplete = 'redirect';
+            // 兜底：3 秒内未回调则直接跳转
+            this.pendingAfterAsrCompleteTimerId = setTimeout(() => {
+                if (this.pendingAfterAsrComplete === 'redirect') {
+                    this.pendingAfterAsrComplete = null;
+                    this.doRedirectToVerdictWaiting();
+                }
+                this.pendingAfterAsrCompleteTimerId = null;
+            }, 3000) as unknown as number;
+            this.asrManager.stop();
+        } else {
+            // 未在录音，短暂展示遮罩后跳转
+            setTimeout(() => {
+                this.doRedirectToVerdictWaiting();
+            }, 1500);
+        }
+    },
+
+    /**
+     * 跳转到 verdict-waiting 页面
+     */
+    doRedirectToVerdictWaiting(): void {
+        const roomId: string = this.data.roomId;
         void wx.redirectTo({
-            url:
-                `/packageB/pages/verdict-waiting/index` +
-                `?roomId=${roomId}&role=${role}`,
+            url: `/packageB/pages/verdict-waiting/index?roomId=${roomId}`,
         });
     },
 
@@ -1022,6 +1082,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
+        // 手指按下：立即进入"连接中"状态
+        this.setData({ micPressed: true });
+
         // 如果已有权限，直接开始录音
         if (this.data.hasMicPermission) {
             // 首次按下麦克风时启动倒计时
@@ -1040,6 +1103,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 麦克风松开
      */
     onMicTouchEnd(): void {
+        this.setData({ micPressed: false });
         this.stopRecording();
     },
 
@@ -1047,6 +1111,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
      * 麦克风触摸取消
      */
     onMicTouchCancel(): void {
+        this.setData({ micPressed: false });
         this.stopRecording();
     },
 
@@ -1109,6 +1174,17 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         // 权限已在 onMicTouchStart 中检查过，直接启动 ASR
         this.startAsrWithCredentials();
+    },
+
+    /**
+     * 预热 STS 凭证缓存（fire-and-forget）
+     * 提前触发一次 getCredentials，使缓存在用户按麦前就已就绪
+     * 错误静默处理：预热失败不影响正常流程，startAsrWithCredentials 会再次尝试
+     */
+    prewarmStsCredentials(): void {
+        stsService.getCredentials().catch((err: unknown) => {
+            logger.warn('ChatRoom', 'STS prewarm failed (non-fatal):', err);
+        });
     },
 
     /**
@@ -1224,8 +1300,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             return;
         }
 
-        const roomId: string = this.data.roomCode;
-        const senderId: string = wx.getStorageSync('userId') ?? '';
+        const roomId: string = this.data.roomId;
+        const senderId: string = getApp<IAppOption>().globalData.selfUserId;
 
         if (!roomId || !senderId) {
             return;
@@ -1255,7 +1331,9 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
             switch (message.type) {
                 case EWSMessageType.SpeechTurnSwitch:
-                    this.handleSpeechTurnSwitch();
+                    this.handleSpeechTurnSwitch(
+                        message.data as ISpeechTurnSwitchPayload
+                    );
                     break;
                 case EWSMessageType.ChatComplete:
                     this.handleChatComplete(

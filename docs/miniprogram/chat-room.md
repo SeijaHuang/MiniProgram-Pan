@@ -161,66 +161,71 @@
 
 ### 6.3 录音与语音识别集成
 
-#### 6.3.1 微信同声传译插件（WechatSI）
+#### 6.3.1 腾讯云语音识别插件（QCloudAIVoice）
 
-**必须使用方案A：WechatSI插件**
+**必须使用方案：QCloudAIVoice 插件**
 
-- 不使用云函数、第三方ASR、数据库
-- 插件配置：在 `app.json` 中添加插件配置
+- 不使用云函数或独立录音管理器（插件内置录音）
+- 使用 STS 临时凭证（由 `stsService.getCredentials()` 获取）
+- 插件已在 `app.json` 中配置：
     ```json
     {
         "plugins": {
-            "WechatSI": {
-                "version": "0.3.0",
-                "provider": "wx069ba97219f66d99"
+            "QCloudAIVoice": {
+                "version": "版本号",
+                "provider": "wx3e17776051baf153"
             }
         }
     }
+    ```
+- 获取管理器实例：
+    ```typescript
+    const QCloudAIVoicePlugin = requirePlugin('QCloudAIVoice');
+    const asrManager = QCloudAIVoicePlugin.speechRecognizerManager();
     ```
 
 #### 6.3.2 录音与识别同步启停
 
 **开始录音时（`startRecording()`）**:
 
-1. 清空识别状态：`speechTextLive = ''`, `speechTextFinal = ''`, `recognizeError = null`
-2. 启动录音管理器：`recorderManager.start(...)`
-3. 同步启动识别管理器：`recognizeManager.start({ lang: "zh_CN" })`
-4. 更新状态：`isRecording: true`, `isRecognizing: true`
+1. 获取 STS 凭证：`await stsService.getCredentials()`
+2. 清空识别状态：`speechTextLive = ''`, `speechTextFinal = ''`
+3. 调用 `asrManager.start({ secretId, secretToken, engine_model_type: '16k_zh', voice_format: 1 })`
+4. 插件自动同时启动录音和识别，触发 `OnRecognitionStart` 回调
+5. 更新状态：`isRecording: true`
 
 **停止录音时（`stopRecording()`）**:
 
-1. 停止录音管理器：`recorderManager.stop()`
-2. 停止识别管理器：`recognizeManager.stop()`（会触发 `onStop` 回调）
+1. 调用 `asrManager.stop()`（同时停止录音和识别）
+2. 依次触发：`OnRecognitionComplete`（最终文本）→ `OnRecorderStop`（录音文件路径）
 3. 更新状态：`isRecording: false`
-4. `onStop` 回调会将最终文本写入 `speechTextFinal`
 
 #### 6.3.3 识别回调处理
 
-**实时识别回调（`onRecognize`）**:
+**实时文本回调（`OnRecognitionResultChange`）**:
 
-- 接收参数：`res.result` 为临时识别文本（会持续变化）
+- `res.result.voice_text_str` 为临时识别文本（会持续变化）
 - 处理：实时更新 `speechTextLive`，显示在对话框
 
-**识别结束回调（`onStop`）**:
+**识别完成回调（`OnRecognitionComplete`）**:
 
-- 接收参数：`res.result` 为最终文本
-- 处理：更新 `speechTextFinal` 和 `speechTextLive`，设置 `isRecognizing: false`
+- `res.result.voice_text_str` 为最终文本
+- 处理：更新 `speechTextFinal` 和 `speechTextLive`
 
-**识别错误回调（`onError`）**:
+**错误回调（`OnError`）**:
 
-- 处理：设置 `recognizeError: '识别失败'`，显示 Toast 提示，设置 `isRecognizing: false`
+- 处理：显示错误占位文案 `[本次语音未成功识别]`，显示 Toast 提示
 
 #### 6.3.4 状态清理
 
 **阶段切换时**:
 
-- 强制停止录音和识别（如果正在进行）
-- 清理识别状态：`speechTextLive = ''`, `speechTextFinal = ''`, `recognizeError = null`, `isRecognizing = false`
+- 调用 `asrManager.stop()` 强制停止录音和识别
+- 清理识别状态：`speechTextLive = ''`, `speechTextFinal = ''`, `isRecording = false`
 
 **页面隐藏/卸载时**:
 
-- 在 `cleanup()` 方法中停止录音和识别
-- 清理识别状态
+- 在 `cleanup()` 方法中调用 `asrManager.stop()`
 
 ---
 
@@ -312,19 +317,17 @@ type ChatRoomState =
 
 ### 9.2 生命周期管理
 
-- **onLoad**: 解析 URL 参数（`roomCode`、`role`、`opponentName`），初始化 WebSocket 连接，注册消息监听
+- **onLoad**: 从 `getApp().globalData` 读取 `roomCode/selfUserId/opponentUserId/firstSpeakerUserId` 等身份与房间信息，初始化状态机与 WebSocket 监听
 - **onShow**: 恢复页面状态，检查连接状态
 - **onUnload**: 取消 WebSocket 监听，关闭连接
 
-**URL 参数说明**:
+**页面入参（重构后）**:
 
-| 参数           | 类型     | 说明                                                     |
-| -------------- | -------- | -------------------------------------------------------- |
-| `roomCode`     | `string` | 房间 ID（来自 drum-room 跳转）                           |
-| `role`         | `string` | 当前用户角色（`host` / `guest`）                         |
-| `opponentName` | `string` | 对手昵称（`encodeURIComponent` 编码，由 drum-room 传入） |
+- **不再通过 URL 传递任何身份字段**（`userId` / `nickname` / `role` / `opponentName` 均移除）
+- `roomCode`/双方昵称与 userId 在 Waiting Room 收到 `JOIN_ACK` 后写入 `globalData`
+- `firstSpeakerUserId` 在 Drum Room 收到 `DRUM_RESULT` 后写入 `globalData`，Chat Room 用它决定谁先发言
 
-`opponentName` 用于 `buildListenerHints(name)` 生成含对方姓名的监听提示文案（如「静听{对方}发言中…」），替代原先的静态文案数组。
+监听提示文案（如「静听{对方}发言中…」）使用 `globalData.opponentNickname` 构造，无需 URL 传参。
 
 ---
 
@@ -379,13 +382,14 @@ type ChatRoomState =
 
 ### 12.2 识别管理器初始化
 
-在页面实例上挂载 `recognizeManager: IRecordRecognitionManager | null`
+在页面实例上挂载 `asrManager: AsrManager | null`（类型为 QCloudAIVoice 插件返回的管理器）
 
 在 `onLoad` 中初始化：
 
 ```typescript
-this.recognizeManager = plugin.getRecordRecognitionManager();
-this.initSpeechRecognitionCallbacks();
+const QCloudAIVoicePlugin = requirePlugin('QCloudAIVoice');
+this.asrManager = QCloudAIVoicePlugin.speechRecognizerManager();
+this.initAsrCallbacks();
 ```
 
 ### 12.3 对话框显示规则
@@ -438,7 +442,7 @@ this.initSpeechRecognitionCallbacks();
 
 ### 12.5 验收标准
 
-- [ ] 仅使用 WechatSI 插件识别（`requirePlugin("WechatSI")`）
+- [ ] 仅使用 QCloudAIVoice 插件识别（`requirePlugin('QCloudAIVoice')`）
 - [ ] 按住麦克风说话时，对话框文字会实时刷新（`speechTextLive`）
 - [ ] 松开/倒计时结束后，对话框显示最终文字（`speechTextFinal`）
 - [ ] 识别失败会显示兜底文案且 toast 提示
@@ -491,20 +495,20 @@ this.initSpeechRecognitionCallbacks();
 - ✅ **已完成** - 基础布局和倒计时实现
 - ✅ **已完成** - 麦克风按钮和录音功能
 - ✅ **已完成** - 表情互动系统
-- ✅ **已完成** - 微信同声传译插件集成（WechatSI）
-- ✅ **已完成** - 消息发送与接收（使用 chat-service）
-- ⏳ **待对接** - WebSocket 后端完整流程（状态同步、语音消息）
-- ⏳ **待完善** - 异常处理和优化
+- ✅ **已完成** - 腾讯云语音识别插件集成（QCloudAIVoice + STS 临时凭证）
+- ✅ **已完成** - 消息发送与接收（ASR_TEXT_PUSH、SPEECH_TURN_END、EMOJI_SEND）
+- ✅ **已完成** - WebSocket 后端完整流程（阶段切换、语音消息同步）
+- ✅ **已完成** - 异常处理和优化
 
 ### 后续规划
 
 1. ✅ **第一阶段**: 基础布局和倒计时实现
 2. ✅ **第二阶段**: 麦克风按钮和录音功能
 3. ✅ **第三阶段**: 表情互动系统
-4. ✅ **第四阶段**: 语音识别功能（WechatSI插件）
-5. ✅ **第五阶段**: 文本消息发送与接收（chat-service）
-6. ⏳ **第六阶段**: WebSocket 后端完整流程对接
-7. ⏳ **第七阶段**: 异常处理和优化
+4. ✅ **第四阶段**: 语音识别功能（QCloudAIVoice 插件 + STS 凭证）
+5. ✅ **第五阶段**: ASR 文本推送与接收（asr-service）
+6. ✅ **第六阶段**: WebSocket 后端完整流程对接（阶段切换、发言结束）
+7. ✅ **第七阶段**: 异常处理和优化
 
 ---
 
@@ -524,10 +528,10 @@ this.initSpeechRecognitionCallbacks();
     - Chat WebSocket: `miniprogram/types/chat-websocket.ts`
     - WebSocket 通用: `miniprogram/types/websocket-common.ts`
 - **插件配置**:
-    - 全局配置: `miniprogram/app.json`（WechatSI 插件配置）
+    - 全局配置: `miniprogram/app.json`（QCloudAIVoice 插件配置）
 - **录音与识别**:
-    - 录音管理器: 使用 `wx.getRecorderManager()`
-    - 语音识别: 使用微信同声传译插件（WechatSI）
+    - 语音识别 + 录音: 使用腾讯云语音识别插件（QCloudAIVoice，内置录音管理器）
+    - STS 凭证: `miniprogram/services/sts-service.ts`
 - **产品文档**:
     - 原始 PRD: `Chat_Room_PRD_v1.0.md`
     - 本实现文档: `docs/miniprogram/chat-room.md`

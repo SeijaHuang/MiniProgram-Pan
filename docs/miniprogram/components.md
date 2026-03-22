@@ -294,8 +294,8 @@ Page({
 ```xml
 <radar-chart
     id="radarChart"
-    hostScores="{{ verdict.battleStats.host }}"
-    guestScores="{{ verdict.battleStats.guest }}"
+    hostScores="{{ verdict.battleStats.players[0].scores }}"
+    guestScores="{{ verdict.battleStats.players[1].scores }}"
     size="{{ 500 }}"
 ></radar-chart>
 ```

@@ -250,19 +250,28 @@ function validateJudgment(obj: unknown): IJudgmentResponse {
  *
  * Uses temperature 0.7 for creative/humorous output
  *
+ * @param player1Nickname - Player 1's display nickname
  * @param player1Speech - Player 1's speech content
+ * @param player2Nickname - Player 2's display nickname
  * @param player2Speech - Player 2's speech content
  * @returns Parsed and validated IJudgmentResponse
  * @throws Error with human-readable message on failure
  */
 export async function createJudgmentVerdict(
+    player1Nickname: string,
     player1Speech: string,
+    player2Nickname: string,
     player2Speech: string,
     idempotencyKey?: string
 ): Promise<IJudgmentResponse> {
     const client = getClient();
 
-    const userContent = buildJudgmentUserContent(player1Speech, player2Speech);
+    const userContent = buildJudgmentUserContent(
+        player1Nickname,
+        player1Speech,
+        player2Nickname,
+        player2Speech
+    );
     const key = idempotencyKey ?? crypto.randomUUID();
 
     const response = await client.chat.completions.create(

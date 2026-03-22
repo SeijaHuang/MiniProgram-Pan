@@ -9,6 +9,8 @@
  * - Does NOT format or send WebSocket messages
  */
 
+import { randomUUID } from 'crypto';
+
 import type { IJoinRoomMessage } from '../../types/websocket';
 import { EWSErrorCode } from '../../types/websocket';
 import { roomManager } from '../websocket/room-manager';
@@ -21,6 +23,7 @@ import { logger } from '../../utils/logger';
 export interface IJoinRoomResult {
     success: true;
     room: IRoom;
+    userId: string;
 }
 
 export interface IJoinRoomError {
@@ -40,9 +43,12 @@ export function handleJoinRoom(
     const v = validatePayload(JoinRoomDataSchema, message.data);
     if (!v.success) return v;
 
-    const { roomCode, user } = v.data;
+    const { roomCode, nickname } = v.data;
 
-    // Check if user is already a participant (e.g., room creator)
+    // Generate a new UUID for this user
+    const userId = randomUUID();
+    const user = { userId, nickname };
+
     const room = roomManager.getRoomByCode(roomCode);
     if (!room) {
         return {
@@ -52,58 +58,39 @@ export function handleJoinRoom(
         };
     }
 
-    const isAlreadyParticipant = room.participants.some(
-        p => p.user.userId === user.userId
-    );
+    // Try to join room
+    const result = roomManager.joinRoom(roomCode, user);
 
-    let finalRoom = room;
+    if (!result.success) {
+        // Map domain errors to WebSocket error codes
+        const errorCodeMap: Record<string, EWSErrorCode> = {
+            ROOM_NOT_FOUND: EWSErrorCode.RoomNotFound,
+            ROOM_CLOSED: EWSErrorCode.RoomClosed,
+            ROOM_FULL: EWSErrorCode.RoomFull,
+            ALREADY_JOINED: EWSErrorCode.AlreadyJoined,
+        };
 
-    if (isAlreadyParticipant) {
-        // User is already a participant, just bind the WebSocket connection
-        logger.log(
-            'JoinRoom',
-            `User ${user.userId} is already a participant, binding WebSocket connection`
-        );
-    } else {
-        // User is not a participant, try to join
-        const result = roomManager.joinRoom(roomCode, user);
+        const errorCode =
+            errorCodeMap[result.error] || EWSErrorCode.InternalError;
 
-        if (!result.success) {
-            // Map domain errors to WebSocket error codes
-            const errorCodeMap: Record<string, EWSErrorCode> = {
-                ROOM_NOT_FOUND: EWSErrorCode.RoomNotFound,
-                ROOM_CLOSED: EWSErrorCode.RoomClosed,
-                ROOM_FULL: EWSErrorCode.RoomFull,
-                ALREADY_JOINED: EWSErrorCode.AlreadyJoined,
-            };
-
-            const errorCode =
-                errorCodeMap[result.error] || EWSErrorCode.InternalError;
-
-            return {
-                success: false,
-                code: errorCode,
-                message: result.error,
-            };
-        }
-
-        finalRoom = result.room;
+        return {
+            success: false,
+            code: errorCode,
+            message: result.error,
+        };
     }
 
     // Bind connection to user and room
-    connectionManager.bindConnection(
-        connectionId,
-        user.userId,
-        finalRoom.roomId
-    );
+    connectionManager.bindConnection(connectionId, userId, result.room.roomId);
 
     logger.log(
         'JoinRoom',
-        `User ${user.userId} connected to room ${finalRoom.roomId} (${finalRoom.participants.length}/2)`
+        `User ${userId} connected to room ${result.room.roomId} (${result.room.participants.length}/2)`
     );
 
     return {
         success: true,
-        room: finalRoom,
+        room: result.room,
+        userId,
     };
 }

@@ -50,7 +50,7 @@
 
 - verdict-waiting 页面收到后端 AI 分析结果（WebSocket 消息 `VERDICT_RESULT`）
 - 页面通过 `wx.redirectTo` 跳转（不可返回 verdict-waiting）
-- 通过页面路由参数或全局状态传入 `roomId`
+- `roomId` / `selfUserId` 等信息从 `getApp().globalData` 读取（不再依赖路由参数传递身份）
 
 ---
 
@@ -58,26 +58,30 @@
 
 ### 4.1 页面入参
 
-通过页面路由 `options` 传入 `roomId`，页面加载时从后端获取完整判决数据。
+页面加载时从 `getApp<IAppOption>().globalData` 读取 `roomId` 与 `selfUserId`，并通过
+WebSocket 推送的 `VERDICT_RESULT` 或 HTTP fallback 获取完整判决数据。
 
-**昵称来源**: 页面 `onLoad` 时从 `getApp<IAppOption>().globalData.participants` 读取
-`hostNickName` / `guestNickName`，由 waiting-room 在双方就位时写入；若字段缺失则
-fallback 为 `'玩家1'` / `'玩家2'`。
+**昵称来源**：
+
+- 优先使用 `verdict.participants`（后端权威映射表，userId → nickname）
+- 兜底使用 `globalData.selfNickname` / `globalData.opponentNickname`
 
 ### 4.2 后端 API
 
 **Endpoint**: `POST /v1/rooms/:roomId/judgments`
 
-**Response 数据结构**:
+**Response 数据结构（重构后：以 userId 为全链路唯一身份标识）**:
 
 ```typescript
 interface IVerdictResult {
     /** 案件编号，5位随机数字 */
     caseNumber: string;
     /** 赢家标识 */
-    winnerId: 'host' | 'guest' | null;
+    winnerId: string | null; // userId
     /** 输家标识 */
-    loserId: 'host' | 'guest' | null;
+    loserId: string | null; // userId
+    /** 参与者映射（userId → nickname） */
+    participants: Array<{ userId: string; nickname: string }>;
     /** 责任分布 */
     responsibility: IResponsibility;
     /** 六维战力图数据 */
@@ -96,10 +100,12 @@ interface IVerdictResult {
 ```typescript
 /** 责任分布 */
 interface IResponsibility {
-    /** 玩家1(host)责任百分比，0-100 */
-    host: number;
-    /** 玩家2(guest)责任百分比，0-100 */
-    guest: number;
+    /** 玩家责任分布（每项含 userId + nickname + 百分比） */
+    players: Array<{
+        userId: string;
+        nickname: string;
+        percentage: number; // 0-100
+    }>;
     /** 第三方因素列表 */
     thirdParty: IThirdPartyFactor[];
 }
@@ -112,12 +118,15 @@ interface IThirdPartyFactor {
     /** 因素 emoji */
     emoji: string;
 }
-/** 约束: host + guest + sum(thirdParty.percentage) = 100 */
+/** 约束: sum(players.percentage) + sum(thirdParty.percentage) = 100 */
 
 /** 六维战力图 */
 interface IBattleStats {
-    host: IDimensionScores;
-    guest: IDimensionScores;
+    players: Array<{
+        userId: string;
+        nickname: string;
+        scores: IDimensionScores;
+    }>;
 }
 
 interface IDimensionScores {
@@ -137,8 +146,10 @@ interface IDimensionScores {
 
 /** 惩罚令牌 */
 interface IPunishmentTask {
-    /** 输家标识 */
-    loserId: 'host' | 'guest';
+    /** 输家 userId */
+    loserUserId: string;
+    /** 输家昵称（后端直接附带，前端可直接渲染） */
+    loserNickname: string;
     /** 惩罚任务描述（含 emoji） */
     task: string;
     /** 期限说明 */
@@ -146,12 +157,11 @@ interface IPunishmentTask {
 }
 
 /** 密折 */
-interface ISecretReports {
-    host: ISecretReport;
-    guest: ISecretReport;
-}
+type ISecretReports = Array<ISecretReport & { userId: string }>;
 
 interface ISecretReport {
+    /** 归属用户 */
+    userId?: string;
     /** 封号标题，如 "嘴硬大魔王" */
     title: string;
     /** 锦囊妙计/建议，50字以内 */
@@ -273,14 +283,14 @@ interface ISecretReport {
 
 #### 6.2.3 玩家责任卡片
 
-| 元素         | 样式                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------- |
-| **卡片容器** | `width: 210rpx`，`border-radius: 16rpx`，`border: 2rpx solid #E8E8E8`                 |
-| **背景色**   | 玩家1 → `#DCE9F5`（淡蓝），玩家2 → `#F5DCE9`（淡粉）                                  |
-| **头像**     | 圆形 `100rpx × 100rpx`，居中，使用 `avatar` 组件                                      |
-| **头像边框** | 玩家1 → `4rpx solid #4D96FF`，玩家2 → `4rpx solid #FF69B4`                            |
-| **角色文字** | `hostNickName` / `guestNickName`（真实昵称），`font-size: 22rpx`，`color: #666`，居中 |
-| **百分比**   | `font-size: 64rpx`，`font-weight: bold`，`color: #D4380D`，`%` 为 `36rpx`             |
+| 元素         | 样式                                                                                      |
+| ------------ | ----------------------------------------------------------------------------------------- |
+| **卡片容器** | `width: 210rpx`，`border-radius: 16rpx`，`border: 2rpx solid #E8E8E8`                     |
+| **背景色**   | 玩家1 → `#DCE9F5`（淡蓝），玩家2 → `#F5DCE9`（淡粉）                                      |
+| **头像**     | 圆形 `100rpx × 100rpx`，居中，使用 `avatar` 组件                                          |
+| **头像边框** | 玩家1 → `4rpx solid #4D96FF`，玩家2 → `4rpx solid #FF69B4`                                |
+| **角色文字** | `responsibility.players[i].nickname`（真实昵称），`font-size: 22rpx`，`color: #666`，居中 |
+| **百分比**   | `font-size: 64rpx`，`font-weight: bold`，`color: #D4380D`，`%` 为 `36rpx`                 |
 
 #### 6.2.4 第三方因素卡片
 
@@ -293,14 +303,14 @@ interface ISecretReport {
 
 #### 6.2.5 数据映射
 
-| UI 元素        | 数据字段                      |
-| -------------- | ----------------------------- |
-| 玩家1百分比    | `responsibility.host`         |
-| 玩家2百分比    | `responsibility.guest`        |
-| 第三方因素列表 | `responsibility.thirdParty[]` |
-| 因素 emoji     | `thirdParty[].emoji`          |
-| 因素名称       | `thirdParty[].reason`         |
-| 因素百分比     | `thirdParty[].percentage`     |
+| UI 元素        | 数据字段                               |
+| -------------- | -------------------------------------- |
+| 玩家1百分比    | `responsibility.players[0].percentage` |
+| 玩家2百分比    | `responsibility.players[1].percentage` |
+| 第三方因素列表 | `responsibility.thirdParty[]`          |
+| 因素 emoji     | `thirdParty[].emoji`                   |
+| 因素名称       | `thirdParty[].reason`                  |
+| 因素百分比     | `thirdParty[].percentage`              |
 
 #### 6.2.6 入场动画
 
@@ -349,9 +359,9 @@ interface ISecretReport {
 | 5    | 求生欲     | 240°         | `survivalInstinct`  |
 | 6    | 受害者演技 | 300°         | `victimActing`      |
 
-**双方数据区域样式**:
+**双方数据区域样式**（对应 `battleStats.players[0]` / `[1]`）:
 
-| 属性         | 玩家1 (host)                | 玩家2 (guest)             |
+| 属性         | 玩家1                       | 玩家2                     |
 | ------------ | --------------------------- | ------------------------- |
 | **边框色**   | `#666666`（深灰）           | `#D4380D`（红色）         |
 | **填充色**   | `rgba(102, 102, 102, 0.25)` | `rgba(212, 56, 13, 0.25)` |
@@ -791,14 +801,11 @@ interface IVerdictPageData {
     /** 判决结果数据 */
     verdict: IVerdictResult | null;
 
-    /** 当前用户角色 */
-    currentRole: 'host' | 'guest';
+    /** 当前用户 userId（来自 globalData） */
+    selfUserId: string;
 
-    /** 房主昵称（来自 globalData.participants，fallback '玩家1'） */
-    hostNickName: string;
-
-    /** 访客昵称（来自 globalData.participants，fallback '玩家2'） */
-    guestNickName: string;
+    /** 参与者昵称映射（优先来自 verdict.participants） */
+    nicknameMap: Record<string, string>;
 
     /** 当前用户是否为赢家 */
     isWinner: boolean;
@@ -826,8 +833,9 @@ interface IVerdictPageData {
     card4Animation: WechatMiniprogram.AnimationExportResult;
     card5Animation: WechatMiniprogram.AnimationExportResult;
 
-    /** 责任百分比动画当前值 */
-    hostPercentDisplay: number;
+    /** 责任百分比动画当前值（按 players[0]/players[1] 显示） */
+    player1PercentDisplay: number;
+    player2PercentDisplay: number;
     guestPercentDisplay: number;
 
     /** 赠言打字机当前文字 */
@@ -973,27 +981,27 @@ Page({
 
 ## 16. 实现状态
 
-### 当前状态（2026-02-13）
+### 当前状态（2026-03-15）
 
-- ⏳ **待开发** - 页面基础布局与标题区
-- ⏳ **待开发** - 责任分布区域（含计数动画）
-- ⏳ **待开发** - 雷达图组件（Canvas 2D）
-- ⏳ **待开发** - 大老爷赠言（打字机效果）
-- ⏳ **待开发** - 惩罚令牌（盖章动画）
-- ⏳ **待开发** - 密折弹窗组件
-- ⏳ **待开发** - 保存判决书功能（离屏 Canvas 生成图片）
-- ⏳ **待开发** - 赛后互动功能（WebSocket 双向通信）
+- ✅ **已完成** - 页面基础布局与标题区
+- ✅ **已完成** - 责任分布区域（含计数动画）
+- ✅ **已完成** - 雷达图组件（Canvas 2D，封装为 `radar-chart` 组件）
+- ✅ **已完成** - 大老爷赠言（打字机效果）
+- ✅ **已完成** - 惩罚令牌（盖章动画）
+- ✅ **已完成** - 密折弹窗组件（`secret-modal` 组件）
+- ✅ **已完成** - 保存判决书功能（Canvas 2D 生成图片）
+- ✅ **已完成** - 赛后互动功能（POST_GAME_ACTION / POST_GAME_EFFECT + post-game-effect 组件）
 
-### 后续规划
+### 完成阶段记录
 
-1. ⏳ **第一阶段**: 页面基础布局与标题区
-2. ⏳ **第二阶段**: 责任分布区域（三列布局 + 计数动画）
-3. ⏳ **第三阶段**: 雷达图组件（Canvas 2D 绘制）
-4. ⏳ **第四阶段**: 大老爷赠言 + 惩罚令牌（打字机 + 盖章效果）
-5. ⏳ **第五阶段**: 密折弹窗组件
-6. ⏳ **第六阶段**: 保存判决书图片功能
-7. ⏳ **第七阶段**: 赛后互动（WebSocket 消息 + 效果组件）
-8. ⏳ **第八阶段**: 入场动画串联 + 性能优化
+1. ✅ **第一阶段**: 页面基础布局与标题区
+2. ✅ **第二阶段**: 责任分布区域（三列布局 + 计数动画）
+3. ✅ **第三阶段**: 雷达图组件（Canvas 2D 绘制）
+4. ✅ **第四阶段**: 大老爷赠言 + 惩罚令牌（打字机 + 盖章效果）
+5. ✅ **第五阶段**: 密折弹窗组件
+6. ✅ **第六阶段**: 保存判决书图片功能
+7. ✅ **第七阶段**: 赛后互动（WebSocket 消息 + 效果组件）
+8. ✅ **第八阶段**: 入场动画串联 + 性能优化
 
 ---
 

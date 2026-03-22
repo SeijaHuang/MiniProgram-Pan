@@ -10,22 +10,15 @@ import type { ICreateRoomResponse } from '../types/room-api';
 class RoomService {
     /**
      * Create a new chat room
-     * @param creator - The user creating the room
      * @returns Promise with room data
      */
-    async createRoom(creator: {
-        userId: string;
-        nickname: string;
-    }): Promise<IRoom> {
+    async createRoom(): Promise<IRoom> {
         return new Promise<IRoom>((resolve, reject) => {
             wx.request({
                 url: `${API_BASE_URL}/v1/rooms`,
                 method: 'POST',
                 header: {
                     'content-type': 'application/json',
-                },
-                data: {
-                    creator,
                 },
                 success: res => {
                     if (res.statusCode === 201) {

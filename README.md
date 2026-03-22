@@ -90,10 +90,9 @@ npm run prepare    # 初始化 Husky
 ### 后端 (backend/)
 
 ```bash
-npm run dev        # 开发模式 (ts-node)
+npm run dev        # 开发模式 (tsx watch, 热重载)
 npm run build      # 编译 TypeScript
 npm start          # 生产模式
-npm run ws:test    # 测试 WebSocket
 npm run lint       # ESLint 检查
 ```
 
@@ -107,10 +106,10 @@ npm run lint       # ESLint 检查
 
 ### 击鼓游戏 (Drum Room)
 
-- 房间就绪后自动启动
-- 3 秒倒计时 + 10 秒点击竞争
-- 服务器计时计分，防止作弊
-- 胜负判定：分高者胜，平局房主胜
+- 房间就绪后服务器广播 `DRUM_READY`（含玩家信息与服务器时间同步）
+- 双方各发 `DRUM_START_REQUEST`，服务器广播 `DRUM_PLAYER_READY`（readyCount）
+- 双方均准备后服务器广播 `DRUM_START`（含 startAtMs 时间戳），10 秒点击竞争
+- 服务器计时计分，防止作弊；胜负判定：分高者胜，平局房主胜
 
 ### 聊天系统 (Chat Room)
 
@@ -137,32 +136,34 @@ npm run lint       # ESLint 检查
 
 ## WebSocket 消息类型
 
-| 类型                 | 方向 | 说明             |
-| -------------------- | ---- | ---------------- |
-| `JOIN_ROOM`          | C→S  | 加入房间         |
-| `JOIN_ACK`           | S→C  | 加入确认（广播） |
-| `CHAT_SEND`          | C→S  | 发送文本消息     |
-| `CHAT_RECEIVE`       | S→C  | 接收消息（广播） |
-| `EMOJI_SEND`         | C→S  | 发送表情         |
-| `EMOJI_RECEIVE`      | S→C  | 接收表情（广播） |
-| `ASR_TEXT_PUSH`      | C→S  | 推送识别文本     |
-| `ASR_TEXT`           | S→C  | 广播识别文本     |
-| `DRUM_READY`         | S→C  | 游戏就绪         |
-| `DRUM_START`         | S→C  | 游戏开始         |
-| `DRUM_TAP`           | 双向 | 点击事件         |
-| `DRUM_FINISH`        | S→C  | 游戏结束         |
-| `DRUM_RESULT`        | S→C  | 游戏结果         |
-| `SPEECH_TURN_END`    | C→S  | 发言轮次结束     |
-| `SPEECH_TURN_SWITCH` | S→C  | 切换发言轮次     |
-| `CHAT_COMPLETE`      | S→C  | 双方发言完毕     |
-| `VERDICT_RESULT`     | S→C  | 判决结果推送     |
-| `VERDICT_FAILED`     | S→C  | 判决生成失败     |
-| `VERDICT_RETRY`      | C→S  | 请求重试判决     |
-| `POST_GAME_ACTION`   | C→S  | 赛后互动操作     |
-| `POST_GAME_EFFECT`   | S→C  | 赛后互动特效     |
-| `LEAVE_ROOM`         | C→S  | 离开房间         |
-| `LEAVE_ROOM_ACK`     | S→C  | 离开房间确认     |
-| `ERROR`              | S→C  | 错误消息         |
+| 类型                 | 方向 | 说明                           |
+| -------------------- | ---- | ------------------------------ |
+| `JOIN_ROOM`          | C→S  | 加入房间                       |
+| `JOIN_ACK`           | S→C  | 加入确认（广播）               |
+| `CHAT_SEND`          | C→S  | 发送文本消息                   |
+| `CHAT_RECEIVE`       | S→C  | 接收消息（广播）               |
+| `EMOJI_SEND`         | C→S  | 发送表情                       |
+| `EMOJI_RECEIVE`      | S→C  | 接收表情（广播）               |
+| `ASR_TEXT_PUSH`      | C→S  | 推送识别文本                   |
+| `ASR_TEXT`           | S→C  | 广播识别文本                   |
+| `DRUM_START_REQUEST` | C→S  | 玩家准备好，请求开始           |
+| `DRUM_READY`         | S→C  | 游戏就绪（含玩家信息）         |
+| `DRUM_PLAYER_READY`  | S→C  | 广播某玩家已准备（readyCount） |
+| `DRUM_START`         | S→C  | 游戏开始（含 startAtMs）       |
+| `DRUM_TAP`           | 双向 | 点击事件                       |
+| `DRUM_FINISH`        | S→C  | 游戏结束                       |
+| `DRUM_RESULT`        | S→C  | 游戏结果                       |
+| `SPEECH_TURN_END`    | C→S  | 发言轮次结束                   |
+| `SPEECH_TURN_SWITCH` | S→C  | 切换发言轮次                   |
+| `CHAT_COMPLETE`      | S→C  | 双方发言完毕                   |
+| `VERDICT_RESULT`     | S→C  | 判决结果推送                   |
+| `VERDICT_FAILED`     | S→C  | 判决生成失败                   |
+| `VERDICT_RETRY`      | C→S  | 请求重试判决                   |
+| `POST_GAME_ACTION`   | C→S  | 赛后互动操作                   |
+| `POST_GAME_EFFECT`   | S→C  | 赛后互动特效                   |
+| `LEAVE_ROOM`         | C→S  | 离开房间                       |
+| `LEAVE_ROOM_ACK`     | S→C  | 离开房间确认                   |
+| `ERROR`              | S→C  | 错误消息                       |
 
 ## 开发规范
 
@@ -185,13 +186,8 @@ npm run lint       # ESLint 检查
 
 ## 文档
 
-详细文档请查看 `docs/` 目录：
-
-- [文档索引](docs/README.md)
-- [前端文档](docs/miniprogram/)
-- [后端文档](docs/backend/)
-- [后端 README](backend/README.md)
-- [前端 README](miniprogram/README.md)
+- [CLAUDE.md](CLAUDE.md) — 前后端整体开发规范与架构说明
+- [backend/CLAUDE.md](backend/CLAUDE.md) — 后端架构、WebSocket 消息协议与 API 详情
 
 ## 许可证
 

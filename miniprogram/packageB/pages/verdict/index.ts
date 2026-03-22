@@ -66,7 +66,6 @@ interface IEffectQueueItem {
 interface IVerdictPageData {
     loading: boolean;
     verdict: IVerdictResult | null;
-    currentRole: 'host' | 'guest';
     isWinner: boolean;
     isDraw: boolean;
     showSecretModal: boolean;
@@ -90,6 +89,9 @@ interface IVerdictPageData {
     // 双方昵称
     hostNickName: string;
     guestNickName: string;
+    // Radar chart scores (derived from verdict.radarChart by userId)
+    hostRadarScores: IDimensionScores;
+    guestRadarScores: IDimensionScores;
     // Effect queue fields
     effectQueue: IEffectQueueItem[];
     isPlayingEffect: boolean;
@@ -101,7 +103,6 @@ Page({
     data: {
         loading: true,
         verdict: null,
-        currentRole: 'host',
         isWinner: false,
         isDraw: false,
         showSecretModal: false,
@@ -119,11 +120,27 @@ Page({
         guestPercentDisplay: 0,
         summaryDisplayText: '',
         saving: false,
-        mySecretReport: { title: '', advice: '' },
+        mySecretReport: { userId: '', title: '', advice: '' },
         myTopDimension: '',
         myTopScore: 0,
         hostNickName: '玩家1',
         guestNickName: '玩家2',
+        hostRadarScores: {
+            mouthHard: 0,
+            oldAccountDigging: 0,
+            logicSlippery: 0,
+            charmAttack: 0,
+            survivalInstinct: 0,
+            victimActing: 0,
+        },
+        guestRadarScores: {
+            mouthHard: 0,
+            oldAccountDigging: 0,
+            logicSlippery: 0,
+            charmAttack: 0,
+            survivalInstinct: 0,
+            victimActing: 0,
+        },
         effectQueue: [] as IEffectQueueItem[],
         isPlayingEffect: false,
         showEffectOverlay: false,
@@ -139,23 +156,21 @@ Page({
     _animTimers: [] as number[],
     _roomId: '' as string,
 
-    onLoad(options: Record<string, string | undefined>): void {
-        this._roomId = options.roomId ?? '';
-        const currentRole: 'host' | 'guest' =
-            (options.role as 'host' | 'guest') ?? 'host';
+    onLoad(_options): void {
+        this._roomId = getApp<IAppOption>().globalData.roomId;
 
         // Try to get verdict from service cache
         const verdict: IVerdictResult | null = verdictService.getResult();
 
         if (verdict) {
-            this.initWithVerdict(verdict, currentRole);
+            this.initWithVerdict(verdict);
         } else {
             // Fallback: fetch via HTTP
             this.setData({ loading: true });
             verdictService
                 .fetchVerdict(this._roomId)
                 .then((result: IVerdictResult) => {
-                    this.initWithVerdict(result, currentRole);
+                    this.initWithVerdict(result);
                 })
                 .catch((error: Error) => {
                     logger.error('Verdict', 'Failed to load:', error);
@@ -203,17 +218,29 @@ Page({
     /**
      * Initialize page with verdict data
      */
-    initWithVerdict(
-        verdict: IVerdictResult,
-        currentRole: 'host' | 'guest'
-    ): void {
-        const isWinner: boolean = verdict.winnerId === currentRole;
-        const isDraw: boolean = verdict.winnerId === null;
+    initWithVerdict(verdict: IVerdictResult): void {
+        const app = getApp<IAppOption>();
+        const { selfUserId, hostUserId } = app.globalData;
 
-        // Compute secret report for current player
-        const mySecretReport: ISecretReport =
-            verdict.secretReports[currentRole];
-        const myScores: IDimensionScores = verdict.battleStats[currentRole];
+        const isWinner: boolean = verdict.winnerId === selfUserId;
+        const isDraw: boolean =
+            verdict.winnerId === null || verdict.winnerId === verdict.loserId;
+
+        // Find self's secret report
+        const mySecretReport: ISecretReport = verdict.secretReports.find(
+            r => r.userId === selfUserId
+        ) ?? { userId: selfUserId, title: '', advice: '' };
+
+        // Find self's radar scores
+        const selfStats = verdict.radarChart.find(p => p.userId === selfUserId);
+        const myScores: IDimensionScores = selfStats?.scores ?? {
+            mouthHard: 0,
+            oldAccountDigging: 0,
+            logicSlippery: 0,
+            charmAttack: 0,
+            survivalInstinct: 0,
+            victimActing: 0,
+        };
 
         // Find top dimension
         let topKey: keyof IDimensionScores = 'mouthHard';
@@ -225,17 +252,39 @@ Page({
             }
         }
 
-        // Read participant nicknames from globalData
-        const app = getApp<IAppOption>();
-        const hostNickName: string =
-            app.globalData.participants?.hostNickName || '玩家1';
-        const guestNickName: string =
-            app.globalData.participants?.guestNickName || '玩家2';
+        // Derive nicknames from responsibility players
+        const hostPlayer = verdict.responsibility.players.find(
+            p => p.userId === hostUserId
+        );
+        const guestPlayer = verdict.responsibility.players.find(
+            p => p.userId !== hostUserId
+        );
+        const hostNickName: string = hostPlayer?.nickname || '玩家1';
+        const guestNickName: string = guestPlayer?.nickname || '玩家2';
+
+        // Derive radar scores for host/guest
+        const emptyScores: IDimensionScores = {
+            mouthHard: 0,
+            oldAccountDigging: 0,
+            logicSlippery: 0,
+            charmAttack: 0,
+            survivalInstinct: 0,
+            victimActing: 0,
+        };
+        const hostRadarEntry = verdict.radarChart.find(
+            p => p.userId === hostUserId
+        );
+        const guestRadarEntry = verdict.radarChart.find(
+            p => p.userId !== hostUserId
+        );
+        const hostRadarScores: IDimensionScores =
+            hostRadarEntry?.scores ?? emptyScores;
+        const guestRadarScores: IDimensionScores =
+            guestRadarEntry?.scores ?? emptyScores;
 
         this.setData({
             loading: false,
             verdict,
-            currentRole,
             isWinner,
             isDraw,
             mySecretReport,
@@ -243,6 +292,8 @@ Page({
             myTopScore: topVal,
             hostNickName,
             guestNickName,
+            hostRadarScores,
+            guestRadarScores,
         });
 
         // Start entrance animations
@@ -338,8 +389,15 @@ Page({
      * Animate percent numbers from 0 to target
      */
     animatePercents(verdict: IVerdictResult): void {
-        const targetHost: number = verdict.responsibility.host;
-        const targetGuest: number = verdict.responsibility.guest;
+        const hostUserId = getApp<IAppOption>().globalData.hostUserId;
+        const hostPlayer = verdict.responsibility.players.find(
+            p => p.userId === hostUserId
+        );
+        const guestPlayer = verdict.responsibility.players.find(
+            p => p.userId !== hostUserId
+        );
+        const targetHost: number = hostPlayer?.percentage ?? 0;
+        const targetGuest: number = guestPlayer?.percentage ?? 0;
         const steps: number = Math.ceil(
             TIMING.PERCENT_ANIM_DURATION / TIMING.PERCENT_ANIM_INTERVAL
         );
@@ -505,8 +563,20 @@ Page({
 
         // ── Pre-calculate section heights ──────────────────────────────
         const { hostNickName, guestNickName } = this.data;
+        const canvasHostUserId = getApp<IAppOption>().globalData.hostUserId;
+        const canvasHostPlayer = verdict.responsibility.players.find(
+            p => p.userId === canvasHostUserId
+        );
+        const canvasGuestPlayer = verdict.responsibility.players.find(
+            p => p.userId !== canvasHostUserId
+        );
+        const hostRespPercent: number = canvasHostPlayer?.percentage ?? 0;
+        const guestRespPercent: number = canvasGuestPlayer?.percentage ?? 0;
+        // Strip Unicode variation selectors (U+FE0E / U+FE0F) from emoji before
+        // drawing on Canvas — WeChat Canvas 2D renders them as "口" tofu boxes.
+        const stripVS = (s: string): string => s.replace(/[\uFE0E\uFE0F]/g, '');
         const thirdPartyLines: string[] = verdict.responsibility.thirdParty.map(
-            f => `${f.emoji}${f.reason}: ${f.percentage}%`
+            f => `${stripVS(f.emoji)}${f.reason}: ${f.percentage}%`
         );
 
         const respTitleH: number = 56;
@@ -588,18 +658,10 @@ Page({
         ctx.fillStyle = '#333333';
         ctx.font = 'bold 44px sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(
-            `${hostNickName}: ${verdict.responsibility.host}%`,
-            textX,
-            iy + 46
-        );
+        ctx.fillText(`${hostNickName}: ${hostRespPercent}%`, textX, iy + 46);
         iy += respNameH;
 
-        ctx.fillText(
-            `${guestNickName}: ${verdict.responsibility.guest}%`,
-            textX,
-            iy + 46
-        );
+        ctx.fillText(`${guestNickName}: ${guestRespPercent}%`, textX, iy + 46);
         iy += respNameH;
 
         ctx.fillStyle = '#666666';

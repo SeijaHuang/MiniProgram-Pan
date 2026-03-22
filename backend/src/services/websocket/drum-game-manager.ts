@@ -8,7 +8,7 @@
 
 import type { IRoom } from '../../models/entities/room';
 import type { IUser } from '../../models/entities/user';
-import { EPlayerRole, EGamePhase } from '../../types/websocket/drum';
+import { EGamePhase } from '../../types/websocket/drum';
 import { DRUM_CONFIG } from '../../constants/config';
 import { logger } from '../../utils/logger';
 
@@ -18,7 +18,8 @@ import { logger } from '../../utils/logger';
 interface IDrumGameState {
     roomId: string;
     phase: EGamePhase;
-    hostRole: EPlayerRole;
+    organizerUserId: string;
+    joinerUserId: string;
     organizer: IUser;
     joiner: IUser;
     organizerScore: number;
@@ -26,16 +27,15 @@ interface IDrumGameState {
     startAtMs: number;
     endAtMs: number;
     readyUserIds: Set<string>;
-    firstToMaxRole?: EPlayerRole;
+    firstToMaxUserId?: string;
 }
 
 /**
  * Game Result
  */
 interface IDrumGameResult {
-    organizerScore: number;
-    joinerScore: number;
-    winnerRole: EPlayerRole;
+    scores: { [userId: string]: number };
+    winnerUserId: string;
 }
 
 export class DrumGameManager {
@@ -73,7 +73,8 @@ export class DrumGameManager {
         const game: IDrumGameState = {
             roomId,
             phase: EGamePhase.Waiting,
-            hostRole: EPlayerRole.Organizer,
+            organizerUserId: hostParticipant.user.userId,
+            joinerUserId: joinerParticipant.user.userId,
             organizer: hostParticipant.user,
             joiner: joinerParticipant.user,
             organizerScore: 0,
@@ -169,7 +170,7 @@ export class DrumGameManager {
      */
     recordTap(
         roomId: string,
-        role: EPlayerRole,
+        userId: string,
         delta: number
     ): IDrumGameState | undefined {
         const game = this.games.get(roomId);
@@ -185,24 +186,24 @@ export class DrumGameManager {
             return game;
         }
 
-        if (role === EPlayerRole.Organizer) {
+        if (userId === game.organizerUserId) {
             game.organizerScore += delta;
         } else {
             game.joinerScore += delta;
         }
 
         // Record who first reaches MAX_TAPS (only once)
-        if (game.firstToMaxRole === undefined) {
+        if (game.firstToMaxUserId === undefined) {
             if (game.organizerScore >= DRUM_CONFIG.MAX_TAPS) {
-                game.firstToMaxRole = EPlayerRole.Organizer;
+                game.firstToMaxUserId = game.organizerUserId;
             } else if (game.joinerScore >= DRUM_CONFIG.MAX_TAPS) {
-                game.firstToMaxRole = EPlayerRole.Joiner;
+                game.firstToMaxUserId = game.joinerUserId;
             }
         }
 
         logger.log(
             'DrumGameManager',
-            `Game ${roomId} tap: ${role} +${delta} (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
+            `Game ${roomId} tap: ${userId} +${delta} (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
         );
 
         return game;
@@ -210,7 +211,7 @@ export class DrumGameManager {
 
     /**
      * Calculate game result
-     * CRITICAL: Higher score wins, tie goes to host (Organizer)
+     * CRITICAL: Higher score wins, tie goes to host (organizerUserId)
      */
     calculateResult(roomId: string): IDrumGameResult | undefined {
         const game = this.games.get(roomId);
@@ -218,31 +219,33 @@ export class DrumGameManager {
             return undefined;
         }
 
-        let winnerRole: EPlayerRole;
+        let winnerUserId: string;
 
-        if (game.firstToMaxRole !== undefined) {
+        if (game.firstToMaxUserId !== undefined) {
             // Someone reached MAX_TAPS — first to reach it wins
-            winnerRole = game.firstToMaxRole;
+            winnerUserId = game.firstToMaxUserId;
         } else if (game.organizerScore > game.joinerScore) {
-            winnerRole = EPlayerRole.Organizer;
+            winnerUserId = game.organizerUserId;
         } else if (game.joinerScore > game.organizerScore) {
-            winnerRole = EPlayerRole.Joiner;
+            winnerUserId = game.joinerUserId;
         } else {
-            // Tie: host (Organizer) wins
-            winnerRole = EPlayerRole.Organizer;
+            // Tie: host (organizer) wins
+            winnerUserId = game.organizerUserId;
         }
 
         game.phase = EGamePhase.Finished;
 
         logger.log(
             'DrumGameManager',
-            `Game ${roomId} result: ${winnerRole} wins (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
+            `Game ${roomId} result: ${winnerUserId} wins (${game.organizerUserId}: ${game.organizerScore}, ${game.joinerUserId}: ${game.joinerScore})`
         );
 
         return {
-            organizerScore: game.organizerScore,
-            joinerScore: game.joinerScore,
-            winnerRole,
+            scores: {
+                [game.organizerUserId]: game.organizerScore,
+                [game.joinerUserId]: game.joinerScore,
+            },
+            winnerUserId,
         };
     }
 

@@ -184,14 +184,18 @@ export class WebSocketController {
             return;
         }
 
-        // Broadcast JOIN_ACK to ALL participants
-        connectionManager.broadcastToRoom(result.room.roomId, {
-            type: EWSMessageType.JoinAck,
-            data: {
-                room: result.room,
-            },
-            timestamp: Date.now(),
-        });
+        // Send JOIN_ACK individually to each participant so selfUserId is correct
+        const joinAckTimestamp = Date.now();
+        for (const participant of result.room.participants) {
+            connectionManager.sendToUser(participant.user.userId, {
+                type: EWSMessageType.JoinAck,
+                data: {
+                    room: result.room,
+                    selfUserId: participant.user.userId,
+                },
+                timestamp: joinAckTimestamp,
+            });
+        }
 
         // If room is ready (2 players), initialize drum game and wait for
         // frontend to send DRUM_START_REQUEST before launching
@@ -260,7 +264,7 @@ export class WebSocketController {
                 type: EWSMessageType.DrumTap,
                 data: {
                     roomId: result.roomId,
-                    role: result.role,
+                    userId: result.userId,
                     delta: result.delta,
                     clientTimeMs: Date.now(),
                 },
@@ -395,25 +399,21 @@ export class WebSocketController {
 
         // Broadcast DRUM_READY with player info
         // 使用角色默认名称，当用户没有设置昵称或使用默认昵称时
-        const organizerNickname = game.organizer.nickname;
-        const joinerNickname = game.joiner.nickname;
-        const organizerName =
-            organizerNickname && organizerNickname !== '匿名用户'
-                ? organizerNickname
-                : '小冤家';
-        const joinerName =
-            joinerNickname && joinerNickname !== '匿名用户'
-                ? joinerNickname
-                : '家冤小';
-
+        const rawOrganizerNickname = game.organizer.nickname;
+        const rawJoinerNickname = game.joiner.nickname;
+        const organizerNickname = rawOrganizerNickname
+            ? rawOrganizerNickname
+            : '小冤家';
+        const joinerNickname = rawJoinerNickname ? rawJoinerNickname : '家冤小';
         connectionManager.broadcastToRoom(roomId, {
             type: EWSMessageType.DrumReady,
             data: {
                 roomId,
                 serverTimeMs: Date.now(),
-                hostRole: game.hostRole,
-                organizerName,
-                joinerName,
+                organizerUserId: game.organizerUserId,
+                joinerUserId: game.joinerUserId,
+                organizerNickname,
+                joinerNickname,
             },
             timestamp: Date.now(),
         });
@@ -550,9 +550,8 @@ export class WebSocketController {
             type: EWSMessageType.DrumResult,
             data: {
                 roomId,
-                organizerScore: result.organizerScore,
-                joinerScore: result.joinerScore,
-                winnerRole: result.winnerRole,
+                scores: result.scores,
+                winnerUserId: result.winnerUserId,
             },
             timestamp: Date.now(),
         });
@@ -562,7 +561,7 @@ export class WebSocketController {
 
         logger.log(
             'WSController',
-            `Game ${roomId} finished: ${result.winnerRole} wins (${result.organizerScore} vs ${result.joinerScore})`
+            `Game ${roomId} finished: ${result.winnerUserId} wins`
         );
     }
 
@@ -628,6 +627,7 @@ export class WebSocketController {
                 type: EWSMessageType.SpeechTurnSwitch,
                 data: {
                     roomId: result.roomId,
+                    nextSpeakerUserId: result.nextSpeakerUserId ?? '',
                 },
                 timestamp: Date.now(),
             });

@@ -5,11 +5,6 @@
 
 import { logger } from '../utils/logger';
 
-import { EPlayerRole } from './websocket-common';
-
-// Re-export EPlayerRole for convenience
-export { EPlayerRole } from './websocket-common';
-
 /**
  * Drum Room Message Types
  */
@@ -52,9 +47,10 @@ export interface IDrumMessage<T = object> {
 export interface IDrumReadyData {
     roomId: string;
     serverTimeMs: number;
-    hostRole: EPlayerRole;
-    organizerName: string;
-    joinerName: string;
+    organizerUserId: string;
+    joinerUserId: string;
+    organizerNickname: string;
+    joinerNickname: string;
 }
 
 /**
@@ -106,7 +102,7 @@ export interface IDrumStartMessage extends IDrumMessage<IDrumStartData> {
  */
 export interface IDrumTapData {
     roomId: string;
-    role: EPlayerRole;
+    userId: string;
     delta: number; // Number of taps in this batch
     clientTimeMs: number;
 }
@@ -134,9 +130,8 @@ export interface IDrumFinishMessage extends IDrumMessage<IDrumFinishData> {
  */
 export interface IDrumResultData {
     roomId: string;
-    organizerScore: number;
-    joinerScore: number;
-    winnerRole: EPlayerRole;
+    winnerUserId: string;
+    scores: { [userId: string]: number };
 }
 
 export interface IDrumResultMessage extends IDrumMessage<IDrumResultData> {
@@ -197,20 +192,20 @@ export function createStartRequestMessage(
 /**
  * Create drum tap message payload
  * @param roomId - Room ID
- * @param role - Player role
+ * @param userId - Player user ID
  * @param delta - Tap count
  * @returns Message object ready to send
  */
 export function createTapMessage(
     roomId: string,
-    role: EPlayerRole,
+    userId: string,
     delta: number
 ): IDrumTapMessage {
     return {
         type: EDrumMessageType.DrumTap,
         data: {
             roomId,
-            role,
+            userId,
             delta,
             clientTimeMs: Date.now(),
         },

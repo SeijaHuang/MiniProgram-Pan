@@ -9,14 +9,13 @@
  */
 
 import { z } from 'zod';
-import { EPlayerRole } from '../../types/websocket/base';
 
 /**
  * DRUM_TAP Data Schema
  */
 export const DrumTapDataSchema = z.object({
     roomId: z.string().min(1, 'roomId is required'),
-    role: z.nativeEnum(EPlayerRole),
+    userId: z.string().min(1, 'userId is required'),
     delta: z.number().int().positive('delta must be a positive integer'),
     clientTimeMs: z.number(),
 });

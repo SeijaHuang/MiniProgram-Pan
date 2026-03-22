@@ -79,12 +79,12 @@ Import the pre-created instance, not the class: `import { connectionManager } fr
 
 ### Drum Game Orchestration
 
-The drum game flow is orchestrated by `WebSocketController` (not a handler), using `setTimeout` chains:
+The drum game flow is orchestrated by `WebSocketController` (not a handler):
 
-1. Room reaches `READY` → `WAITING_ROOM_CONFIG.COUNTDOWN_MS` delay
-2. `DRUM_READY` broadcast → `DRUM_START` broadcast with timing
-3. `DRUM_CONFIG.COUNTDOWN_MS` later → phase becomes `Running`
-4. `DRUM_CONFIG.GAME_DURATION_MS` later → `DRUM_FINISH` → `DRUM_RESULT` → cleanup
+1. Room reaches `READY` → after `WAITING_ROOM_CONFIG.COUNTDOWN_MS` → broadcast `DRUM_READY` (player info + server time sync)
+2. Each player sends `DRUM_START_REQUEST` → server broadcasts `DRUM_PLAYER_READY` (readyCount)
+3. When both players ready → broadcast `DRUM_START` with `startAtMs` timing
+4. `DRUM_CONFIG.GAME_DURATION_MS` (10s) later → `DRUM_FINISH` → `DRUM_RESULT` → cleanup
 
 ### Validation Pattern
 
@@ -119,9 +119,9 @@ Schemas are in `src/models/schemas/`: `http-request.schema.ts`, `ws-message.sche
 
 ## WebSocket Message Protocol
 
-**Client → Server**: `JOIN_ROOM`, `CHAT_SEND`, `DRUM_TAP`, `ASR_TEXT_PUSH`, `SPEECH_TURN_END`, `VERDICT_RETRY`
+**Client → Server**: `JOIN_ROOM`, `DRUM_START_REQUEST`, `DRUM_TAP`, `CHAT_SEND`, `ASR_TEXT_PUSH`, `EMOJI_SEND`, `SPEECH_TURN_END`, `VERDICT_RETRY`, `POST_GAME_ACTION`, `LEAVE_ROOM`
 
-**Server → Client**: `JOIN_ACK`, `CHAT_RECEIVE`, `DRUM_READY`, `DRUM_START`, `DRUM_TAP`, `DRUM_FINISH`, `DRUM_RESULT`, `ASR_TEXT`, `SPEECH_TURN_SWITCH`, `CHAT_COMPLETE`, `VERDICT_RESULT`, `VERDICT_FAILED`, `ERROR`
+**Server → Client**: `JOIN_ACK`, `DRUM_READY`, `DRUM_PLAYER_READY`, `DRUM_START`, `DRUM_TAP`, `DRUM_FINISH`, `DRUM_RESULT`, `CHAT_RECEIVE`, `ASR_TEXT`, `EMOJI_RECEIVE`, `SPEECH_TURN_SWITCH`, `CHAT_COMPLETE`, `VERDICT_RESULT`, `VERDICT_FAILED`, `POST_GAME_EFFECT`, `LEAVE_ROOM_ACK`, `ERROR`
 
 All messages: `{ type: EWSMessageType, data: T, timestamp: number }`
 

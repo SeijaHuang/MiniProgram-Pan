@@ -19,6 +19,7 @@ import type {
     IVerdictResultData,
     IVerdictFailedData,
 } from '../../types/websocket/verdict';
+import type { IPlayerInfo } from '../../types/llm';
 import { logger } from '../../utils/logger';
 
 export class VerdictOrchestratorService {
@@ -65,26 +66,42 @@ export class VerdictOrchestratorService {
                 `Generating verdict for room ${roomId} (attempt ${retryCount + 1}/${VERDICT_CONFIG.MAX_RETRIES})`
             );
 
-            // 6. Validate speeches are not empty
-            const hostText = room.speechState.hostText.trim();
-            const guestText = room.speechState.guestText.trim();
+            // 6. Extract player info and validate speeches are not empty
+            const [p1, p2] = room.participants;
+            const p1Speech = (
+                room.speechState.texts[p1.user.userId] ?? ''
+            ).trim();
+            const p2Speech = (
+                room.speechState.texts[p2.user.userId] ?? ''
+            ).trim();
 
-            if (!hostText && !guestText) {
+            if (!p1Speech && !p2Speech) {
                 throw new Error('Both speeches are empty');
             }
+
+            const player1: IPlayerInfo = {
+                userId: p1.user.userId,
+                nickname: p1.user.nickname,
+                speech: p1Speech || '（无发言）',
+            };
+            const player2: IPlayerInfo = {
+                userId: p2.user.userId,
+                nickname: p2.user.nickname,
+                speech: p2Speech || '（无发言）',
+            };
 
             // 7. Call LLM service with timeout
             const judgment = await this.callLLMWithTimeout(
                 roomId,
-                hostText || '（无发言）',
-                guestText || '（无发言）'
+                player1,
+                player2
             );
 
             // 8. Transform to frontend format
             const verdict = verdictMapperService.mapJudgmentToVerdict(
                 judgment,
-                room.hostUserId,
-                room.participants
+                player1,
+                player2
             );
 
             // 9. Store result in room
@@ -93,7 +110,7 @@ export class VerdictOrchestratorService {
 
             logger.log(
                 'VerdictOrchestrator',
-                `Verdict generated successfully for room ${roomId}, winner: ${verdict.winnerId}`
+                `Verdict generated for room ${roomId}, winner: ${verdict.winnerId}`
             );
 
             // 10. Broadcast VERDICT_RESULT
@@ -118,8 +135,8 @@ export class VerdictOrchestratorService {
      */
     private async callLLMWithTimeout(
         roomId: string,
-        hostText: string,
-        guestText: string
+        player1: IPlayerInfo,
+        player2: IPlayerInfo
     ): Promise<Awaited<ReturnType<typeof llmJudgementService.createJudgment>>> {
         const timeoutPromise = new Promise<never>((_, reject) => {
             setTimeout(() => {
@@ -128,8 +145,8 @@ export class VerdictOrchestratorService {
         });
 
         const llmPromise = llmJudgementService.createJudgment(roomId, {
-            player1Speech: hostText,
-            player2Speech: guestText,
+            player1,
+            player2,
         });
 
         return Promise.race([llmPromise, timeoutPromise]);

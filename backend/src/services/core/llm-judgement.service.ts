@@ -27,8 +27,10 @@ export class LlmJudgementService {
         payload: ICreateJudgmentRequest
     ): Promise<IJudgmentResponse> {
         return createJudgmentVerdict(
-            payload.player1Speech,
-            payload.player2Speech,
+            payload.player1.nickname,
+            payload.player1.speech,
+            payload.player2.nickname,
+            payload.player2.speech,
             payload.idempotencyKey
         );
     }

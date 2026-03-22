@@ -154,19 +154,19 @@ export const nicknameService = new NicknameService();
 ```typescript
 interface IDrumServiceOptions {
     roomId: string;
-    selfRole: EPlayerRole;
     onReady: (
         serverTimeMs,
-        hostRole,
-        organizerName,
-        joinerName,
+        organizerUserId,
+        joinerUserId,
+        organizerNickname,
+        joinerNickname,
         receivedAtMs
     ) => void;
     onPlayerReady: (readyCount: number) => void;
     onStart: (startAtMs) => void;
-    onTap: (role, delta) => void;
+    onTap: (userId: string, delta: number) => void;
     onFinish: () => void;
-    onResult: (winnerRole) => void;
+    onResult: (winnerUserId: string) => void;
     onError: (message) => void;
 }
 ```
@@ -178,7 +178,7 @@ interface IDrumServiceOptions {
 
 **消息队列机制**:
 
-当 handlers 未就绪时（页面跳转期间），`DRUM_READY` 和 `DRUM_START` 消息会被队列，
+当 handlers 未就绪时（页面跳转期间），`DRUM_READY`、`DRUM_PLAYER_READY`、`DRUM_START` 消息会被队列，
 并记录原始接收时间 `receivedAtMs`。`initialize()` 调用后会处理队列消息，
 使用原始接收时间进行时间同步，避免队列延迟影响偏移计算。
 
@@ -241,14 +241,16 @@ interface IVerdictListeningOptions {
 }
 ```
 
-**数据格式转换**:
+**数据格式转换**（PRD 重构后）:
 
-| 后端字段           | 前端字段                   | 转换说明    |
-| ------------------ | -------------------------- | ----------- |
-| `logicFallacy`     | `logicSlippery`            | 维度键映射  |
-| `coquettishDamage` | `charmAttack`              | 维度键映射  |
-| `factors[].name`   | `factors[].reason`         | 字段重命名  |
-| `secretReports[]`  | `secretReports.host/guest` | 数组 → 对象 |
+| 后端字段                                   | 前端字段                   | 转换说明                                    |
+| ------------------------------------------ | -------------------------- | ------------------------------------------- |
+| `verdict.winnerId/loserId`                 | `verdict.winnerId/loserId` | 均为真实 `userId`                           |
+| `responsibility.players[]`                 | `responsibility.players[]` | 数组内已含 `userId + nickname + percentage` |
+| `radarChart[]`                             | `battleStats.players[]`    | 后端数组 → 前端数组（内含 nickname）        |
+| `verdict`                                  | `verdictSummary`           | 字段重命名                                  |
+| `punishmentTask.loserUserId/loserNickname` | `punishmentTask.*`         | 直接渲染，无 role 映射                      |
+| `secretReports[]`                          | `secretReports[]`          | 每项含 `userId`，前端用 `selfUserId` 匹配   |
 
 **消息类型**:
 
@@ -268,17 +270,17 @@ interface IVerdictListeningOptions {
 
 **核心方法**:
 
-- `initialize()`: 注册 WebSocket 消息回调
+- `initialize()`: 注册 WebSocket 消息回调（监听 POST_GAME_EFFECT）
 - `sendAction(roomId, action, remaining)`: 发送赛后互动动作
-- `sendLeaveTogether(roomId)`: 发送共同退堂请求
 - `onEffect(callback)`: 注册特效接收回调
-- `onLeaveAck(callback)`: 注册退堂确认回调
 - `destroy()`: 清理回调
 
 **消息类型**:
 
-- 发送: `POST_GAME_EFFECT`, `LEAVE_TOGETHER`
-- 接收: `POST_GAME_EFFECT`, `LEAVE_TOGETHER_ACK`
+- 发送: `POST_GAME_ACTION`（execute_punishment / beg_for_mercy）
+- 接收: `POST_GAME_EFFECT`
+
+> ⚠️ 注意：共同退堂（`LEAVE_ROOM` / `LEAVE_ROOM_ACK`）由页面直接通过 `wsManager` 处理，不经过 PostGameService。
 
 ## 使用约定与注意事项
 

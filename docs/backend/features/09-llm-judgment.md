@@ -216,7 +216,7 @@ clients/openai.client.ts
   ↓ OpenAI Chat Completion API
   ↓ JSON 响应 + 验证 + 归一化
 services/core/verdict-mapper.service.ts
-  ↓ 中文键→英文键, player→host/guest, 添加 emoji/战报
+  ↓ 中文键→英文键, player→userId 映射, 添加 emoji/战报
   ↓ 缓存到 room.verdictResult
 controllers/ws-controller.ts → 广播 VERDICT_RESULT
 ```
@@ -263,8 +263,8 @@ controllers/ws-controller.ts → 广播 VERDICT_RESULT
 
 | LLM 输出 | 前端 |
 |---------|------|
-| `player1` | `host`（房主） |
-| `player2` | `guest`（访客） |
+| `player1` | `participants[0].userId` |
+| `player2` | `participants[1].userId` |
 
 ### 胜负判定
 
@@ -428,50 +428,64 @@ curl -X POST http://localhost:8080/v1/rooms/room_123456/judgments \
     "roomId": "room_123456",
     "verdict": {
       "caseNumber": "NO.23456",
-      "winnerId": "host",
-      "loserId": "guest",
+      "winnerId": "user-u1",
+      "loserId": "user-u2",
+      "participants": [
+        { "userId": "user-u1", "nickname": "小明" },
+        { "userId": "user-u2", "nickname": "小红" }
+      ],
       "responsibility": {
-        "host": 40,
-        "guest": 45,
-        "thirdParty": {
-          "factors": [
-            { "name": "水星逆行", "percentage": 10, "emoji": "🪐" },
-            { "name": "空调温度分歧", "percentage": 5, "emoji": "❄️" }
-          ]
-        }
+        "players": [
+          { "userId": "user-u1", "nickname": "小明", "percentage": 40 },
+          { "userId": "user-u2", "nickname": "小红", "percentage": 45 }
+        ],
+        "thirdParty": [
+          { "reason": "水星逆行", "percentage": 10, "emoji": "🪐" },
+          { "reason": "空调温度分歧", "percentage": 5, "emoji": "❄️" }
+        ]
       },
-      "radarChart": {
-        "host": {
-          "mouthHard": 75,
-          "oldAccountDigging": 60,
-          "logicFallacy": 40,
-          "coquettishDamage": 30,
-          "survivalInstinct": 85,
-          "victimActing": 50
+      "radarChart": [
+        {
+          "userId": "user-u1",
+          "nickname": "小明",
+          "scores": {
+            "mouthHard": 75,
+            "oldAccountDigging": 60,
+            "logicFallacy": 40,
+            "coquettishDamage": 30,
+            "survivalInstinct": 85,
+            "victimActing": 50
+          }
         },
-        "guest": {
-          "mouthHard": 65,
-          "oldAccountDigging": 80,
-          "logicFallacy": 55,
-          "coquettishDamage": 70,
-          "survivalInstinct": 40,
-          "victimActing": 60
+        {
+          "userId": "user-u2",
+          "nickname": "小红",
+          "scores": {
+            "mouthHard": 65,
+            "oldAccountDigging": 80,
+            "logicFallacy": 55,
+            "coquettishDamage": 70,
+            "survivalInstinct": 40,
+            "victimActing": 60
+          }
         }
-      },
+      ],
       "verdict": "本官判定双方各打五十大板，建议下次吵架前先喝杯奶茶冷静一下。",
       "punishmentTask": {
-        "role": "guest",
-        "task": "败方需连续三天早起给对方买早餐"
+        "loserUserId": "user-u2",
+        "loserNickname": "小红",
+        "task": "败方需连续三天早起给对方买早餐",
+        "deadline": "须在24小时内完成"
       },
       "secretReports": [
         {
-          "role": "host",
-          "highestDimension": "求生欲",
+          "userId": "user-u1",
+          "title": "求生欲大师",
           "advice": "求生欲满分，但建议少用苦肉计"
         },
         {
-          "role": "guest",
-          "highestDimension": "翻旧账",
+          "userId": "user-u2",
+          "title": "翻旧账冠军",
           "advice": "翻旧账技能点满，建议把精力放在未来"
         }
       ]

@@ -2,14 +2,14 @@
 
 interface IAppOption {
   globalData: {
-    userInfo: {
-      userId: string;
-      nickName: string;
-    };
-    participants?: {
-      hostNickName: string;
-      guestNickName: string;
-    };
+    selfUserId: string;
+    selfNickname: string;
+    opponentUserId: string;
+    opponentNickname: string;
+    roomId: string;
+    roomCode: string;
+    firstSpeakerUserId: string;
+    hostUserId: string;
   }
   userInfoReadyCallback?: WechatMiniprogram.GetUserInfoSuccessCallback,
 }

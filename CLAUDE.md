@@ -118,7 +118,7 @@ All services are classes exported as singleton instances:
 The frontend uses **two separate type hierarchies** for WebSocket messages:
 
 1. **General messages** (`types/websocket-common.ts`): `EWSMessageType` + `IWSMessage<T>` — for `JOIN_ROOM`, `CHAT_SEND`, `ASR_TEXT_PUSH`, `SPEECH_TURN_END`, `VERDICT_RESULT`, etc.
-2. **Drum messages** (`types/drum-websocket.ts`): `EDrumMessageType` + `IDrumMessage<T>` — for `DRUM_READY`, `DRUM_START`, `DRUM_TAP`, `DRUM_FINISH`, `DRUM_RESULT`
+2. **Drum messages** (`types/drum-websocket.ts`): `EDrumMessageType` + `IDrumMessage<T>` — for `DRUM_READY`, `DRUM_START_REQUEST`, `DRUM_PLAYER_READY`, `DRUM_START`, `DRUM_TAP`, `DRUM_FINISH`, `DRUM_RESULT`
 3. **Verdict messages** (`types/verdict-ws.ts`): Verdict-specific payload types — `IBackendVerdictResult`, `IVerdictResultPayload`, `IVerdictFailedPayload`, etc.
 4. **Emoji messages** (`types/emoji-websocket.ts`): `IEmojiReceiveData` — for `EMOJI_RECEIVE` server→client payload
 
@@ -129,7 +129,7 @@ The backend uses a single unified `EWSMessageType` enum for all message types.
 `DrumService` implements an early-listening pattern for messages that arrive between page navigations:
 
 1. `startListening()` called from waiting-room when room becomes `READY` — registers WebSocket handler
-2. Messages (`DRUM_READY`, `DRUM_START`) are queued with `receivedAtMs` timestamps
+2. Messages (`DRUM_READY`, `DRUM_PLAYER_READY`, `DRUM_START`) are queued with `receivedAtMs` timestamps
 3. `initialize()` called from drum-room `onLoad` — processes queued messages with original timestamps for accurate time sync
 
 ### Backend Structure (backend/src/)
@@ -239,46 +239,49 @@ Husky + lint-staged runs ESLint + Prettier on `.ts`, `.js`, `.json`, `.md`. Comm
 
 **Client → Server**:
 
-| Type               | Description                                                         |
-| ------------------ | ------------------------------------------------------------------- |
-| `JOIN_ROOM`        | Join a room via room code                                           |
-| `DRUM_TAP`         | Record drum tap during game                                         |
-| `CHAT_SEND`        | Send a chat message                                                 |
-| `ASR_TEXT_PUSH`    | Push ASR transcription text (throttled partials + immediate finals) |
-| `EMOJI_SEND`       | Send emoji reaction to opponent during chat                         |
-| `SPEECH_TURN_END`  | Notify server that player's speech turn is done                     |
-| `VERDICT_RETRY`    | Request retry after verdict generation failure                      |
-| `POST_GAME_ACTION` | Send post-game action (execute_punishment / beg_for_mercy)          |
-| `LEAVE_ROOM`       | Request to leave the room from verdict page                         |
+| Type                 | Description                                                         |
+| -------------------- | ------------------------------------------------------------------- |
+| `JOIN_ROOM`          | Join a room via room code                                           |
+| `DRUM_START_REQUEST` | Signal player is ready to start the drum game (triggers countdown)  |
+| `DRUM_TAP`           | Record drum tap during game                                         |
+| `CHAT_SEND`          | Send a chat message                                                 |
+| `ASR_TEXT_PUSH`      | Push ASR transcription text (throttled partials + immediate finals) |
+| `EMOJI_SEND`         | Send emoji reaction to opponent during chat                         |
+| `SPEECH_TURN_END`    | Notify server that player's speech turn is done                     |
+| `VERDICT_RETRY`      | Request retry after verdict generation failure                      |
+| `POST_GAME_ACTION`   | Send post-game action (execute_punishment / beg_for_mercy)          |
+| `LEAVE_ROOM`         | Request to leave the room from verdict page                         |
 
 **Server → Client**:
 
-| Type                 | Description                                               |
-| -------------------- | --------------------------------------------------------- |
-| `JOIN_ACK`           | Confirm room join (broadcast)                             |
-| `DRUM_READY`         | Both players ready for drum game                          |
-| `DRUM_START`         | Drum game starts (includes `startAtMs` timing)            |
-| `DRUM_TAP`           | Tap count update (forwarded to opponent)                  |
-| `DRUM_FINISH`        | Drum game ends                                            |
-| `DRUM_RESULT`        | Final game results (scores + winner)                      |
-| `CHAT_RECEIVE`       | Receive chat message (broadcast)                          |
-| `ASR_TEXT`           | ASR transcription result (broadcast to other participant) |
-| `EMOJI_RECEIVE`      | Emoji reaction from opponent during chat                  |
-| `SPEECH_TURN_SWITCH` | First speaker done, notify turn switch                    |
-| `CHAT_COMPLETE`      | Both speakers done, triggers verdict generation           |
-| `VERDICT_RESULT`     | AI verdict result push (success)                          |
-| `VERDICT_FAILED`     | AI verdict generation failed (with canRetry flag)         |
-| `POST_GAME_EFFECT`   | Post-game effect broadcast from opponent (stamp/emoji)    |
-| `LEAVE_ROOM_ACK`     | Acknowledge leave room request                            |
-| `ERROR`              | Error notification                                        |
+| Type                 | Description                                                               |
+| -------------------- | ------------------------------------------------------------------------- |
+| `JOIN_ACK`           | Confirm room join (broadcast)                                             |
+| `DRUM_READY`         | Room ready — includes player info and server time sync                    |
+| `DRUM_PLAYER_READY`  | A player signalled ready (broadcast readyCount so UI can show both ready) |
+| `DRUM_START`         | Drum game starts (includes `startAtMs` timing)                            |
+| `DRUM_TAP`           | Tap count update (forwarded to opponent)                                  |
+| `DRUM_FINISH`        | Drum game ends                                                            |
+| `DRUM_RESULT`        | Final game results (scores + winner)                                      |
+| `CHAT_RECEIVE`       | Receive chat message (broadcast)                                          |
+| `ASR_TEXT`           | ASR transcription result (broadcast to other participant)                 |
+| `EMOJI_RECEIVE`      | Emoji reaction from opponent during chat                                  |
+| `SPEECH_TURN_SWITCH` | First speaker done, notify turn switch                                    |
+| `CHAT_COMPLETE`      | Both speakers done, triggers verdict generation                           |
+| `VERDICT_RESULT`     | AI verdict result push (success)                                          |
+| `VERDICT_FAILED`     | AI verdict generation failed (with canRetry flag)                         |
+| `POST_GAME_EFFECT`   | Post-game effect broadcast from opponent (stamp/emoji)                    |
+| `LEAVE_ROOM_ACK`     | Acknowledge leave room request                                            |
+| `ERROR`              | Error notification                                                        |
 
 ### Room Flow
 
-1. Creator calls `POST /room/create` → gets `roomCode`
+1. Creator calls `POST /v1/rooms` → gets `roomCode`
 2. Both users connect via WebSocket, send `JOIN_ROOM` with `roomCode`
-3. When 2 users join, room becomes `READY`
-4. After `WAITING_ROOM_CONFIG.COUNTDOWN_MS` (3s), drum game auto-starts
-5. Room states: `WAITING` (1 person) → `READY` (2 people) → `CLOSED`
+3. When 2 users join, room becomes `READY` → server broadcasts `DRUM_READY` (player info + server time sync)
+4. Each player sends `DRUM_START_REQUEST` when ready → server broadcasts `DRUM_PLAYER_READY` (readyCount)
+5. When both ready → server broadcasts `DRUM_START` (with `startAtMs`) → 10s game → `DRUM_FINISH` → `DRUM_RESULT`
+6. Room states: `WAITING` (1 person) → `READY` (2 people) → `CLOSED`
 
 ### Error Codes
 
@@ -351,4 +354,3 @@ docker build -t chatroom-backend:latest -f backend/Dockerfile backend/  # Produc
 ## Additional Documentation
 
 - **Backend-specific**: See `backend/CLAUDE.md` for backend architecture, WebSocket message types, and API details
-- **API Specification**: See `backend/docs/` for detailed API specifications

@@ -87,20 +87,24 @@ export const JUDGMENT_SYSTEM_PROMPT = `你是"清汤大老爷"，一位断案风
 /**
  * Build the user message for judgment verdict
  *
+ * @param player1Nickname - Player 1's display nickname
  * @param player1Speech - Player 1's speech content
+ * @param player2Nickname - Player 2's display nickname
  * @param player2Speech - Player 2's speech content
  * @returns Formatted user content string
  */
 export function buildJudgmentUserContent(
+    player1Nickname: string,
     player1Speech: string,
+    player2Nickname: string,
     player2Speech: string
 ): string {
     return `以下是两位当事人的陈述，请据此做出判决：
 
-【玩家1陈述】
+【${player1Nickname}陈述】
 ${player1Speech}
 
-【玩家2陈述】
+【${player2Nickname}陈述】
 ${player2Speech}
 
 请根据以上内容生成判决书。`;

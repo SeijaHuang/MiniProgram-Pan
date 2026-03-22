@@ -3,10 +3,14 @@ import { logger } from './utils/logger';
 
 App<IAppOption>({
     globalData: {
-        userInfo: {
-            userId: '',
-            nickName: '',
-        },
+        selfUserId: '',
+        selfNickname: '',
+        opponentUserId: '',
+        opponentNickname: '',
+        roomId: '',
+        roomCode: '',
+        firstSpeakerUserId: '',
+        hostUserId: '',
     },
     onLaunch() {
         // 展示本地存储能力

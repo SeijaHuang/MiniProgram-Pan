@@ -477,8 +477,9 @@ enum EPlayerRole {
 interface IDrumGameState {
   roomId: string;
   phase: EGamePhase;
-  organizerScore: number;     // 房主总点击数
-  joinerScore: number;        // 加入者总点击数
+  organizerUserId: string;
+  joinerUserId: string;
+  scores: Record<string, number>; // key = userId，value = 点击数
   startAtMs?: number;         // 游戏开始时间戳
   endAtMs?: number;           // 游戏结束时间戳
 }
@@ -489,9 +490,8 @@ interface IDrumGameState {
 ```typescript
 interface IDrumGameResult {
   roomId: string;
-  organizerScore: number;
-  joinerScore: number;
-  winnerRole: EPlayerRole;    // 获胜者角色（平局时房主胜）
+  scores: Record<string, number>;
+  winnerUserId: string;       // 获胜者 userId（平局时房主胜）
 }
 ```
 
@@ -502,7 +502,7 @@ initGame(room) → WAITING
    ↓ setPhase(COUNTDOWN)
 COUNTDOWN
    ↓ setPhase(RUNNING) + setTiming(startAtMs, endAtMs)
-RUNNING → recordTap(roomId, role, delta) 记录点击
+RUNNING → recordTap(roomId, userId, delta) 记录点击
    ↓ setPhase(FINISHED)
 FINISHED → calculateResult(roomId) 计算结果
    ↓
@@ -559,9 +559,10 @@ interface IDrumReadyMessage {
   data: {
     roomId: string;
     serverTimeMs: number;        // 服务器当前时间（同步基准）
-    hostRole: EPlayerRole;       // 房主角色
-    organizerName: string;       // 房主昵称（或默认 '小冤家'）
-    joinerName: string;          // 加入者昵称（或默认 '家冤小'）
+    organizerUserId: string;     // 房主 userId
+    joinerUserId: string;        // 加入者 userId
+    organizerNickname: string;   // 房主昵称
+    joinerNickname: string;      // 加入者昵称
   };
   timestamp: number;
 }
@@ -569,7 +570,7 @@ interface IDrumReadyMessage {
 
 #### IDrumStartMessage
 
-游戏开始消息（Server → All），DRUM_READY 同时发送。
+游戏开始消息（Server → All），双方均发送 DRUM_START_REQUEST 后发送。
 
 ```typescript
 interface IDrumStartMessage {
@@ -627,9 +628,8 @@ interface IDrumResultMessage {
   type: "DRUM_RESULT";
   data: {
     roomId: string;
-    organizerScore: number;
-    joinerScore: number;
-    winnerRole: EPlayerRole;     // 'Organizer' | 'Joiner'
+    scores: Record<string, number>; // key = userId
+    winnerUserId: string;
   };
   timestamp: number;
 }
@@ -703,10 +703,8 @@ interface ICreateJudgmentRequest {
 
 ```typescript
 interface ISpeechState {
-  hostText: string;         // 房主累积的 Final ASR 文本
-  guestText: string;        // 访客累积的 Final ASR 文本
-  hostFinished: boolean;    // 房主发言轮次是否结束
-  guestFinished: boolean;   // 访客发言轮次是否结束
+  texts: Record<string, string>;      // userId → 累积的 Final ASR 文本
+  finished: Record<string, boolean>;  // userId → 发言轮次是否结束
 }
 ```
 
@@ -714,48 +712,43 @@ interface ISpeechState {
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `hostText` | string | ASR Final 消息中房主的累积文本，自动添加句号 |
-| `guestText` | string | ASR Final 消息中访客的累积文本，自动添加句号 |
-| `hostFinished` | boolean | 收到房主 `SPEECH_TURN_END` 后为 `true` |
-| `guestFinished` | boolean | 收到访客 `SPEECH_TURN_END` 后为 `true` |
+| `texts[userId]` | string | ASR Final 消息中该 userId 的累积文本，自动添加句号 |
+| `finished[userId]` | boolean | 收到该 userId 的 `SPEECH_TURN_END` 后为 `true` |
 
-#### 文本累积机制
+#### 文本累积机制（重构后：以 userId 为 key）
 
-- ASR Handler 收到 `isFinal: true` 时，将文本追加到对应的 `hostText` / `guestText`
+- ASR Handler 收到 `isFinal: true` 时，将文本追加到 `speechState.texts[speakerId]`
 - 如果文本末尾没有标点符号，自动追加句号
-- 当 `hostFinished && guestFinished` 时，触发判决生成
+- 当 `participants` 中所有 userId 均 `speechState.finished[userId] === true` 时，触发判决生成
 - 如果某方无发言，使用 `"（无发言）"` 作为替代文本
 
 ---
 
 ### 判决结果（WebSocket 推送格式）
 
-#### IVerdictResult（前端格式判决结果）
+#### IVerdictResult（前端格式判决结果，userId 贯穿）
 
 经过 `VerdictMapperService` 转换后的判决结果，存储在 `room.verdictResult` 中并通过 WebSocket 推送。
 
 ```typescript
 interface IVerdictResult {
   caseNumber: string;              // 案件编号，如 "NO.12345"
-  winnerId: 'host' | 'guest';     // 胜者角色
-  loserId: 'host' | 'guest';      // 败者角色
+  winnerId: string;               // 胜者 userId
+  loserId: string;                // 败者 userId
+  participants: Array<{ userId: string; nickname: string }>;
   responsibility: {
-    host: number;                  // 房主责任百分比
-    guest: number;                 // 访客责任百分比
-    thirdParty: {
-      factors: IVerdictFactor[];
-    };
+    players: Array<{ userId: string; nickname: string; percentage: number }>;
+    thirdParty: IVerdictFactor[];
   };
-  radarChart: {
-    host: IVerdictDimensionScores;
-    guest: IVerdictDimensionScores;
-  };
+  radarChart: Array<{ userId: string; nickname: string; scores: IVerdictDimensionScores }>;
   verdict: string;                 // 大老爷赠言
   punishmentTask: {
-    role: 'host' | 'guest';       // 被罚者角色
-    task: string;                  // 惩罚任务
+    loserUserId: string;
+    loserNickname: string;
+    task: string;
+    deadline: string;
   };
-  secretReports: ISecretReport[];  // 私密战报（每人一份）
+  secretReports: Array<{ userId: string; title: string; advice: string }>;
 }
 ```
 
@@ -785,11 +778,7 @@ interface IVerdictFactor {
 #### ISecretReport（私密战报）
 
 ```typescript
-interface ISecretReport {
-  role: 'host' | 'guest';
-  highestDimension: string;    // 最高维度名称
-  advice: string;              // 锦囊妙计
-}
+// 注：密折结构不再携带 role/highestDimension，前端用 userId 匹配自己的那条
 ```
 
 #### TVerdictStatus（判决状态）
@@ -1242,8 +1231,9 @@ IDrumGameState
 │   ├── COUNTDOWN
 │   ├── RUNNING
 │   └── FINISHED
-├── organizerScore: number
-├── joinerScore: number
+├── organizerUserId: string
+├── joinerUserId: string
+├── scores: Record<userId, number>
 ├── startAtMs?: number
 └── endAtMs?: number
 
@@ -1270,25 +1260,21 @@ IJudgmentResponse (LLM 原始输出)
 
 IVerdictResult (推送给前端)
 ├── caseNumber: string
-├── winnerId: 'host' | 'guest'
-├── loserId: 'host' | 'guest'
+├── winnerId: userId
+├── loserId: userId
+├── participants: [{ userId, nickname }, ...]
 ├── responsibility
-│   ├── host: number
-│   ├── guest: number
-│   └── thirdParty.factors[]
-│       ├── name, percentage, emoji
+│   ├── players: [{ userId, nickname, percentage }, ...]
+│   └── thirdParty: [{ reason, percentage, emoji }, ...]
 ├── radarChart
-│   ├── host: IVerdictDimensionScores (6 维度，英文键)
-│   └── guest: IVerdictDimensionScores
+│   └── [{ userId, nickname, scores: IVerdictDimensionScores }, ...]
 ├── verdict: string
-├── punishmentTask: { role, task }
-└── secretReports: ISecretReport[]
+├── punishmentTask: { loserUserId, loserNickname, task, deadline }
+└── secretReports: [{ userId, title, advice }, ...]
 
 ISpeechState
-├── hostText: string
-├── guestText: string
-├── hostFinished: boolean
-└── guestFinished: boolean
+├── texts: Record<userId, string>
+└── finished: Record<userId, boolean>
 ```
 
 ---

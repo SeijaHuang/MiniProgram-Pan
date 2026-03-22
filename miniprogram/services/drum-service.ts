@@ -11,7 +11,6 @@
 
 import {
     EDrumMessageType,
-    EPlayerRole,
     parseDrumMessage,
     createStartRequestMessage,
     createTapMessage,
@@ -22,10 +21,10 @@ import { logger } from '../utils/logger';
 import { wsManager } from './websocket-manager';
 
 /** Handler for opponent tap events */
-type DrumTapHandler = (role: EPlayerRole, delta: number) => void;
+type DrumTapHandler = (userId: string, delta: number) => void;
 
 /** Handler for game result events */
-type DrumResultHandler = (winnerRole: EPlayerRole) => void;
+type DrumResultHandler = (winnerUserId: string) => void;
 
 /** Handler for errors */
 type DrumErrorHandler = (message: string) => void;
@@ -33,9 +32,10 @@ type DrumErrorHandler = (message: string) => void;
 /** Handler for DRUM_READY events */
 type DrumReadyHandler = (
     serverTimeMs: number,
-    hostRole: EPlayerRole,
-    organizerName: string,
-    joinerName: string,
+    organizerUserId: string,
+    joinerUserId: string,
+    organizerNickname: string,
+    joinerNickname: string,
     receivedAtMs: number
 ) => void;
 
@@ -51,7 +51,6 @@ type DrumPlayerReadyHandler = (readyCount: number) => void;
 /** Options for initializing drum service */
 interface IDrumServiceOptions {
     roomId: string;
-    selfRole: EPlayerRole;
     onReady: DrumReadyHandler;
     onPlayerReady: DrumPlayerReadyHandler;
     onStart: DrumStartHandler;
@@ -77,7 +76,6 @@ class DrumService {
     private pendingDelta: number = 0;
     private tapFlushTimer: ReturnType<typeof setTimeout> | null = null;
     private currentRoomId: string = '';
-    private currentRole: EPlayerRole = EPlayerRole.Organizer;
 
     /** Queued message with receive timestamp */
     private messageQueue: Array<{
@@ -114,7 +112,6 @@ class DrumService {
      */
     initialize(options: IDrumServiceOptions): void {
         this.currentRoomId = options.roomId;
-        this.currentRole = options.selfRole;
         this.readyHandler = options.onReady;
         this.playerReadyHandler = options.onPlayerReady;
         this.startHandler = options.onStart;
@@ -235,9 +232,10 @@ class DrumService {
             return;
         }
 
+        const selfUserId: string = getApp<IAppOption>().globalData.selfUserId;
         const tapMessage = createTapMessage(
             this.currentRoomId,
-            this.currentRole,
+            selfUserId,
             delta
         );
         wsManager.send(tapMessage);
@@ -302,9 +300,10 @@ class DrumService {
             case EDrumMessageType.DrumReady:
                 this.handleReady(
                     message.data.serverTimeMs,
-                    message.data.hostRole,
-                    message.data.organizerName,
-                    message.data.joinerName,
+                    message.data.organizerUserId,
+                    message.data.joinerUserId,
+                    message.data.organizerNickname,
+                    message.data.joinerNickname,
                     receivedAtMs
                 );
                 break;
@@ -318,7 +317,7 @@ class DrumService {
                 break;
 
             case EDrumMessageType.DrumTap:
-                this.handleTap(message.data.role, message.data.delta);
+                this.handleTap(message.data.userId, message.data.delta);
                 break;
 
             case EDrumMessageType.DrumFinish:
@@ -326,7 +325,7 @@ class DrumService {
                 break;
 
             case EDrumMessageType.DrumResult:
-                this.handleResult(message.data.winnerRole);
+                this.handleResult(message.data.winnerUserId);
                 break;
 
             default:
@@ -339,17 +338,19 @@ class DrumService {
      */
     private handleReady(
         serverTimeMs: number,
-        hostRole: EPlayerRole,
-        organizerName: string,
-        joinerName: string,
+        organizerUserId: string,
+        joinerUserId: string,
+        organizerNickname: string,
+        joinerNickname: string,
         receivedAtMs: number
     ): void {
         if (this.readyHandler) {
             this.readyHandler(
                 serverTimeMs,
-                hostRole,
-                organizerName,
-                joinerName,
+                organizerUserId,
+                joinerUserId,
+                organizerNickname,
+                joinerNickname,
                 receivedAtMs
             );
         }
@@ -377,9 +378,9 @@ class DrumService {
     /**
      * Handle opponent tap event
      */
-    private handleTap(role: EPlayerRole, delta: number): void {
+    private handleTap(userId: string, delta: number): void {
         if (this.tapHandler) {
-            this.tapHandler(role, delta);
+            this.tapHandler(userId, delta);
         }
     }
 
@@ -395,9 +396,9 @@ class DrumService {
     /**
      * Handle game result
      */
-    private handleResult(winnerRole: EPlayerRole): void {
+    private handleResult(winnerUserId: string): void {
         if (this.resultHandler) {
-            this.resultHandler(winnerRole);
+            this.resultHandler(winnerUserId);
         }
     }
 

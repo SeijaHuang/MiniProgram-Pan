@@ -11,7 +11,7 @@
  */
 
 import type { IDrumTapMessage } from '../../types/websocket';
-import { EWSErrorCode, EPlayerRole } from '../../types/websocket';
+import { EWSErrorCode } from '../../types/websocket';
 import { EGamePhase } from '../../types/websocket/drum';
 import { drumGameManager } from '../websocket/drum-game-manager';
 import { DrumTapDataSchema } from '../../models/schemas/drum-message.schema';
@@ -21,7 +21,7 @@ import { logger } from '../../utils/logger';
 export interface IDrumTapResult {
     success: true;
     roomId: string;
-    role: EPlayerRole;
+    userId: string;
     delta: number;
 }
 
@@ -38,7 +38,7 @@ export function handleDrumTap(message: IDrumTapMessage): TDrumTapHandlerResult {
     const v = validatePayload(DrumTapDataSchema, message.data);
     if (!v.success) return v;
 
-    const { roomId, role, delta } = v.data;
+    const { roomId, userId, delta } = v.data;
 
     // Check game exists
     const game = drumGameManager.getGame(roomId);
@@ -60,17 +60,17 @@ export function handleDrumTap(message: IDrumTapMessage): TDrumTapHandlerResult {
     }
 
     // Record tap
-    drumGameManager.recordTap(roomId, role, delta);
+    drumGameManager.recordTap(roomId, userId, delta);
 
     logger.log(
         'DrumTap',
-        `Room ${roomId}: ${role} +${delta} (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
+        `Room ${roomId}: ${userId} +${delta} (Organizer: ${game.organizerScore}, Joiner: ${game.joinerScore})`
     );
 
     return {
         success: true,
         roomId,
-        role,
+        userId,
         delta,
     };
 }

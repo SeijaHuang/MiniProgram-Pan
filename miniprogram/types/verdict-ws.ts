@@ -11,6 +11,7 @@
  */
 export interface ISpeechTurnSwitchPayload {
     roomId: string;
+    nextSpeakerUserId: string;
 }
 
 /**
@@ -38,7 +39,7 @@ export interface IBackendDimensionScores {
  * Backend third-party factor format
  */
 export interface IBackendThirdPartyFactor {
-    name: string;
+    reason: string;
     percentage: number;
     emoji: string;
 }
@@ -47,8 +48,8 @@ export interface IBackendThirdPartyFactor {
  * Backend secret report format
  */
 export interface IBackendSecretReport {
-    role: 'host' | 'guest';
-    highestDimension: string;
+    userId: string;
+    title: string;
     advice: string;
 }
 
@@ -58,23 +59,27 @@ export interface IBackendSecretReport {
  */
 export interface IBackendVerdictResult {
     caseNumber: string;
-    winnerId: 'host' | 'guest';
-    loserId: 'host' | 'guest';
+    winnerId: string; // userId
+    loserId: string; // userId
     responsibility: {
-        host: number;
-        guest: number;
-        thirdParty: {
-            factors: IBackendThirdPartyFactor[];
-        };
+        players: Array<{
+            userId: string;
+            nickname: string;
+            percentage: number;
+        }>;
+        thirdParty: IBackendThirdPartyFactor[];
     };
-    radarChart: {
-        host: IBackendDimensionScores;
-        guest: IBackendDimensionScores;
-    };
-    verdict: string;
+    radarChart: Array<{
+        userId: string;
+        nickname: string;
+        scores: IBackendDimensionScores;
+    }>;
+    verdictSummary: string;
     punishmentTask: {
-        role: 'host' | 'guest';
+        loserUserId: string;
+        loserNickname: string;
         task: string;
+        deadline: string;
     };
     secretReports: IBackendSecretReport[];
 }

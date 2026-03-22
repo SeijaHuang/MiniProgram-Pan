@@ -16,6 +16,7 @@ import {
     RoomIdParamSchema,
 } from '../models/schemas/llm-request.schema';
 import { llmJudgementService } from '../services/core/llm-judgement.service';
+import { roomManager } from '../services/websocket/room-manager';
 import type { IBaseResponse } from '../types/http';
 import { EHttpErrorCode } from '../types/http';
 import type { IJudgmentResponse } from '../types/llm';
@@ -66,14 +67,42 @@ export class LlmJudgementController {
             }
 
             const { roomId } = paramResult.data;
-            const { player1Speech, player2Speech, idempotencyKey } =
-                bodyResult.data;
+            const { idempotencyKey } = bodyResult.data;
+
+            // Look up room to get participant identity and accumulated speech
+            const room = roomManager.getRoomById(roomId);
+            if (!room || room.participants.length < 2) {
+                const response: IBaseResponse<never> = {
+                    success: false,
+                    error: {
+                        code: EHttpErrorCode.InvalidRequest,
+                        message: '房间不存在或参与者不足',
+                    },
+                };
+                res.status(400).json(response);
+                return;
+            }
+
+            const [p1, p2] = room.participants;
+            const texts = room.speechState?.texts ?? {};
 
             // Call service (synchronous LLM call)
             const result: IJudgmentResponse =
                 await llmJudgementService.createJudgment(roomId, {
-                    player1Speech,
-                    player2Speech,
+                    player1: {
+                        userId: p1.user.userId,
+                        nickname: p1.user.nickname,
+                        speech:
+                            (texts[p1.user.userId] ?? '').trim() ||
+                            '（无发言）',
+                    },
+                    player2: {
+                        userId: p2.user.userId,
+                        nickname: p2.user.nickname,
+                        speech:
+                            (texts[p2.user.userId] ?? '').trim() ||
+                            '（无发言）',
+                    },
                     idempotencyKey,
                 });
 

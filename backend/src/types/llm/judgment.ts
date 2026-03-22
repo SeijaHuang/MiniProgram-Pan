@@ -51,11 +51,20 @@ export interface IJudgmentResponse {
 }
 
 /**
+ * Player info for LLM judgment request
+ */
+export interface IPlayerInfo {
+    userId: string;
+    nickname: string;
+    speech: string;
+}
+
+/**
  * Create judgment request payload
  */
 export interface ICreateJudgmentRequest {
-    player1Speech: string;
-    player2Speech: string;
+    player1: IPlayerInfo;
+    player2: IPlayerInfo;
     /** 幂等键，防止前端重复调用 OpenAI */
     idempotencyKey?: string;
 }

@@ -12,19 +12,11 @@ import { z } from 'zod';
 import { EMessageType } from '../entities/message';
 
 /**
- * User Schema
- */
-export const UserSchema = z.object({
-    userId: z.string().min(1, 'userId is required'),
-    nickname: z.string().min(1, 'nickname is required'),
-});
-
-/**
  * JOIN_ROOM Data Schema
  */
 export const JoinRoomDataSchema = z.object({
     roomCode: z.string().min(1, 'roomCode is required'),
-    user: UserSchema,
+    nickname: z.string().min(1, 'nickname is required'),
 });
 
 /**

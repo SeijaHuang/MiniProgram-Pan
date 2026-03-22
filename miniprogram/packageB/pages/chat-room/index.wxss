@@ -274,6 +274,7 @@
     flex-direction: column;
     align-items: center;
     padding-bottom: 40rpx;
+    gap: 32rpx;
 }
 
 .chat-room__mic-buttons {
@@ -308,6 +309,13 @@
 
 .chat-room__mic--active:active {
     transform: scale(0.95);
+}
+
+/* Connecting: Amber - Pressed but ASR not yet started */
+.chat-room__mic--connecting {
+    background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+    box-shadow: 0 8rpx 30rpx rgba(251, 191, 36, 0.45);
+    transform: scale(1.05);
 }
 
 /* Recording: Dark Green + Enlarged */
@@ -427,8 +435,7 @@
         0 10rpx 0 #000000,
         -10rpx 0 0 #000000,
         10rpx 0 0 #000000,
-        /* 立体投影效果 */
-        12rpx 12rpx 0 rgba(0, 0, 0, 0.6);
+        /* 立体投影效果 */ 12rpx 12rpx 0 rgba(0, 0, 0, 0.6);
     line-height: 1;
 }
 

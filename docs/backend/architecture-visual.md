@@ -244,7 +244,7 @@ DRUM_START → 广播 startAtMs = Date.now() + 3000
    ↓ setTimeout(10000ms)
 DRUM_FINISH → 广播 endAtMs
    ↓ (立即)
-DRUM_RESULT → 广播 organizerScore, joinerScore, winnerRole
+DRUM_RESULT → 广播 scores{[userId]:score}, winnerUserId
    ↓
 cleanupGame(roomId)
 ```
@@ -269,7 +269,7 @@ CHAT_COMPLETE → 广播给所有参与者
 VerdictOrchestratorService.generateVerdict()
    ├─ 获取 room.speechState 中的 hostText, guestText
    ├─ 调用 llmJudgementService → OpenAI API (30s 超时)
-   ├─ VerdictMapperService 转换 (中文键→英文键, player→host/guest)
+   ├─ VerdictMapperService 转换 (中文键→英文键, player→userId)
    ├─ 缓存到 room.verdictResult
    └─ 广播 VERDICT_RESULT 或 VERDICT_FAILED
        ↓ (失败时)

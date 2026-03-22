@@ -5,7 +5,6 @@
  */
 
 import type { IRoom } from '../models/room';
-import type { IUser } from '../models/user';
 
 import type { IWSMessage, EWSMessageType } from './websocket-common';
 
@@ -21,7 +20,7 @@ export interface IJoinRoomMessage extends IWSMessage<IJoinRoomData> {
 
 export interface IJoinRoomData {
     roomCode: string;
-    user: IUser;
+    nickname: string;
 }
 
 // ==================== Server → Client ====================
@@ -35,5 +34,6 @@ export interface IJoinAckMessage extends IWSMessage<IJoinAckData> {
 }
 
 export interface IJoinAckData {
+    selfUserId: string;
     room: IRoom;
 }
