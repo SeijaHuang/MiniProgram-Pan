@@ -572,8 +572,11 @@ Page({
         );
         const hostRespPercent: number = canvasHostPlayer?.percentage ?? 0;
         const guestRespPercent: number = canvasGuestPlayer?.percentage ?? 0;
+        // Strip Unicode variation selectors (U+FE0E / U+FE0F) from emoji before
+        // drawing on Canvas — WeChat Canvas 2D renders them as "口" tofu boxes.
+        const stripVS = (s: string): string => s.replace(/[\uFE0E\uFE0F]/g, '');
         const thirdPartyLines: string[] = verdict.responsibility.thirdParty.map(
-            f => `${f.emoji}${f.reason}: ${f.percentage}%`
+            f => `${stripVS(f.emoji)}${f.reason}: ${f.percentage}%`
         );
 
         const respTitleH: number = 56;
