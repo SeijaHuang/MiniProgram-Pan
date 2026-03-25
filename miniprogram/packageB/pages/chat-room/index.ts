@@ -862,75 +862,80 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const liveKey: 'speakerALive' | 'speakerBLive' =
             phase === EPhase.SpeakerA ? 'speakerALive' : 'speakerBLive';
         const wasRecording: boolean = this.data.isRecording;
+        const wasRecording: boolean = this.data.isRecording;
 
         // 强制停止语音识别，并在 ASR 完成后发送控制消息并显示切换提示（确保录音结果先到后端）
         if (this.asrManager && wasRecording) {
-            if (canSpeak) {
-                this.stopAsrAndDefer('sendTurnEndAndNotify');
-            } else {
-                this.asrManager.stop();
-            }
-        } else if (canSpeak) {
-            // 未在录音，直接发送
-            this.sendSpeechTurnEnd();
-        }
-
-        const nextPhase: EPhase = PHASE_TRANSITION[phase];
-
-        if (nextPhase === EPhase.Done) {
-            // 清理定时器
-            if (this.timerId) {
-                clearInterval(this.timerId);
-                this.timerId = null;
+            // 强制停止语音识别，并在 ASR 完成后发送控制消息并显示切换提示（确保录音结果先到后端）
+            if (this.asrManager && wasRecording) {
+                if (canSpeak) {
+                    this.stopAsrAndDefer('sendTurnEndAndNotify');
+                } else {
+                    this.asrManager.stop();
+                }
+            } else if (canSpeak) {
+                // 未在录音，直接发送
+                this.sendSpeechTurnEnd();
             }
 
-            this.stopListenerHintRotation();
+            const nextPhase: EPhase = PHASE_TRANSITION[phase];
 
-            this.setData({
-                phase: EPhase.Done,
-                canSpeak: false,
-                remaining: 0,
-                isRecording: false,
-                [liveKey]: '', // 仅清 live，final 保留
-            });
-            // 等待 CHAT_COMPLETE 消息触发跳转
-        } else {
-            const phaseApp = getApp<IAppOption>();
-            // 第二发言人是非第一发言人的那一方
-            this.currentSpeakerUserId = this.isSelfFirstSpeaker
-                ? phaseApp.globalData.opponentUserId
-                : phaseApp.globalData.selfUserId;
-            const nextCanSpeak: boolean =
-                this.currentSpeakerUserId === phaseApp.globalData.selfUserId;
+            if (nextPhase === EPhase.Done) {
+                // 清理定时器
+                if (this.timerId) {
+                    clearInterval(this.timerId);
+                    this.timerId = null;
+                }
 
-            // 不再发言时停止倒计时（由新发言者自行启动）
-            if (!nextCanSpeak && this.timerId) {
-                clearInterval(this.timerId);
-                this.timerId = null;
-            }
-
-            // 显示"下一位"切换提示（录音中则等 OnRecognitionComplete 确认最后一段文本已发出）
-            if (!(this.asrManager && wasRecording)) {
-                void this.showSwitchNotification();
-            }
-
-            this.setData({
-                phase: nextPhase,
-                remaining: totalPerTurn,
-                canSpeak: nextCanSpeak,
-                countdownClass: this.getCountdownClass(totalPerTurn),
-                isRecording: false,
-                [liveKey]: '', // 仅清结束阶段的 live
-                listenerHint: nextCanSpeak ? '' : this.pickListenerHint(),
-            });
-
-            if (nextCanSpeak) {
                 this.stopListenerHintRotation();
-            } else {
-                this.startListenerHintRotation();
-            }
 
-            asrService.resetSequence();
+                this.setData({
+                    phase: EPhase.Done,
+                    canSpeak: false,
+                    remaining: 0,
+                    isRecording: false,
+                    [liveKey]: '', // 仅清 live，final 保留
+                });
+                // 等待 CHAT_COMPLETE 消息触发跳转
+            } else {
+                const phaseApp = getApp<IAppOption>();
+                // 第二发言人是非第一发言人的那一方
+                this.currentSpeakerUserId = this.isSelfFirstSpeaker
+                    ? phaseApp.globalData.opponentUserId
+                    : phaseApp.globalData.selfUserId;
+                const nextCanSpeak: boolean =
+                    this.currentSpeakerUserId ===
+                    phaseApp.globalData.selfUserId;
+
+                // 不再发言时停止倒计时（由新发言者自行启动）
+                if (!nextCanSpeak && this.timerId) {
+                    clearInterval(this.timerId);
+                    this.timerId = null;
+                }
+
+                // 显示"下一位"切换提示（录音中则等 OnRecognitionComplete 确认最后一段文本已发出）
+                if (!(this.asrManager && wasRecording)) {
+                    void this.showSwitchNotification();
+                }
+
+                this.setData({
+                    phase: nextPhase,
+                    remaining: totalPerTurn,
+                    canSpeak: nextCanSpeak,
+                    countdownClass: this.getCountdownClass(totalPerTurn),
+                    isRecording: false,
+                    [liveKey]: '', // 仅清结束阶段的 live
+                    listenerHint: nextCanSpeak ? '' : this.pickListenerHint(),
+                });
+
+                if (nextCanSpeak) {
+                    this.stopListenerHintRotation();
+                } else {
+                    this.startListenerHintRotation();
+                }
+
+                asrService.resetSequence();
+            }
         }
     },
 
