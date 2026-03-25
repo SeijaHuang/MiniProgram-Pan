@@ -301,6 +301,31 @@ controllers/ws-controller.ts → 广播 VERDICT_RESULT
 | 超时 | `30000ms` | `VERDICT_CONFIG.LLM_TIMEOUT_MS` |
 | 响应格式 | JSON | 强制 JSON 输出 |
 
+### 日志
+
+HTTP 接口在 LLM 调用前后记录结构化日志，包含 `durationMs`：
+
+```typescript
+// LLM 调用开始
+logger.info('llm.judgment.start', { roomId });
+
+// LLM 调用成功（含耗时）
+logger.info('llm.judgment.ok', { roomId, durationMs });
+
+// LLM 调用失败（含耗时和错误信息）
+logger.error('llm.judgment.failed', { roomId, durationMs, error });
+```
+
+WebSocket 流程由 `verdict-orchestrator.service.ts` 记录：
+
+```typescript
+// 判决广播成功
+logger.info('ws.verdict_result', { roomId, caseNumber });
+
+// 判决生成失败
+logger.error('ws.verdict_failed', { roomId, retryCount, error });
+```
+
 ### 环境变量
 
 ```bash

@@ -80,16 +80,17 @@ backend/src/
 │   └── common.ts                        # ✅ 通用类型
 │
 ├── 📁 constants/                        # 🔢 常量 (Constants)
-│   ├── config.ts                        # ✅ 配置常量（APP/WS/ROOM/DRUM/OPENAI/TENCENT）
 │   ├── config.ts                        # ✅ 配置常量（APP/WS/ROOM/DRUM/OPENAI/TENCENT/VERDICT）
 │   └── prompts.ts                       # ✅ LLM Prompt 模板
 │
+├── 📁 middleware/                        # 🔧 中间件层 (Middleware)
+│   └── requestLogger.ts                 # ✅ HTTP 请求日志中间件（method/path/status/durationMs）
+│
 ├── 📁 utils/                            # 🛠️ 工具函数 (Utilities)
+│   ├── logger.ts                        # ✅ Winston 结构化日志（双 API：legacy tag + structured event）
 │   └── env-loader.ts                    # ✅ 环境变量加载
 │
-├── 📁 middlewares/                      # 🔧 中间件层 (预留)
-│
-├── app.ts                               # ✅ Express 应用（路由注册）
+├── app.ts                               # ✅ Express 应用（路由注册 + requestLogger 中间件）
 ├── ws.ts                                # ✅ WebSocket 服务器初始化
 └── index.ts                             # ✅ 入口文件（HTTP + WS 启动）
 ```
