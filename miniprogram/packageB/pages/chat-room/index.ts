@@ -117,7 +117,12 @@ interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     currentSpeakerUserId: string; // UserId of current speaker
     isSelfFirstSpeaker: boolean; // Whether self is first speaker (SpeakerA)
     // ASR 完成后的待执行动作（用于确保录音结果先于控制消息发出）
-    pendingAfterAsrComplete: 'sendTurnEnd' | 'redirect' | null;
+    pendingAfterAsrComplete:
+        | 'sendTurnEnd'
+        | 'sendTurnEndAndNotify'
+        | 'showSwitchNotification'
+        | 'redirect'
+        | null;
     pendingAfterAsrCompleteTimerId: number | null;
 }
 
@@ -677,6 +682,11 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             this.pendingAfterAsrComplete = null;
             if (pending === 'sendTurnEnd') {
                 this.sendSpeechTurnEnd();
+            } else if (pending === 'sendTurnEndAndNotify') {
+                this.sendSpeechTurnEnd();
+                void this.showSwitchNotification();
+            } else if (pending === 'showSwitchNotification') {
+                void this.showSwitchNotification();
             } else if (pending === 'redirect') {
                 this.doRedirectToVerdictWaiting();
             }
@@ -857,17 +867,21 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         // 根据当前阶段直接计算 liveKey（同步，无竞态问题）
         const liveKey: 'speakerALive' | 'speakerBLive' =
             phase === EPhase.SpeakerA ? 'speakerALive' : 'speakerBLive';
+        const wasRecording: boolean = this.data.isRecording;
 
-        // 强制停止语音识别，并在 ASR 完成后发送控制消息（确保录音结果先到后端）
-        if (this.asrManager && this.data.isRecording) {
+        // 强制停止语音识别，并在 ASR 完成后发送控制消息并显示切换提示（确保录音结果先到后端）
+        if (this.asrManager && wasRecording) {
             if (canSpeak) {
                 // 先设置 pending 再 stop，避免回调比赋值先到
-                this.pendingAfterAsrComplete = 'sendTurnEnd';
-                // 兜底：3 秒内 OnRecognitionComplete 未触发则直接发送
+                this.pendingAfterAsrComplete = 'sendTurnEndAndNotify';
+                // 兜底：3 秒内 OnRecognitionComplete 未触发则直接执行
                 this.pendingAfterAsrCompleteTimerId = setTimeout(() => {
-                    if (this.pendingAfterAsrComplete === 'sendTurnEnd') {
+                    if (
+                        this.pendingAfterAsrComplete === 'sendTurnEndAndNotify'
+                    ) {
                         this.pendingAfterAsrComplete = null;
                         this.sendSpeechTurnEnd();
+                        void this.showSwitchNotification();
                     }
                     this.pendingAfterAsrCompleteTimerId = null;
                 }, 3000) as unknown as number;
@@ -912,8 +926,12 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                 this.timerId = null;
             }
 
-            // 显示"下一位"切换提示
-            this.showSwitchNotification();
+            // 显示"下一位"切换提示（录音中则等 OnRecognitionComplete 确认最后一段文本已发出）
+            if (this.asrManager && wasRecording) {
+                // 已通过 pendingAfterAsrComplete = 'sendTurnEndAndNotify' 延迟触发
+            } else {
+                void this.showSwitchNotification();
+            }
 
             this.setData({
                 phase: nextPhase,
@@ -980,8 +998,22 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const selfUserId: string = getApp<IAppOption>().globalData.selfUserId;
         const nextCanSpeak: boolean = this.currentSpeakerUserId === selfUserId;
 
-        // 显示"下一位"切换提示
-        this.showSwitchNotification();
+        // 显示"下一位"切换提示（录音中则等 OnRecognitionComplete 确认最后一段文本已发出）
+        const wasRecording: boolean = this.data.isRecording;
+        if (this.asrManager && wasRecording) {
+            this.pendingAfterAsrComplete = 'showSwitchNotification';
+            // 兜底：3 秒内 OnRecognitionComplete 未触发则直接显示
+            this.pendingAfterAsrCompleteTimerId = setTimeout(() => {
+                if (this.pendingAfterAsrComplete === 'showSwitchNotification') {
+                    this.pendingAfterAsrComplete = null;
+                    void this.showSwitchNotification();
+                }
+                this.pendingAfterAsrCompleteTimerId = null;
+            }, 3000) as unknown as number;
+            this.asrManager.stop();
+        } else {
+            void this.showSwitchNotification();
+        }
 
         this.setData({
             phase: EPhase.SpeakerB,
