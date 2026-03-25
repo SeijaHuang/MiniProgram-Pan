@@ -104,6 +104,12 @@ type TSpeakerFinal = Pick<IChatRoomPageData, 'speakerAFinal' | 'speakerBFinal'>;
 
 type TSpeakerLive = Pick<IChatRoomPageData, 'speakerALive' | 'speakerBLive'>;
 
+type TPendingAsrAction =
+    | 'sendTurnEnd'
+    | 'sendTurnEndAndNotify'
+    | 'showSwitchNotification'
+    | 'redirect';
+
 interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     timerId: number | null;
     listenerHintTimerId: number | null;
@@ -117,12 +123,7 @@ interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     currentSpeakerUserId: string; // UserId of current speaker
     isSelfFirstSpeaker: boolean; // Whether self is first speaker (SpeakerA)
     // ASR 完成后的待执行动作（用于确保录音结果先于控制消息发出）
-    pendingAfterAsrComplete:
-        | 'sendTurnEnd'
-        | 'sendTurnEndAndNotify'
-        | 'showSwitchNotification'
-        | 'redirect'
-        | null;
+    pendingAfterAsrComplete: TPendingAsrAction | null;
     pendingAfterAsrCompleteTimerId: number | null;
 }
 
@@ -680,15 +681,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             // 执行挂起的动作（录音结果已全部发送，现在安全地发控制消息或跳转）
             const pending = this.pendingAfterAsrComplete;
             this.pendingAfterAsrComplete = null;
-            if (pending === 'sendTurnEnd') {
-                this.sendSpeechTurnEnd();
-            } else if (pending === 'sendTurnEndAndNotify') {
-                this.sendSpeechTurnEnd();
-                void this.showSwitchNotification();
-            } else if (pending === 'showSwitchNotification') {
-                void this.showSwitchNotification();
-            } else if (pending === 'redirect') {
-                this.doRedirectToVerdictWaiting();
+            if (pending) {
+                this.executePendingAction(pending);
             }
         };
 
@@ -868,88 +862,119 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const liveKey: 'speakerALive' | 'speakerBLive' =
             phase === EPhase.SpeakerA ? 'speakerALive' : 'speakerBLive';
         const wasRecording: boolean = this.data.isRecording;
+        const wasRecording: boolean = this.data.isRecording;
 
         // 强制停止语音识别，并在 ASR 完成后发送控制消息并显示切换提示（确保录音结果先到后端）
         if (this.asrManager && wasRecording) {
-            if (canSpeak) {
-                // 先设置 pending 再 stop，避免回调比赋值先到
-                this.pendingAfterAsrComplete = 'sendTurnEndAndNotify';
-                // 兜底：3 秒内 OnRecognitionComplete 未触发则直接执行
-                this.pendingAfterAsrCompleteTimerId = setTimeout(() => {
-                    if (
-                        this.pendingAfterAsrComplete === 'sendTurnEndAndNotify'
-                    ) {
-                        this.pendingAfterAsrComplete = null;
-                        this.sendSpeechTurnEnd();
-                        void this.showSwitchNotification();
-                    }
-                    this.pendingAfterAsrCompleteTimerId = null;
-                }, 3000) as unknown as number;
-            }
-            this.asrManager.stop();
-        } else if (canSpeak) {
-            // 未在录音，直接发送
-            this.sendSpeechTurnEnd();
-        }
-
-        const nextPhase: EPhase = PHASE_TRANSITION[phase];
-
-        if (nextPhase === EPhase.Done) {
-            // 清理定时器
-            if (this.timerId) {
-                clearInterval(this.timerId);
-                this.timerId = null;
-            }
-
-            this.stopListenerHintRotation();
-
-            this.setData({
-                phase: EPhase.Done,
-                canSpeak: false,
-                remaining: 0,
-                isRecording: false,
-                [liveKey]: '', // 仅清 live，final 保留
-            });
-            // 等待 CHAT_COMPLETE 消息触发跳转
-        } else {
-            const phaseApp = getApp<IAppOption>();
-            // 第二发言人是非第一发言人的那一方
-            this.currentSpeakerUserId = this.isSelfFirstSpeaker
-                ? phaseApp.globalData.opponentUserId
-                : phaseApp.globalData.selfUserId;
-            const nextCanSpeak: boolean =
-                this.currentSpeakerUserId === phaseApp.globalData.selfUserId;
-
-            // 不再发言时停止倒计时（由新发言者自行启动）
-            if (!nextCanSpeak && this.timerId) {
-                clearInterval(this.timerId);
-                this.timerId = null;
-            }
-
-            // 显示"下一位"切换提示（录音中则等 OnRecognitionComplete 确认最后一段文本已发出）
+            // 强制停止语音识别，并在 ASR 完成后发送控制消息并显示切换提示（确保录音结果先到后端）
             if (this.asrManager && wasRecording) {
-                // 已通过 pendingAfterAsrComplete = 'sendTurnEndAndNotify' 延迟触发
-            } else {
-                void this.showSwitchNotification();
+                if (canSpeak) {
+                    this.stopAsrAndDefer('sendTurnEndAndNotify');
+                } else {
+                    this.asrManager.stop();
+                }
+            } else if (canSpeak) {
+                // 未在录音，直接发送
+                this.sendSpeechTurnEnd();
             }
 
-            this.setData({
-                phase: nextPhase,
-                remaining: totalPerTurn,
-                canSpeak: nextCanSpeak,
-                countdownClass: this.getCountdownClass(totalPerTurn),
-                isRecording: false,
-                [liveKey]: '', // 仅清结束阶段的 live
-                listenerHint: nextCanSpeak ? '' : this.pickListenerHint(),
-            });
+            const nextPhase: EPhase = PHASE_TRANSITION[phase];
 
-            if (nextCanSpeak) {
+            if (nextPhase === EPhase.Done) {
+                // 清理定时器
+                if (this.timerId) {
+                    clearInterval(this.timerId);
+                    this.timerId = null;
+                }
+
                 this.stopListenerHintRotation();
-            } else {
-                this.startListenerHintRotation();
-            }
 
-            asrService.resetSequence();
+                this.setData({
+                    phase: EPhase.Done,
+                    canSpeak: false,
+                    remaining: 0,
+                    isRecording: false,
+                    [liveKey]: '', // 仅清 live，final 保留
+                });
+                // 等待 CHAT_COMPLETE 消息触发跳转
+            } else {
+                const phaseApp = getApp<IAppOption>();
+                // 第二发言人是非第一发言人的那一方
+                this.currentSpeakerUserId = this.isSelfFirstSpeaker
+                    ? phaseApp.globalData.opponentUserId
+                    : phaseApp.globalData.selfUserId;
+                const nextCanSpeak: boolean =
+                    this.currentSpeakerUserId ===
+                    phaseApp.globalData.selfUserId;
+
+                // 不再发言时停止倒计时（由新发言者自行启动）
+                if (!nextCanSpeak && this.timerId) {
+                    clearInterval(this.timerId);
+                    this.timerId = null;
+                }
+
+                // 显示"下一位"切换提示（录音中则等 OnRecognitionComplete 确认最后一段文本已发出）
+                if (!(this.asrManager && wasRecording)) {
+                    void this.showSwitchNotification();
+                }
+
+                this.setData({
+                    phase: nextPhase,
+                    remaining: totalPerTurn,
+                    canSpeak: nextCanSpeak,
+                    countdownClass: this.getCountdownClass(totalPerTurn),
+                    isRecording: false,
+                    [liveKey]: '', // 仅清结束阶段的 live
+                    listenerHint: nextCanSpeak ? '' : this.pickListenerHint(),
+                });
+
+                if (nextCanSpeak) {
+                    this.stopListenerHintRotation();
+                } else {
+                    this.startListenerHintRotation();
+                }
+
+                asrService.resetSequence();
+            }
+        }
+    },
+
+    /**
+     * 强制停止 ASR 并将指定动作延迟到 OnRecognitionComplete 后执行
+     * 确保录音结果先于控制消息/跳转发出。
+     * 兜底：3 秒内回调未触发时直接执行该动作。
+     */
+    stopAsrAndDefer(action: TPendingAsrAction): void {
+        // 先赋值再 stop，避免回调先于赋值到达
+        this.pendingAfterAsrComplete = action;
+        this.pendingAfterAsrCompleteTimerId = setTimeout(() => {
+            if (this.pendingAfterAsrComplete === action) {
+                this.pendingAfterAsrComplete = null;
+                this.executePendingAction(action);
+            }
+            this.pendingAfterAsrCompleteTimerId = null;
+        }, 3000) as unknown as number;
+        this.asrManager.stop();
+    },
+
+    /**
+     * 执行 pendingAfterAsrComplete 挂起的动作
+     */
+    executePendingAction(action: TPendingAsrAction): void {
+        switch (action) {
+            case 'sendTurnEnd':
+                this.sendSpeechTurnEnd();
+                break;
+            case 'sendTurnEndAndNotify':
+                this.sendSpeechTurnEnd();
+                void this.showSwitchNotification();
+                break;
+            case 'showSwitchNotification':
+                void this.showSwitchNotification();
+                break;
+            case 'redirect':
+                this.doRedirectToVerdictWaiting();
+                break;
         }
     },
 
@@ -1001,16 +1026,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         // 显示"下一位"切换提示（录音中则等 OnRecognitionComplete 确认最后一段文本已发出）
         const wasRecording: boolean = this.data.isRecording;
         if (this.asrManager && wasRecording) {
-            this.pendingAfterAsrComplete = 'showSwitchNotification';
-            // 兜底：3 秒内 OnRecognitionComplete 未触发则直接显示
-            this.pendingAfterAsrCompleteTimerId = setTimeout(() => {
-                if (this.pendingAfterAsrComplete === 'showSwitchNotification') {
-                    this.pendingAfterAsrComplete = null;
-                    void this.showSwitchNotification();
-                }
-                this.pendingAfterAsrCompleteTimerId = null;
-            }, 3000) as unknown as number;
-            this.asrManager.stop();
+            this.stopAsrAndDefer('showSwitchNotification');
         } else {
             void this.showSwitchNotification();
         }
@@ -1070,16 +1086,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
         if (this.asrManager && wasRecording) {
             // 等 OnRecognitionComplete 回调确认最后一段文本已发出，再跳转
-            this.pendingAfterAsrComplete = 'redirect';
-            // 兜底：3 秒内未回调则直接跳转
-            this.pendingAfterAsrCompleteTimerId = setTimeout(() => {
-                if (this.pendingAfterAsrComplete === 'redirect') {
-                    this.pendingAfterAsrComplete = null;
-                    this.doRedirectToVerdictWaiting();
-                }
-                this.pendingAfterAsrCompleteTimerId = null;
-            }, 3000) as unknown as number;
-            this.asrManager.stop();
+            this.stopAsrAndDefer('redirect');
         } else {
             // 未在录音，短暂展示遮罩后跳转
             setTimeout(() => {
