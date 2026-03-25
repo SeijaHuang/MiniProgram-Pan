@@ -34,6 +34,8 @@ jobs:
       - name: Write .env file
         run: |
           cat > /tmp/.env << EOF
+          NODE_ENV=${{ github.event.inputs.environment == 'release' && 'production' || 'development' }}
+          LOG_LEVEL=${{ github.event.inputs.environment == 'release' && 'info' || 'debug' }}
           AI_API_KEY=${{ secrets.AI_API_KEY }}
           AI_MODEL=${{ vars.AI_MODEL }}
           AI_BASE_URL=${{ vars.AI_BASE_URL }}

@@ -47,6 +47,12 @@ export class RoomController {
             };
 
             res.status(201).json(response);
+            logger.info('room.created', {
+                roomId: room.roomId,
+                roomCode: room.roomCode,
+                hostUserId: room.hostUserId,
+                createdAt: room.createdAt,
+            });
         } catch (error: unknown) {
             logger.error('RoomController', 'Room creation failed:', error);
 

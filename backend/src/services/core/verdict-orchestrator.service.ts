@@ -124,6 +124,10 @@ export class VerdictOrchestratorService {
                 data: resultData,
                 timestamp: Date.now(),
             });
+            logger.info('ws.verdict_result', {
+                roomId,
+                caseNumber: verdict.caseNumber,
+            });
         } catch (error) {
             // Handle error
             this.handleVerdictError(roomId, error, connectionManager);
@@ -176,6 +180,11 @@ export class VerdictOrchestratorService {
             'VerdictOrchestrator',
             `Verdict generation failed for room ${roomId}: ${errorMessage}`
         );
+        logger.error('ws.verdict_failed', {
+            roomId,
+            retryCount: room.verdictRetryCount,
+            error: errorMessage,
+        });
 
         // Check if can retry
         const canRetry = room.verdictRetryCount < VERDICT_CONFIG.MAX_RETRIES;

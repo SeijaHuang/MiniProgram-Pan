@@ -37,9 +37,13 @@ export class TencentController {
         try {
             const response = await this._getSTSTokenWithCache();
             res.status(200).json(response);
+            logger.info('tencent.credentials.ok', {});
             return;
         } catch (error: unknown) {
             logger.error('TencentController', 'Get STS token failed:', error);
+            logger.error('tencent.credentials.failed', {
+                error: error instanceof Error ? error.message : String(error),
+            });
             const response: IBaseResponse<never> = {
                 success: false,
                 error: {
