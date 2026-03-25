@@ -862,7 +862,6 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         const liveKey: 'speakerALive' | 'speakerBLive' =
             phase === EPhase.SpeakerA ? 'speakerALive' : 'speakerBLive';
         const wasRecording: boolean = this.data.isRecording;
-        const wasRecording: boolean = this.data.isRecording;
 
         // 强制停止语音识别，并在 ASR 完成后发送控制消息并显示切换提示（确保录音结果先到后端）
         if (this.asrManager && wasRecording) {
