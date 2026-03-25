@@ -8,17 +8,18 @@
  *
  * Structured mode activates when there is exactly one argument and it is a
  * plain (non-Error) object. This produces top-level JSON fields for
- * grep-ability (e.g. grep roomId in logs/combined.log).
+ * grep-ability (e.g. grep roomId in logs/combined-YYYY-MM-DD.log).
  *
  * Transports:
  *   - Console: colorized readable format (dev) or JSON (prod)
- *   - logs/error.log: error level only, always JSON
- *   - logs/combined.log: all levels, always JSON
+ *   - logs/error-YYYY-MM-DD.log: error level only, always JSON, rotated daily
+ *   - logs/combined-YYYY-MM-DD.log: all levels, always JSON, rotated daily
  *
  * Log level is controlled by LOG_LEVEL env var (default: info).
  */
 
 import winston from 'winston';
+import DailyRotateFile from 'winston-daily-rotate-file';
 
 const { combine, timestamp, errors, json, printf } = winston.format;
 
@@ -81,14 +82,20 @@ const winstonLogger = winston.createLogger({
         new winston.transports.Console({
             format: isDev ? devConsoleFormat : jsonFormat,
         }),
-        new winston.transports.File({
-            filename: 'logs/error.log',
+        new DailyRotateFile({
+            dirname: 'logs',
+            filename: 'error-%DATE%.log',
+            datePattern: 'YYYY-MM-DD',
             level: 'error',
             format: jsonFormat,
+            maxFiles: '30d',
         }),
-        new winston.transports.File({
-            filename: 'logs/combined.log',
+        new DailyRotateFile({
+            dirname: 'logs',
+            filename: 'combined-%DATE%.log',
+            datePattern: 'YYYY-MM-DD',
             format: jsonFormat,
+            maxFiles: '30d',
         }),
     ],
 });

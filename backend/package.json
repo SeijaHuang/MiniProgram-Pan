@@ -23,6 +23,7 @@
         "openai": "^4.77.0",
         "tencentcloud-sdk-nodejs-sts": "^4.1.100",
         "winston": "^3.19.0",
+        "winston-daily-rotate-file": "^5.0.0",
         "ws": "^8.19.0",
         "zod": "^3.24.0"
     },
