@@ -67,9 +67,11 @@ export class WebSocketController {
      * Routes message to appropriate handler based on type
      */
     static handleMessage(connectionId: string, data: RawData): void {
+        let messageType = 'unknown';
         try {
             const messageText = WebSocketController.rawDataToText(data);
             const message = JSON.parse(messageText) as IWSMessage;
+            messageType = String(message.type);
 
             // Route message to appropriate handler
             switch (message.type) {
@@ -144,6 +146,11 @@ export class WebSocketController {
                     break;
 
                 default:
+                    logger.warn('ws.validation_failed', {
+                        connectionId,
+                        type: messageType,
+                        error: `Unknown message type: ${message.type}`,
+                    });
                     WebSocketController.sendError(
                         connectionId,
                         EWSErrorCode.InvalidPayload,
@@ -151,7 +158,12 @@ export class WebSocketController {
                     );
             }
         } catch (error) {
-            logger.error('WSController', 'Message handling error:', error);
+            logger.error('ws.internal_error', {
+                connectionId,
+                type: messageType,
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+            });
             WebSocketController.sendError(
                 connectionId,
                 EWSErrorCode.InternalError,
@@ -196,6 +208,13 @@ export class WebSocketController {
                 timestamp: joinAckTimestamp,
             });
         }
+
+        logger.info('ws.join_room', {
+            roomId: result.room.roomId,
+            userId: result.userId,
+            nickname: message.data.nickname,
+            roomStatus: result.room.status,
+        });
 
         // If room is ready (2 players), initialize drum game and wait for
         // frontend to send DRUM_START_REQUEST before launching
@@ -589,6 +608,10 @@ export class WebSocketController {
             'WSController',
             `Speech turn end for user ${result.userId} in room ${result.roomId}`
         );
+        logger.info('ws.speech_turn_end', {
+            roomId: result.roomId,
+            userId: result.userId,
+        });
 
         if (result.bothFinished) {
             // Both players finished, broadcast CHAT_COMPLETE and trigger verdict
@@ -596,6 +619,7 @@ export class WebSocketController {
                 'WSController',
                 `Chat complete, triggering verdict generation for room ${result.roomId}`
             );
+            logger.info('ws.chat_complete', { roomId: result.roomId });
 
             const chatCompleteData: IChatCompleteData = {
                 roomId: result.roomId,
@@ -775,6 +799,11 @@ export class WebSocketController {
         logger.log('WSController', `Client disconnected: ${connectionId}`);
 
         const connection = connectionManager.getConnection(connectionId);
+        logger.info('ws.disconnected', {
+            connectionId,
+            roomId: connection?.roomId,
+            userId: connection?.userId,
+        });
 
         if (connection?.userId && connection?.roomId) {
             const room = roomManager.getRoomById(connection.roomId);
@@ -812,6 +841,12 @@ export class WebSocketController {
         code: EWSErrorCode,
         message: string
     ): void {
+        if (code === EWSErrorCode.InvalidPayload) {
+            logger.warn('ws.validation_failed', {
+                connectionId,
+                error: message,
+            });
+        }
         connectionManager.sendToConnection(connectionId, {
             type: EWSMessageType.Error,
             data: {

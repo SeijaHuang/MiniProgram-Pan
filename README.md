@@ -33,12 +33,15 @@
 │   └── utils/            # 工具函数
 │
 ├── backend/              # Node.js 后端
+│   ├── logs/             # 运行日志 (error.log, combined.log)
 │   └── src/
 │       ├── routes/       # HTTP 路由
 │       ├── controllers/  # 控制器
+│       ├── middleware/   # Express 中间件 (requestLogger)
 │       ├── services/     # 业务逻辑 (core, websocket, handlers)
 │       ├── models/       # 数据模型
-│       └── types/        # 类型定义
+│       ├── types/        # 类型定义
+│       └── utils/        # 工具函数 (Winston logger)
 │
 └── docs/                 # 项目文档
     ├── miniprogram/      # 前端文档 (页面、组件、服务)
@@ -92,9 +95,20 @@ npm run prepare    # 初始化 Husky
 ```bash
 npm run dev        # 开发模式 (tsx watch, 热重载)
 npm run build      # 编译 TypeScript
-npm start          # 生产模式
+npm start          # 生产模式 (自动创建 logs/ 目录)
 npm run lint       # ESLint 检查
 ```
+
+### 日志
+
+后端使用 Winston 结构化日志，日志文件写入 `backend/logs/`：
+
+| 文件                | 内容                     |
+| ------------------- | ------------------------ |
+| `logs/combined.log` | 所有级别，JSON 格式      |
+| `logs/error.log`    | 仅 error 级别，JSON 格式 |
+
+开发环境 Console 输出彩色可读格式，生产环境输出 JSON。通过 `LOG_LEVEL` 环境变量控制级别（默认 `info`）。
 
 ## 核心功能
 

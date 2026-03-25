@@ -13,23 +13,30 @@ import type {
     IJoinAckMessage,
     IJoinAckData,
 } from '../types/room-websocket';
+import type { IErrorMessage, IErrorData } from '../types/websocket-common';
 import { EWSMessageType } from '../types/websocket-common';
 import { logger } from '../utils/logger';
 
 import { wsManager } from './websocket-manager';
 
 type JoinAckHandler = (data: IJoinAckData) => void;
+type JoinErrorHandler = (error: IErrorData) => void;
 
 class RoomWebSocketService {
     private currentRoomCode: string | null = null;
     private currentNickname: string | null = null;
     private joinAckHandler: JoinAckHandler | null = null;
+    private joinErrorHandler: JoinErrorHandler | null = null;
 
     /**
      * Initialize WebSocket connection for room operations
      */
-    initialize(onJoinAck: JoinAckHandler): void {
+    initialize(
+        onJoinAck: JoinAckHandler,
+        onJoinError?: JoinErrorHandler
+    ): void {
         this.joinAckHandler = onJoinAck;
+        this.joinErrorHandler = onJoinError ?? null;
 
         wsManager.updateCallbacks({
             onMessage: (data: string) => {
@@ -75,10 +82,12 @@ class RoomWebSocketService {
      */
     private handleMessage(data: string): void {
         try {
-            const message = JSON.parse(data) as IJoinAckMessage;
+            const message = JSON.parse(data) as IJoinAckMessage | IErrorMessage;
 
             if (message.type === EWSMessageType.JoinAck) {
                 this.handleJoinAck(message);
+            } else if (message.type === EWSMessageType.Error) {
+                this.handleError(message);
             }
             // Other message types will be handled by other services
         } catch (error) {
@@ -94,6 +103,17 @@ class RoomWebSocketService {
 
         if (this.joinAckHandler) {
             this.joinAckHandler(message.data);
+        }
+    }
+
+    /**
+     * Handle ERROR message
+     */
+    private handleError(message: IErrorMessage): void {
+        logger.error('RoomWS', 'ERROR received:', message.data);
+
+        if (this.joinErrorHandler) {
+            this.joinErrorHandler(message.data);
         }
     }
 

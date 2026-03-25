@@ -33,6 +33,8 @@ export class LlmJudgementController {
      * - 502: LLM call failed
      */
     static async createJudgment(req: Request, res: Response): Promise<void> {
+        let llmRoomId: string | undefined;
+        let llmStartMs = 0;
         try {
             // Validate path params
             const paramResult = RoomIdParamSchema.safeParse(req.params);
@@ -68,6 +70,7 @@ export class LlmJudgementController {
 
             const { roomId } = paramResult.data;
             const { idempotencyKey } = bodyResult.data;
+            llmRoomId = roomId;
 
             // Look up room to get participant identity and accumulated speech
             const room = roomManager.getRoomById(roomId);
@@ -87,6 +90,8 @@ export class LlmJudgementController {
             const texts = room.speechState?.texts ?? {};
 
             // Call service (synchronous LLM call)
+            llmStartMs = Date.now();
+            logger.info('llm.judgment.start', { roomId });
             const result: IJudgmentResponse =
                 await llmJudgementService.createJudgment(roomId, {
                     player1: {
@@ -110,6 +115,10 @@ export class LlmJudgementController {
                 success: true,
                 data: result,
             };
+            logger.info('llm.judgment.ok', {
+                roomId: llmRoomId,
+                durationMs: Date.now() - llmStartMs,
+            });
             res.status(200).json(response);
         } catch (error: unknown) {
             logger.error(
@@ -117,6 +126,11 @@ export class LlmJudgementController {
                 'createJudgment failed:',
                 error instanceof Error ? error.message : String(error)
             );
+            logger.error('llm.judgment.failed', {
+                roomId: llmRoomId,
+                durationMs: Date.now() - llmStartMs,
+                error: error instanceof Error ? error.message : String(error),
+            });
 
             const response: IBaseResponse<never> = {
                 success: false,

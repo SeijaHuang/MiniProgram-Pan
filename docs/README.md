@@ -281,7 +281,7 @@ docs/
     - 错误代码体系
     - 错误响应格式
     - 异常场景处理
-    - 日志记录
+    - 结构化日志（Winston）：`ws.internal_error`、`ws.validation_failed`
 
 #### 06. 震天鼓游戏
 
@@ -310,8 +310,9 @@ docs/
 - **功能**: ASR 临时安全凭证分发
 - **核心内容**:
     - GET /v1/tencent/credentials 接口
-    - STS 凭证缓存机制
+    - STS 凭证缓存机制（24h 有效期，1min 刷新阈值）
     - 权限限制和安全说明
+    - 结构化日志：`tencent.credentials.ok`、`tencent.credentials.failed`
 
 #### 09. LLM 判决书生成
 

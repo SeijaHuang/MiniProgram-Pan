@@ -31,6 +31,7 @@ export function initWebSocket(server: HttpServer): void {
 
         // Register connection
         connectionManager.registerConnection(connectionId, ws);
+        logger.info('ws.connected', { connectionId });
 
         logger.log(
             'WS',

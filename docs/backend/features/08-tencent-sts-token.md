@@ -328,13 +328,19 @@ curl -X GET http://localhost:8080/v1/tencent/credentials
 
 ### 日志记录
 
-```typescript
-// 成功获取 Token
-console.log('[TencentController] STS token retrieved successfully');
+后端使用 Winston 结构化日志：
 
-// 失败情况
-console.error('[TencentController] Get STS token failed:', error);
+```typescript
+// 成功获取 Token（使用缓存或新获取）
+logger.info('tencent.credentials.ok', {});
+
+// 失败情况（包含错误信息，不含凭证值）
+logger.error('tencent.credentials.failed', {
+    error: error instanceof Error ? error.message : String(error),
+});
 ```
+
+日志事件可在 `logs/combined.log` 中按 `"event":"tencent.credentials.ok"` 或 `"event":"tencent.credentials.failed"` 过滤。
 
 ### 建议的监控指标
 
@@ -347,35 +353,25 @@ console.error('[TencentController] Get STS token failed:', error);
 
 ## 性能考虑
 
-### Token 缓存策略（可选优化）
+### Token 缓存策略
 
-当前实现每次请求都调用腾讯云 STS API。如果请求频繁，可以考虑在后端缓存 Token：
+当前实现已在 `TencentController` 中内置 Token 缓存，避免每次请求都调用腾讯云 STS API：
+
+- Token 有效期设为 **24 小时**（`TOKEN_DURATION_SECONDS = 24 * 60 * 60`）
+- 刷新阈值为 **1 分钟**（`REFRESH_THRESHOLD_SECONDS = 60`）：剩余有效期不足 1 分钟时才重新获取
+- 缓存存储在模块级 `cachedToken` 变量中（进程内单例）
 
 ```typescript
-// 伪代码示例（未实现）
-class TokenCache {
-    private cachedToken: GetFederationTokenResponse | null = null;
-    private expireTime: number = 0;
-
-    async getToken(): Promise<GetFederationTokenResponse> {
-        const now = Date.now() / 1000;
-        
-        // 如果 Token 还有 5 分钟以上有效期，直接返回缓存
-        if (this.cachedToken && this.expireTime - now > 300) {
-            return this.cachedToken;
-        }
-
-        // 否则重新获取
-        this.cachedToken = await stsClient.GetFederationToken(...);
-        this.expireTime = this.cachedToken.ExpiredTime;
-        
-        return this.cachedToken;
-    }
+// 缓存检查逻辑（tencent-controller.ts）
+private static _isTokenValid(token: GetFederationTokenResponse): boolean {
+    const currentTimeSeconds = Math.floor(Date.now() / 1000);
+    const remainingSeconds = token.ExpiredTime - currentTimeSeconds;
+    return remainingSeconds > REFRESH_THRESHOLD_SECONDS;
 }
 ```
 
-**优点**: 减少对腾讯云 STS API 的调用次数
-**缺点**: 增加实现复杂度，需要处理多实例缓存一致性
+**优点**: 显著减少对腾讯云 STS API 的调用次数，降低延迟和费用
+**注意**: 缓存仅在单进程内有效；多实例部署时每个实例独立缓存
 
 ---
 

@@ -11,6 +11,8 @@ import { roomService } from '../../../services/room-service';
 import { roomWebSocketService } from '../../../services/room-websocket-service';
 import { wsManager } from '../../../services/websocket-manager';
 import type { IJoinAckData } from '../../../types/room-websocket';
+import type { IErrorData } from '../../../types/websocket-common';
+import { EWSErrorCode } from '../../../types/websocket-common';
 import { logger } from '../../../utils/logger';
 
 /**
@@ -196,9 +198,14 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             },
         });
 
-        roomWebSocketService.initialize((data: IJoinAckData) => {
-            this.handleRoomJoined(data);
-        });
+        roomWebSocketService.initialize(
+            (data: IJoinAckData) => {
+                this.handleRoomJoined(data);
+            },
+            (error: IErrorData) => {
+                this.handleJoinError(error);
+            }
+        );
     },
 
     /**
@@ -555,18 +562,6 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             roomCodeInput,
             nicknameService.getNickName()
         );
-
-        // 设置超时处理
-        setTimeout(() => {
-            if (!this.data.currentRoom) {
-                void wx.hideLoading();
-                this.isJoiningRoom = false;
-                this.setData({
-                    errorType: 'not_found',
-                    errorMessage: '加入超时，请重试',
-                });
-            }
-        }, 5000);
     },
 
     /**
@@ -650,6 +645,26 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             // 启动倒计时，准备进入击鼓房间
             this.startCountdown();
         }
+    },
+
+    /**
+     * 处理房间加入失败
+     */
+    handleJoinError(error: IErrorData): void {
+        void wx.hideLoading();
+        this.isJoiningRoom = false;
+
+        const errorMap: Partial<Record<EWSErrorCode, ErrorType>> = {
+            [EWSErrorCode.RoomNotFound]: 'not_found',
+            [EWSErrorCode.RoomFull]: 'full',
+            [EWSErrorCode.RoomClosed]: 'started',
+        };
+
+        const errorType: ErrorType = errorMap[error.code] ?? 'not_found';
+        this.setData({
+            errorType,
+            errorMessage: ERROR_MESSAGES[errorType],
+        });
     },
 
     /**

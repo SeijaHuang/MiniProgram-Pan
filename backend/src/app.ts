@@ -13,11 +13,15 @@ import roomRoutes from './routes/room-routes';
 import llmJudgementRoutes from './routes/llm-judgement.routes';
 import tencentRoutes from './routes/tencent-routes';
 import verdictRoutes from './routes/verdict-routes';
+import { requestLogger } from './middleware/requestLogger';
 
 const app = express();
 
 // Parse JSON request bodies
 app.use(express.json());
+
+// Log all HTTP requests
+app.use(requestLogger);
 
 /**
  * Health check endpoint

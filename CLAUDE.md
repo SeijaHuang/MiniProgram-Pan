@@ -314,6 +314,7 @@ Required environment variables (see `backend/.env.example`):
 PORT=8080
 NODE_ENV=development
 WS_PATH=/ws
+LOG_LEVEL=debug                        # Winston log level: debug|info|warn|error (default: info)
 TENCENT_SECRET_ID=your_secret_id      # Required for ASR service
 TENCENT_SECRET_KEY=your_secret_key    # Required for ASR service
 TENCENT_REGION=ap-guangzhou           # Required for ASR service

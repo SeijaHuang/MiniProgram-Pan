@@ -50,8 +50,10 @@ Three-layer architecture: Routes → Controllers → Services
 | File | Purpose |
 |------|---------|
 | `src/index.ts` | Entry point, creates HTTP server, calls `initWebSocket()` |
-| `src/app.ts` | Express app — only `express.json()` middleware + routes |
+| `src/app.ts` | Express app — `express.json()` + `requestLogger` middleware + routes |
 | `src/ws.ts` | WebSocket init, assigns `conn_*` IDs, delegates to controller |
+| `src/utils/logger.ts` | Winston logger — dual API: legacy `log(tag, msg)` + structured `info(event, { meta })` |
+| `src/middleware/requestLogger.ts` | Express middleware — logs every HTTP request with method/path/status/durationMs |
 | `src/controllers/ws-controller.ts` | Central message router — routes messages AND orchestrates drum game timing + verdict generation |
 | `src/controllers/verdict-http.controller.ts` | GET /v1/rooms/:roomId/verdict — fallback to fetch cached verdict |
 | `src/services/core/verdict-orchestrator.service.ts` | Async verdict generation (LLM call + mapping + WS push) |
@@ -105,7 +107,6 @@ Schemas are in `src/models/schemas/`: `http-request.schema.ts`, `ws-message.sche
 - **Database**: MongoDB config in `src/database/` — stubbed, not connected. All storage is in-memory via `room-manager.ts`
 - **Repository layer**: Interfaces in `src/repositories/` — defined but no implementations
 - **room-crud.service.ts**: All methods throw "Not implemented"
-- **Middleware**: Error handler, request logger, and validation middleware are defined in `src/middlewares/` but **not used** by `app.ts`
 
 ## Adding New WebSocket Message Types
 
@@ -163,12 +164,20 @@ Key constants in `src/constants/config.ts`:
 Required (see `.env.example`):
 ```bash
 PORT=8080
-NODE_ENV=development
+NODE_ENV=development       # 'production' enables JSON console output
 WS_PATH=/ws
-TENCENT_SECRET_ID=...    # Required for ASR STS tokens
+LOG_LEVEL=debug            # Winston log level: debug | info | warn | error (default: info)
+TENCENT_SECRET_ID=...      # Required for ASR STS tokens
 TENCENT_SECRET_KEY=...
 TENCENT_REGION=ap-guangzhou
 ```
+
+In CI/CD (`deploy.yml`), `NODE_ENV` and `LOG_LEVEL` are derived from the deployment environment:
+
+| Environment | `NODE_ENV` | `LOG_LEVEL` |
+|-------------|------------|-------------|
+| `trial` | `development` | `debug` (all levels) |
+| `release` | `production` | `info` (info/warn/error) |
 
 Note: `.env.example` contains additional unused variables (OpenAI, LLM Worker) — only the above are read by the code.
 

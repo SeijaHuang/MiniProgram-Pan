@@ -5,7 +5,7 @@
     "scripts": {
         "dev": "tsx watch src/index.ts",
         "build": "tsc",
-        "start": "node dist/index.js",
+        "start": "mkdir -p logs && node dist/index.js",
         "ws:test": "ts-node scripts/ws-test.ts",
         "test:llm": "ts-node scripts/test-llm-e2e.ts",
         "lint": "eslint . --ext .ts",
@@ -22,6 +22,7 @@
         "express": "^5.2.1",
         "openai": "^4.77.0",
         "tencentcloud-sdk-nodejs-sts": "^4.1.100",
+        "winston": "^3.19.0",
         "ws": "^8.19.0",
         "zod": "^3.24.0"
     },

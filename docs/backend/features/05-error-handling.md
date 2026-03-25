@@ -668,16 +668,26 @@ Page({
 
 ### 服务器日志
 
+后端使用 Winston 结构化日志，所有错误通过 `logger` 记录为 JSON 字段，便于按 `roomId`、`connectionId` 等过滤：
+
 ```typescript
-// 记录所有错误
-console.error(`[Error] ${code}: ${message}`, {
-  connectionId,
-  userId,
-  roomId,
-  context,
-  timestamp: new Date().toISOString()
+// WebSocket 内部异常（ws-controller.ts）
+logger.error('ws.internal_error', {
+    connectionId,
+    type: messageType,   // 触发异常的消息类型
+    error: errorMessage,
+    stack: error instanceof Error ? error.stack : undefined,
+});
+
+// 消息格式验证失败（ws-controller.ts）
+logger.warn('ws.validation_failed', {
+    connectionId,
+    type: messageType,
+    error: errorMessage,
 });
 ```
+
+日志输出到 `logs/error.log`（仅 error 级别）和 `logs/combined.log`（所有级别），开发环境同时输出彩色可读格式到 console。
 
 ### 客户端日志
 
