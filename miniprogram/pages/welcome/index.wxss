@@ -97,3 +97,17 @@
     transform: scale(0);
 }
 
+/* 备案信息 */
+.welcome-page__icp {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 20rpx 0 40rpx;
+}
+
+.welcome-page__icp-text {
+    font-size: 22rpx;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: 1rpx;
+}
+
