@@ -41,4 +41,9 @@
         ></styled-button>
     </view>
 
+    <!-- 备案信息 -->
+    <view class="welcome-page__icp">
+        <text class="welcome-page__icp-text">沪ICP备2026007177号</text>
+    </view>
+
 </view>
