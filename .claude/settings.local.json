@@ -14,7 +14,10 @@
             "Bash(findstr:*)",
             "Bash(npx prettier:*)",
             "Bash(cd:*)",
-            "Bash(npm install:*)"
+            "Bash(npm install:*)",
+            "Bash(cat)",
+            "Read(//tmp/**)",
+            "Bash(xargs grep:*)"
         ]
     }
 }
