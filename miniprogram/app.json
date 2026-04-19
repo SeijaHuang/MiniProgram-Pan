@@ -14,6 +14,11 @@
             "provider": "wx3e17776051baf153"
         }
     },
+    "permission": {
+        "scope.record": {
+            "desc": "需要使用麦克风进行语音识别，方便您向判官诉说心声"
+        }
+    },
     "subPackages": [
         {
             "name": "packageA",

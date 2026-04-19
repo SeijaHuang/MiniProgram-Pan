@@ -125,6 +125,8 @@ interface IChatRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     // ASR 完成后的待执行动作（用于确保录音结果先于控制消息发出）
     pendingAfterAsrComplete: TPendingAsrAction | null;
     pendingAfterAsrCompleteTimerId: number | null;
+    // 麦克风权限被明确拒绝（通过预检知道，不触发 re-render）
+    micPermissionDenied: boolean;
 }
 
 const EMOJI_LIST = [
@@ -244,6 +246,7 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     isSelfFirstSpeaker: false,
     pendingAfterAsrComplete: null,
     pendingAfterAsrCompleteTimerId: null,
+    micPermissionDenied: false,
 
     onLoad(_options): void {
         const app = getApp<IAppOption>();
@@ -318,7 +321,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             this.prewarmStsCredentials();
         }
 
-        // 权限检查移到用户按下麦克风时进行
+        // 预检麦克风权限状态（缓存 granted/denied，避免 touchstart 时走 getSetting 异步链）
+        this.preCheckMicPermission();
     },
 
     onShow(): void {
@@ -727,50 +731,25 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     },
 
     /**
-     * 检查麦克风权限
-     * 用户按下麦克风时调用，权限通过后启动倒计时并开始录音
+     * 预检麦克风权限状态（在 onLoad 中调用）
+     * 缓存 granted / denied 状态，使 touchstart 时无需再走 getSetting 异步链。
+     * 未请求过（undefined）不做处理，等用户按麦时直接调 wx.authorize。
      */
-    checkMicrophonePermission(): void {
+    preCheckMicPermission(): void {
         wx.getSetting({
             success: res => {
-                const recordAuth = res.authSetting['scope.record'];
-                if (recordAuth === true) {
-                    // 已有权限，启动倒计时并开始录音
-                    this.onMicPermissionGranted();
-                } else if (recordAuth === false) {
-                    // 用户之前拒绝过，显示弹窗引导去设置
-                    this.showMicPermissionDeniedModal();
-                } else {
-                    // 未请求过，请求权限
-                    this.requestMicrophonePermission();
+                const auth = res.authSetting['scope.record'];
+                if (auth === true) {
+                    this.setData({ hasMicPermission: true });
+                } else if (auth === false) {
+                    this.micPermissionDenied = true;
                 }
             },
-            fail: () => {
-                // 获取设置失败，尝试请求权限
-                this.requestMicrophonePermission();
-            },
         });
     },
 
     /**
-     * 请求麦克风权限
-     */
-    requestMicrophonePermission(): void {
-        wx.authorize({
-            scope: 'scope.record',
-            success: () => {
-                // 授权成功，启动倒计时并开始录音
-                this.onMicPermissionGranted();
-            },
-            fail: () => {
-                // 授权失败，显示弹窗
-                this.showMicPermissionDeniedModal();
-            },
-        });
-    },
-
-    /**
-     * 显示麦克风权限被拒绝的弹窗
+     * 显示麦克风权限被拒绝的弹窗，引导用户前往系统设置开启
      */
     showMicPermissionDeniedModal(): void {
         void wx.showModal({
@@ -785,7 +764,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
                             if (
                                 settingRes.authSetting['scope.record'] === true
                             ) {
-                                // 用户在设置中开启了权限，启动倒计时并开始录音
+                                // 用户在设置中开启了权限
+                                this.micPermissionDenied = false;
                                 this.onMicPermissionGranted();
                             } else {
                                 // 用户仍未开启权限，再次显示弹窗
@@ -1109,7 +1089,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
     /**
      * 麦克风按下
-     * 首次按下时检查权限，权限通过后启动倒计时并开始录音
+     * 首次按下时在用户手势上下文中直接请求权限，避免经过 getSetting 异步链。
+     * 正式版中 wx.authorize 必须在手势上下文内发起，否则授权弹窗不会出现。
      */
     onMicTouchStart(): void {
         if (!this.data.canSpeak) {
@@ -1119,17 +1100,29 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
         // 手指按下：立即进入"连接中"状态
         this.setData({ micPressed: true });
 
-        // 如果已有权限，直接开始录音
         if (this.data.hasMicPermission) {
-            // 首次按下麦克风时启动倒计时
+            // 已有权限，直接开始录音
             if (!this.timerId) {
                 this.startTimer();
             }
             void wx.vibrateShort({ type: 'light' });
             this.startRecording();
+        } else if (this.micPermissionDenied) {
+            // 已知被拒绝，直接引导去设置（无需再调 wx.authorize）
+            this.showMicPermissionDeniedModal();
         } else {
-            // 没有权限，先检查并请求权限
-            this.checkMicrophonePermission();
+            // 未请求过：在用户手势上下文中直接调用 wx.authorize
+            // 不经过 wx.getSetting 的异步链，确保正式版授权弹窗正常弹出
+            wx.authorize({
+                scope: 'scope.record',
+                success: () => {
+                    this.onMicPermissionGranted();
+                },
+                fail: () => {
+                    this.micPermissionDenied = true;
+                    this.showMicPermissionDeniedModal();
+                },
+            });
         }
     },
 
