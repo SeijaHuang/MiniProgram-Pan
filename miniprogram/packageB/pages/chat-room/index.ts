@@ -786,12 +786,15 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
     onMicPermissionGranted(): void {
         this.setData({ hasMicPermission: true });
 
-        // 启动倒计时
+        // 授权完成时按钮可能已松开（auth 流中已提前重置 micPressed）
+        // 仅在仍按住的情况下才启动录音，否则等用户重新按下
+        if (!this.data.micPressed) {
+            return;
+        }
+
         if (!this.timerId) {
             this.startTimer();
         }
-
-        // 震动反馈并开始录音
         void wx.vibrateShort({ type: 'light' });
         this.startRecording();
     },
@@ -1089,41 +1092,109 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
 
     /**
      * 麦克风按下
-     * 首次按下时在用户手势上下文中直接请求权限，避免经过 getSetting 异步链。
-     * 正式版中 wx.authorize 必须在手势上下文内发起，否则授权弹窗不会出现。
+     * 首次按下时先完成隐私授权，再申请 scope.record 权限。
      */
     onMicTouchStart(): void {
         if (!this.data.canSpeak) {
             return;
         }
 
-        // 手指按下：立即进入"连接中"状态
         this.setData({ micPressed: true });
 
         if (this.data.hasMicPermission) {
-            // 已有权限，直接开始录音
             if (!this.timerId) {
                 this.startTimer();
             }
             void wx.vibrateShort({ type: 'light' });
             this.startRecording();
         } else if (this.micPermissionDenied) {
-            // 已知被拒绝，直接引导去设置（无需再调 wx.authorize）
             this.showMicPermissionDeniedModal();
         } else {
-            // 未请求过：在用户手势上下文中直接调用 wx.authorize
-            // 不经过 wx.getSetting 的异步链，确保正式版授权弹窗正常弹出
-            wx.authorize({
-                scope: 'scope.record',
-                success: () => {
-                    this.onMicPermissionGranted();
-                },
-                fail: () => {
-                    this.micPermissionDenied = true;
-                    this.showMicPermissionDeniedModal();
-                },
-            });
+            this.setData({ micPressed: false });
+            this.requestRecordPermission();
         }
+    },
+
+    /**
+     * 四步授权流程：
+     * ① 检查是否需要隐私授权（wx.getPrivacySetting）
+     * ② 需要则弹出隐私协议弹窗，用户点同意后继续
+     * ③ 调用 wx.requirePrivacyAuthorize 完成 WeChat 侧授权登记
+     * ④ 调用 wx.authorize({scope:'scope.record'}) 申请麦克风权限
+     */
+    requestRecordPermission(): void {
+        wx.getPrivacySetting({
+            success: res => {
+                if (res.needAuthorization) {
+                    void wx.showModal({
+                        title: '隐私保护提示',
+                        content: `本小程序需要使用麦克风进行语音识别，请阅读并同意《${res.privacyContractName}》。`,
+                        confirmText: '同意',
+                        cancelText: '拒绝',
+                        success: modalRes => {
+                            if (!modalRes.confirm) {
+                                return;
+                            }
+                            wx.requirePrivacyAuthorize({
+                                success: () => {
+                                    this.doAuthorizeRecord();
+                                },
+                                fail: () => {
+                                    void wx.showToast({
+                                        title: '隐私授权失败，请再次按住麦克风以授权录音',
+                                        icon: 'none',
+                                        duration: 2000,
+                                    });
+                                },
+                            });
+                        },
+                    });
+                } else {
+                    this.doAuthorizeRecord();
+                }
+            },
+            fail: () => {
+                void wx.showToast({
+                    title: '请再次按住麦克风以授权录音',
+                    icon: 'none',
+                    duration: 2000,
+                });
+            },
+        });
+    },
+
+    /**
+     * 申请 scope.record 并处理结果
+     * scope.record === false  → 用户明确拒绝 → 引导去小程序设置
+     * scope.record === undefined → 用户划掉弹窗 → 提示重试，不锁定状态
+     */
+    doAuthorizeRecord(): void {
+        wx.authorize({
+            scope: 'scope.record',
+            success: () => {
+                this.onMicPermissionGranted();
+            },
+            fail: () => {
+                wx.getSetting({
+                    success: settingRes => {
+                        if (settingRes.authSetting['scope.record'] === false) {
+                            this.micPermissionDenied = true;
+                            this.showMicPermissionDeniedModal();
+                        } else {
+                            void wx.showToast({
+                                title: '请再次按住麦克风以授权录音',
+                                icon: 'none',
+                                duration: 2000,
+                            });
+                        }
+                    },
+                    fail: () => {
+                        this.micPermissionDenied = true;
+                        this.showMicPermissionDeniedModal();
+                    },
+                });
+            },
+        });
     },
 
     /**
@@ -1227,7 +1298,8 @@ Page<IChatRoomPageData, IChatRoomCustomOption>({
             logger.log('ChatRoom', 'Got STS credentials');
 
             // 使用临时凭证启动 ASR
-            if (this.asrManager) {
+            // STS 请求是异步的，期间用户可能已松开按钮，此时不再建立连接
+            if (this.asrManager && this.data.micPressed) {
                 this.asrManager.start({
                     secretkey: credentials.TmpSecretKey,
                     secretid: credentials.TmpSecretId,
