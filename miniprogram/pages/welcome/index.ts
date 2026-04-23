@@ -140,4 +140,22 @@ Page<WelcomePageData, WechatMiniprogram.Page.CustomOption>({
             });
         }, 250);
     },
+
+    onShareAppMessage(
+        _options: WechatMiniprogram.Page.IShareAppMessageOption
+    ): WechatMiniprogram.Page.ICustomShareContent {
+        return {
+            title: '判了么 · 清汤大老爷在线断案',
+            path: '/pages/welcome/index',
+            imageUrl: '/assets/logo.jpg',
+        };
+    },
+
+    onShareTimeline(): { title: string; query: string; imageUrl: string } {
+        return {
+            title: '将争吵转化为游戏 · 在爆笑中和好如初',
+            query: '',
+            imageUrl: '/assets/logo.jpg',
+        };
+    },
 });
