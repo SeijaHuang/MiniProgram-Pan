@@ -20,7 +20,7 @@ interface IEnvConfig {
 }
 
 /** LAN IP for real device testing in develop mode */
-const LAN_IP: string = '192.168.31.204';
+const LAN_IP: string = '192.168.31.205';
 
 const ENV_CONFIGS = {
     devtools: {

@@ -78,7 +78,7 @@ interface IWaitingRoomCustomOption extends WechatMiniprogram.Page.CustomOption {
     confirmButtonAnim: WechatMiniprogram.Animation | null;
     isCreatingRoom: boolean;
     isJoiningRoom: boolean;
-    pendingRoomId: string | null;
+    pendingAction: 'host' | 'join' | 'confirm_join' | null;
 }
 
 /**
@@ -144,7 +144,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
     // 请求锁
     isCreatingRoom: false,
     isJoiningRoom: false,
-    pendingRoomId: null,
+    pendingAction: null,
 
     onLoad(options: IWaitingRoomOnLoadOptions): void {
         this.initAnimations();
@@ -155,14 +155,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         });
 
         const roomId = options['room_id'] ?? null;
-        const storedNick: string = wx.getStorageSync('userNickName') || '';
-
-        if (!storedNick) {
-            // 未设置昵称：先弹昵称框，房间号暂存
-            this.pendingRoomId = roomId;
-            this.openNicknameModal();
-        } else if (roomId) {
-            // 已有昵称且是分享链接进入：直接弹加入房间框
+        if (roomId) {
             this.showJoinModalWithCode(roomId);
         }
     },
@@ -269,14 +262,8 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
         }
 
         nicknameService.saveNickName(nicknameInput);
-
         this.setData({ showNicknameModal: false });
-
-        if (this.pendingRoomId) {
-            const rid = this.pendingRoomId;
-            this.pendingRoomId = null;
-            this.showJoinModalWithCode(rid);
-        }
+        this.executePendingAction();
     },
 
     /**
@@ -284,11 +271,35 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      */
     onNicknameSkip(): void {
         this.setData({ showNicknameModal: false });
+        this.executePendingAction();
+    },
 
-        if (this.pendingRoomId) {
-            const rid = this.pendingRoomId;
-            this.pendingRoomId = null;
-            this.showJoinModalWithCode(rid);
+    /**
+     * 昵称弹窗关闭后，根据 pendingAction 执行后续操作
+     */
+    executePendingAction(): void {
+        const action = this.pendingAction;
+        this.pendingAction = null;
+        if (action === 'host') {
+            void this.createRoom();
+        } else if (action === 'join') {
+            this.setData({
+                showJoinModal: true,
+                roomCodeInput: '',
+                roomCodeDisplay: ['', '', '', '', '', ''],
+                inputFocus: true,
+                errorType: null,
+                errorMessage: '',
+                isJoinButtonDisabled: true,
+            });
+        } else if (action === 'confirm_join') {
+            const { roomCodeInput } = this.data;
+            this.isJoiningRoom = true;
+            void wx.showLoading({ title: '加入房间中...' });
+            roomWebSocketService.joinRoom(
+                roomCodeInput,
+                nicknameService.getNickName()
+            );
         }
     },
 
@@ -297,7 +308,7 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
      */
     onNicknameModalMaskTap(): void {
         this.setData({ showNicknameModal: false });
-        this.pendingRoomId = null;
+        this.pendingAction = null;
     },
 
     /**
@@ -399,6 +410,15 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             'hostButtonAnimation'
         );
 
+        const storedNick: string = wx.getStorageSync('userNickName') || '';
+        if (!storedNick) {
+            this.pendingAction = 'host';
+            setTimeout(() => {
+                this.openNicknameModal();
+            }, 200);
+            return;
+        }
+
         setTimeout(() => {
             void this.createRoom();
         }, 200);
@@ -462,6 +482,15 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             this.joinButtonAnim,
             'joinButtonAnimation'
         );
+
+        const storedNick: string = wx.getStorageSync('userNickName') || '';
+        if (!storedNick) {
+            this.pendingAction = 'join';
+            setTimeout(() => {
+                this.openNicknameModal();
+            }, 200);
+            return;
+        }
 
         setTimeout(() => {
             this.setData({
@@ -548,16 +577,18 @@ Page<IWaitingRoomPageData, IWaitingRoomCustomOption>({
             return;
         }
 
-        // 通过 WebSocket 加入房间
-        this.setData({
-            errorType: null,
-            errorMessage: '',
-        });
+        this.setData({ errorType: null, errorMessage: '' });
+
+        // 无昵称：先弹昵称框，确认后再加入
+        const storedNick: string = wx.getStorageSync('userNickName') || '';
+        if (!storedNick) {
+            this.pendingAction = 'confirm_join';
+            this.openNicknameModal();
+            return;
+        }
 
         this.isJoiningRoom = true;
         void wx.showLoading({ title: '加入房间中...' });
-
-        // 发送加入房间消息
         roomWebSocketService.joinRoom(
             roomCodeInput,
             nicknameService.getNickName()

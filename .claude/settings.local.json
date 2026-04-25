@@ -17,7 +17,8 @@
             "Bash(npm install:*)",
             "Bash(cat)",
             "Read(//tmp/**)",
-            "Bash(xargs grep:*)"
+            "Bash(xargs grep:*)",
+            "Bash(ipconfig)"
         ]
     }
 }
